@@ -1,7 +1,7 @@
 import { ReactNode, useState, useEffect } from "react";
 import { FloatingSidebar } from "./FloatingSidebar";
 import { Button, Avatar, Switch } from "@heroui/react";
-import { Settings, Moon, Sun, CloudRain, Maximize2, Minus, X } from "lucide-react";
+import { Settings, Moon, Sun, Maximize2, Minus, X } from "lucide-react";
 import type { Folder } from "../../types";
 
 interface TahoeLayoutProps {
@@ -44,18 +44,15 @@ export function TahoeLayout({
 
     return (
         <div className="flex flex-col h-screen bg-background overflow-hidden">
-            {/* Transparent top bar - drag region */}
-            <header
-                className="window-drag flex items-center justify-between h-12 px-4"
-                style={{ paddingLeft: isWindows ? 16 : 78 }}
-            >
-                {/* Left - App title */}
-                <div className="window-no-drag flex items-center gap-2">
-                    <CloudRain className="size-5 text-primary" />
-                    <h1 className="text-sm font-semibold tracking-tight">Rainy Cowork</h1>
-                </div>
+            {/* Drag region - covers top area for window movement */}
+            <div
+                data-tauri-drag-region
+                className="absolute top-0 right-0 h-10 z-10"
+                style={{ left: 78 }}
+            />
 
-                {/* Right - Controls */}
+            {/* Header with controls - inline, not floating */}
+            <header className="flex items-center justify-end h-10 px-4 shrink-0">
                 <div className="window-no-drag flex items-center gap-2">
                     {/* Theme Toggle */}
                     <div className="flex items-center gap-1.5">
@@ -82,22 +79,22 @@ export function TahoeLayout({
                     <Avatar size="sm">
                         <Avatar.Fallback>RC</Avatar.Fallback>
                     </Avatar>
-                </div>
 
-                {/* Windows Controls - only shown on Windows */}
-                {isWindows && (
-                    <div className="windows-controls flex items-center gap-0.5 ml-4">
-                        <Button variant="ghost" size="sm" aria-label="Minimize">
-                            <Minus className="size-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm" aria-label="Maximize">
-                            <Maximize2 className="size-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm" aria-label="Close" className="hover:bg-red-500 hover:text-white">
-                            <X className="size-4" />
-                        </Button>
-                    </div>
-                )}
+                    {/* Windows Controls - only shown on Windows */}
+                    {isWindows && (
+                        <div className="windows-controls flex items-center gap-0.5 ml-2">
+                            <Button variant="ghost" size="sm" aria-label="Minimize">
+                                <Minus className="size-4" />
+                            </Button>
+                            <Button variant="ghost" size="sm" aria-label="Maximize">
+                                <Maximize2 className="size-4" />
+                            </Button>
+                            <Button variant="ghost" size="sm" aria-label="Close" className="hover:bg-red-500 hover:text-white">
+                                <X className="size-4" />
+                            </Button>
+                        </div>
+                    )}
+                </div>
             </header>
 
             {/* Main content area */}
