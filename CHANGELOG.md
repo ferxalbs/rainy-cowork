@@ -5,6 +5,40 @@ All notable changes to Rainy Cowork will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-01-18
+
+### Added - Cowork Plan Integration
+
+**Rust Backend (`src-tauri/src/`)**
+- `rainy-sdk` v0.4.2 integration for Cowork services
+- `provider.rs` - Updated AIProviderManager with plan-based model access
+- `commands/ai.rs` - New `get_cowork_status` command returning plan info, usage tracking, and feature availability
+- `CoworkStatus` struct with plan, usage, models, and features
+- Caching system for Cowork capabilities (5-minute TTL)
+
+**Frontend (`src/`)**
+- `services/tauri.ts` - Added `CoworkStatus`, `CoworkUsage`, `CoworkFeatures` types
+- `hooks/useCoworkStatus.ts` - New hook for plan status with computed helpers:
+  - `hasPaidPlan`, `plan`, `planName`, `isValid`
+  - `usagePercent`, `remainingUses`, `isOverLimit`
+  - `canUseWebResearch`, `canUseDocumentExport`, `canUseImageAnalysis`
+- `components/settings/SettingsPanel.tsx` - New **Subscription** tab:
+  - Plan display with status badge
+  - Usage progress bar (color-coded)
+  - Remaining uses and reset date
+  - Feature availability checkmarks
+  - Upgrade button for users on Free plan
+
+### Changed
+- `Cargo.toml` - Updated `rainy-sdk` from 0.4.1 to 0.4.2
+- Replaced "premium" terminology with plan-based language throughout codebase
+- AIProviderManager now uses `is_paid()` instead of `is_premium()`
+
+### Technical
+- SDK types: `CoworkTier` → `CoworkPlan` (Free/GoPlus/Plus/Pro/ProPlus)
+- SDK types: `CoworkLimits` → `CoworkUsage` with usage tracking fields
+- Backward compatibility aliases for deprecated types
+
 ## [0.2.0] - 2026-01-17
 
 ### Added - Phase 2: Core AI Features Foundation
