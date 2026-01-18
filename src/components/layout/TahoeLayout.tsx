@@ -53,7 +53,7 @@ export function TahoeLayout({
 
             {/* Header with controls - inline, not floating */}
             <header className="flex items-center justify-end h-10 px-4 shrink-0">
-                <div className="window-no-drag flex items-center gap-2">
+                <div className="relative z-20 window-no-drag flex items-center gap-2">
                     {/* Theme Toggle */}
                     <div className="flex items-center gap-1.5">
                         <Sun className="size-3.5 text-muted-foreground" />
