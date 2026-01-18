@@ -20,7 +20,7 @@ pub enum AIError {
     ProviderNotAvailable(String),
 }
 
-/// Trait for AI providers
+/// Trait for AI providers (for future extensibility)
 #[async_trait]
 pub trait AIProvider: Send + Sync {
     /// Get provider name
@@ -75,7 +75,7 @@ impl AIProviderManager {
             AIProviderConfig {
                 provider: ProviderType::Gemini,
                 name: "Google Gemini".to_string(),
-                model: "gemini-1.5-pro".to_string(),
+                model: "gemini-3-pro-preview".to_string(),
                 is_available: true,
                 requires_api_key: true,
             },
@@ -95,7 +95,7 @@ impl AIProviderManager {
                 .validate_key(api_key)
                 .await
                 .map_err(|e| e.to_string()),
-            _ => Err(format!("Unknown provider: {}", provider)),
+            _ => Err(AIError::ProviderNotAvailable(provider.to_string()).to_string()),
         }
     }
 
@@ -114,13 +114,27 @@ impl AIProviderManager {
         self.keychain.delete_key(provider)
     }
 
+    /// Check if API key exists for a provider
+    pub async fn has_api_key(&self, provider: &str) -> Result<bool, String> {
+        Ok(self.keychain.has_key(provider))
+    }
+
     /// Get available models for a provider
     pub async fn get_models(&self, provider: &str) -> Result<Vec<String>, String> {
         match provider {
             "rainy_api" => Ok(self.rainy_api.available_models()),
             "gemini" => Ok(self.gemini.available_models()),
-            _ => Err(format!("Unknown provider: {}", provider)),
+            _ => Err(AIError::ProviderNotAvailable(provider.to_string()).to_string()),
         }
+    }
+
+    /// Check if model is valid for provider
+    fn is_valid_model(&self, provider: &ProviderType, model: &str) -> bool {
+        let models = match provider {
+            ProviderType::RainyApi => self.rainy_api.available_models(),
+            ProviderType::Gemini => self.gemini.available_models(),
+        };
+        models.iter().any(|m| m == model)
     }
 
     /// Execute a prompt using the specified provider
@@ -134,16 +148,24 @@ impl AIProviderManager {
     where
         F: Fn(u8, Option<String>) + Send + Sync + 'static,
     {
+        // Validate model exists for provider
+        if !self.is_valid_model(provider, model) {
+            return Err(
+                AIError::ModelNotFound(format!("{} not found for {:?}", model, provider))
+                    .to_string(),
+            );
+        }
+
         let provider_name = match provider {
             ProviderType::RainyApi => "rainy_api",
             ProviderType::Gemini => "gemini",
         };
 
         // Get API key from keychain
-        let api_key = self
-            .get_api_key(provider_name)
-            .await?
-            .ok_or_else(|| format!("No API key found for {}", provider_name))?;
+        let api_key = self.get_api_key(provider_name).await?.ok_or_else(|| {
+            AIError::ProviderNotAvailable(format!("No API key configured for {}", provider_name))
+                .to_string()
+        })?;
 
         match provider {
             ProviderType::RainyApi => self

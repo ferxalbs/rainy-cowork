@@ -110,10 +110,10 @@ export const AI_PROVIDERS: AIProvider[] = [
     {
         id: 'gemini',
         name: 'Google Gemini',
-        model: 'gemini-1.5-pro',
+        model: 'gemini-3-pro-preview',
         isAvailable: true,
         requiresApiKey: true,
-        description: 'Use your own Google API key',
+        description: 'Gemini 3 with thinking capabilities',
     },
 ];
 
@@ -122,5 +122,50 @@ export const AI_PROVIDERS: AIProvider[] = [
  */
 export const PROVIDER_MODELS: Record<ProviderType, string[]> = {
     rainyApi: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'claude-3.5-sonnet', 'claude-3-opus'],
-    gemini: ['gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-2.0-flash-exp'],
+    gemini: [
+        // Gemini 3 - Latest with thinking levels
+        'gemini-3-pro-preview',
+        'gemini-3-flash-preview',
+        // Gemini 2.5 - Thinking budget
+        'gemini-2.5-pro',
+        'gemini-2.5-flash',
+        'gemini-2.5-flash-lite',
+    ],
+};
+
+/**
+ * Thinking levels for Gemini 3 models
+ */
+export type ThinkingLevel = 'minimal' | 'low' | 'medium' | 'high';
+
+/**
+ * Model metadata with thinking capabilities
+ */
+export const GEMINI_MODEL_INFO: Record<string, {
+    name: string;
+    description: string;
+    thinkingLevels?: ThinkingLevel[];
+}> = {
+    'gemini-3-pro-preview': {
+        name: 'Gemini 3 Pro (Preview)',
+        description: 'Most intelligent - reasoning, coding, agents',
+        thinkingLevels: ['low', 'high'],
+    },
+    'gemini-3-flash-preview': {
+        name: 'Gemini 3 Flash (Preview)',
+        description: 'Fast with good quality - general backend',
+        thinkingLevels: ['minimal', 'low', 'medium', 'high'],
+    },
+    'gemini-2.5-pro': {
+        name: 'Gemini 2.5 Pro',
+        description: 'Deep analysis, long context',
+    },
+    'gemini-2.5-flash': {
+        name: 'Gemini 2.5 Flash',
+        description: 'General backend, high QPS',
+    },
+    'gemini-2.5-flash-lite': {
+        name: 'Gemini 2.5 Flash Lite',
+        description: 'Cost-sensitive, minimal latency',
+    },
 };

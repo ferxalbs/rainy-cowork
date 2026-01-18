@@ -140,6 +140,10 @@ export async function getProviderModels(provider: string): Promise<string[]> {
     return invoke<string[]>('get_provider_models', { provider });
 }
 
+export async function hasApiKey(provider: string): Promise<boolean> {
+    return invoke<boolean>('has_api_key', { provider });
+}
+
 // ============ File Commands ============
 
 export async function setWorkspace(path: string, name: string): Promise<Workspace> {

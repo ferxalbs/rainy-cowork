@@ -12,10 +12,10 @@ use std::sync::Arc;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // Initialize AI provider manager
+    // Initialize AI provider manager as Arc for sharing
     let ai_provider = Arc::new(AIProviderManager::new());
 
-    // Initialize task manager with AI provider
+    // Initialize task manager with Arc clone
     let task_manager = TaskManager::new(ai_provider.clone());
 
     // Initialize file manager
@@ -27,10 +27,10 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
-        // Managed state
+        // Managed state - Arc<AIProviderManager> for both TaskManager and AI commands
         .manage(task_manager)
         .manage(file_manager)
-        .manage(ai_provider)
+        .manage(ai_provider) // Arc<AIProviderManager>
         // Commands
         .invoke_handler(tauri::generate_handler![
             // Task commands
@@ -47,6 +47,7 @@ pub fn run() {
             commands::store_api_key,
             commands::get_api_key,
             commands::delete_api_key,
+            commands::has_api_key,
             commands::get_provider_models,
             // File commands
             commands::select_workspace,
