@@ -1,5 +1,5 @@
 // Rainy Cowork - Settings Panel
-// AI Provider configuration with API key management
+// AI Provider configuration with API key management and Cowork subscription
 
 import { useState } from 'react';
 import {
@@ -13,8 +13,8 @@ import {
     Card,
     Separator,
 } from '@heroui/react';
-import { Settings, Key, Zap, Sparkles, Check, X, Eye, EyeOff } from 'lucide-react';
-import { useAIProvider } from '../../hooks';
+import { Settings, Key, Zap, Sparkles, Check, X, Eye, EyeOff, CreditCard, TrendingUp } from 'lucide-react';
+import { useAIProvider, useCoworkStatus } from '../../hooks';
 import { AI_PROVIDERS, type ProviderType } from '../../types';
 
 interface SettingsPanelProps {
@@ -29,6 +29,17 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
         storeApiKey,
         deleteApiKey,
     } = useAIProvider();
+
+    const {
+        planName,
+        hasPaidPlan,
+        usagePercent,
+        remainingUses,
+        isOverLimit,
+        isLoading: coworkLoading,
+        status: coworkStatus,
+        refresh: refreshCowork,
+    } = useCoworkStatus();
 
     const [activeTab, setActiveTab] = useState('providers');
     const [apiKeyInputs, setApiKeyInputs] = useState<Record<string, string>>({});
@@ -70,6 +81,8 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
             await storeApiKey(providerId, key);
             setApiKeyInputs(prev => ({ ...prev, [provider]: '' }));
             setValidationStatus(prev => ({ ...prev, [provider]: 'idle' }));
+            // Refresh cowork status after saving key
+            await refreshCowork();
         } catch (error) {
             console.error('Failed to save API key:', error);
         } finally {
@@ -80,10 +93,22 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
     const handleDeleteKey = async (provider: ProviderType) => {
         const providerId = getProviderId(provider);
         await deleteApiKey(providerId);
+        // Refresh cowork status after deleting key
+        await refreshCowork();
     };
 
     const toggleShowKey = (provider: ProviderType) => {
         setShowKeys(prev => ({ ...prev, [provider]: !prev[provider] }));
+    };
+
+    // Format reset date
+    const formatResetDate = (isoDate: string) => {
+        if (!isoDate) return 'N/A';
+        try {
+            return new Date(isoDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        } catch {
+            return 'N/A';
+        }
     };
 
     return (
@@ -104,9 +129,13 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                                 onSelectionChange={(key) => setActiveTab(key as string)}
                             >
                                 <Tabs.List>
+                                    <Tabs.Tab id="subscription">
+                                        <CreditCard className="size-4" />
+                                        Subscription
+                                    </Tabs.Tab>
                                     <Tabs.Tab id="providers">
                                         <Key className="size-4" />
-                                        AI Providers
+                                        API Keys
                                     </Tabs.Tab>
                                     <Tabs.Tab id="general">
                                         <Zap className="size-4" />
@@ -114,6 +143,145 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                                     </Tabs.Tab>
                                 </Tabs.List>
 
+                                {/* Subscription Tab */}
+                                <Tabs.Panel id="subscription" className="pt-4 space-y-4">
+                                    <Card className="p-4">
+                                        <div className="space-y-4">
+                                            {/* Plan Header */}
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                    <Sparkles className="size-5 text-primary" />
+                                                    <span className="font-semibold text-lg">{planName}</span>
+                                                    {hasPaidPlan && (
+                                                        <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                                                            Active
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                {!hasPaidPlan && (
+                                                    <Button
+                                                        variant="primary"
+                                                        size="sm"
+                                                        onPress={() => window.open('https://enosislabs.com/pricing', '_blank')}
+                                                    >
+                                                        <TrendingUp className="size-4" />
+                                                        Upgrade
+                                                    </Button>
+                                                )}
+                                            </div>
+
+                                            <Separator />
+
+                                            {/* Usage Stats */}
+                                            {!coworkLoading && coworkStatus && (
+                                                <div className="space-y-3">
+                                                    <div className="flex justify-between text-sm">
+                                                        <span className="text-muted-foreground">Monthly Usage</span>
+                                                        <span className={isOverLimit ? 'text-red-500 font-medium' : ''}>
+                                                            {coworkStatus.usage.used} / {coworkStatus.usage.limit} uses
+                                                        </span>
+                                                    </div>
+
+                                                    {/* Progress Bar */}
+                                                    <div className="w-full bg-muted rounded-full h-2">
+                                                        <div
+                                                            className={`h-2 rounded-full transition-all ${usagePercent >= 90 ? 'bg-red-500' :
+                                                                    usagePercent >= 70 ? 'bg-yellow-500' :
+                                                                        'bg-primary'
+                                                                }`}
+                                                            style={{ width: `${Math.min(100, usagePercent)}%` }}
+                                                        />
+                                                    </div>
+
+                                                    <div className="flex justify-between text-xs text-muted-foreground">
+                                                        <span>{remainingUses} remaining</span>
+                                                        <span>Resets {formatResetDate(coworkStatus.usage.resets_at)}</span>
+                                                    </div>
+
+                                                    {/* Credit Usage (for paid plans) */}
+                                                    {hasPaidPlan && coworkStatus.usage.credits_ceiling > 0 && (
+                                                        <>
+                                                            <Separator />
+                                                            <div className="flex justify-between text-sm">
+                                                                <span className="text-muted-foreground">Credit Usage</span>
+                                                                <span>
+                                                                    ${coworkStatus.usage.credits_used.toFixed(2)} / ${coworkStatus.usage.credits_ceiling.toFixed(2)}
+                                                                </span>
+                                                            </div>
+                                                        </>
+                                                    )}
+
+                                                    {/* Upgrade Message */}
+                                                    {coworkStatus.upgrade_message && (
+                                                        <p className="text-sm text-muted-foreground bg-muted/50 p-2 rounded">
+                                                            {coworkStatus.upgrade_message}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            )}
+
+                                            {coworkLoading && (
+                                                <div className="text-sm text-muted-foreground text-center py-4">
+                                                    Loading...
+                                                </div>
+                                            )}
+
+                                            {/* Features */}
+                                            {!coworkLoading && coworkStatus && (
+                                                <>
+                                                    <Separator />
+                                                    <div className="space-y-2">
+                                                        <span className="text-sm font-medium">Features</span>
+                                                        <div className="grid grid-cols-2 gap-2 text-sm">
+                                                            <div className="flex items-center gap-2">
+                                                                {coworkStatus.features.web_research ? (
+                                                                    <Check className="size-4 text-green-500" />
+                                                                ) : (
+                                                                    <X className="size-4 text-muted-foreground" />
+                                                                )}
+                                                                <span className={coworkStatus.features.web_research ? '' : 'text-muted-foreground'}>
+                                                                    Web Research
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                {coworkStatus.features.document_export ? (
+                                                                    <Check className="size-4 text-green-500" />
+                                                                ) : (
+                                                                    <X className="size-4 text-muted-foreground" />
+                                                                )}
+                                                                <span className={coworkStatus.features.document_export ? '' : 'text-muted-foreground'}>
+                                                                    Doc Export
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                {coworkStatus.features.image_analysis ? (
+                                                                    <Check className="size-4 text-green-500" />
+                                                                ) : (
+                                                                    <X className="size-4 text-muted-foreground" />
+                                                                )}
+                                                                <span className={coworkStatus.features.image_analysis ? '' : 'text-muted-foreground'}>
+                                                                    Image Analysis
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                {coworkStatus.features.priority_support ? (
+                                                                    <Check className="size-4 text-green-500" />
+                                                                ) : (
+                                                                    <X className="size-4 text-muted-foreground" />
+                                                                )}
+                                                                <span className={coworkStatus.features.priority_support ? '' : 'text-muted-foreground'}>
+                                                                    Priority Support
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </>
+                                            )}
+                                        </div>
+                                    </Card>
+                                </Tabs.Panel>
+
+                                {/* Providers Tab */}
                                 <Tabs.Panel id="providers" className="pt-4 space-y-4">
                                     {AI_PROVIDERS.map((provider) => {
                                         const providerId = getProviderId(provider.id);
@@ -213,6 +381,7 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                                     })}
                                 </Tabs.Panel>
 
+                                {/* General Tab */}
                                 <Tabs.Panel id="general" className="pt-4 space-y-4">
                                     <div className="space-y-3">
                                         <div className="flex items-center justify-between">
