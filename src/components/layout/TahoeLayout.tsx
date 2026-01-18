@@ -108,7 +108,7 @@ export function TahoeLayout({
                 />
 
                 {/* Main Content - Glass Surface */}
-                <main className="flex-1 glass-surface overflow-y-auto p-6">
+                <main className="flex-1 overflow-y-auto p-6 rounded-3xl bg-white/70 dark:bg-black/20 backdrop-blur-2xl backdrop-saturate-150 shadow-2xl border border-white/20 dark:border-white/10">
                     <div className="max-w-3xl mx-auto select-text">
                         {children}
                     </div>

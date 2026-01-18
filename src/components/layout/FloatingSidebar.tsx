@@ -54,7 +54,7 @@ export function FloatingSidebar({
     };
 
     return (
-        <aside className="floating-sidebar w-52 h-fit max-h-[calc(100vh-48px)] overflow-y-auto animate-sidebar select-none">
+        <aside className="w-52 h-fit max-h-[calc(100vh-48px)] overflow-y-auto overflow-x-hidden select-none rounded-2xl bg-sidebar backdrop-blur-[20px] backdrop-saturate-150 shadow-lg border border-sidebar-border animate-sidebar">
             {/* Folders Section */}
             <div className="p-2">
                 <SectionHeader
@@ -100,22 +100,21 @@ export function FloatingSidebar({
                 {expandedSections.tasks && (
                     <div className="space-y-0.5 mt-1">
                         <SidebarItem
-                            icon={<Timer className="size-4 text-blue-500" />}
+                            icon={<Timer className="size-4" />}
                             label="Running"
                             badge={taskCounts.running > 0 ? taskCounts.running : undefined}
-                            badgeColor="blue"
                             isActive={activeSection === "running"}
                             onClick={() => onNavigate?.("running")}
                         />
                         <SidebarItem
-                            icon={<ListTodo className="size-4 text-orange-500" />}
+                            icon={<ListTodo className="size-4" />}
                             label="Queued"
                             badge={taskCounts.queued > 0 ? taskCounts.queued : undefined}
                             isActive={activeSection === "queued"}
                             onClick={() => onNavigate?.("queued")}
                         />
                         <SidebarItem
-                            icon={<CheckCircle2 className="size-4 text-green-500" />}
+                            icon={<CheckCircle2 className="size-4" />}
                             label="Completed"
                             badge={taskCounts.completed > 0 ? taskCounts.completed : undefined}
                             isActive={activeSection === "completed"}
@@ -190,17 +189,22 @@ function SidebarItem({
 }) {
     return (
         <button
-            className={`sidebar-item w-full ${isActive ? "bg-accent text-foreground font-medium" : ""}`}
+            className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors group ${isActive
+                ? "bg-accent text-foreground font-medium"
+                : "text-foreground/80 hover:bg-accent/50 hover:text-foreground"
+                }`}
             data-selected={isActive}
             onClick={onClick}
         >
-            <span className="sidebar-item-icon">{icon}</span>
+            <span className={`size-4 shrink-0 transition-discrete ${isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground"}`}>
+                {icon}
+            </span>
             <span className="truncate flex-1 text-left">{label}</span>
             {badge !== undefined && (
                 <span
                     className={`text-xs px-1.5 py-0.5 rounded-full ${badgeColor === "blue"
-                            ? "bg-blue-500/20 text-blue-500"
-                            : "bg-muted text-muted-foreground"
+                        ? "bg-blue-500/20 text-blue-500"
+                        : "bg-muted text-muted-foreground"
                         }`}
                 >
                     {badge}
@@ -213,12 +217,12 @@ function SidebarItem({
 function getFolderIcon(name: string) {
     switch (name) {
         case "Documents":
-            return <FileCode className="size-4 text-blue-500" />;
+            return <FileCode className="size-4" />;
         case "Downloads":
-            return <Download className="size-4 text-blue-500" />;
+            return <Download className="size-4" />;
         case "Projects":
-            return <FolderOpen className="size-4 text-blue-500" />;
+            return <FolderOpen className="size-4" />;
         default:
-            return <FolderOpen className="size-4 text-muted-foreground" />;
+            return <FolderOpen className="size-4" />;
     }
 }
