@@ -3,7 +3,7 @@
 
 use crate::ai::{gemini::GeminiProvider, keychain::KeychainManager};
 use crate::models::{AIProviderConfig, ProviderType};
-use rainy_sdk::{CoworkCapabilities, CoworkTier, RainyClient};
+use rainy_sdk::{CoworkCapabilities, CoworkPlan, RainyClient};
 
 /// Error type for AI operations
 #[derive(Debug, thiserror::Error)]
@@ -14,12 +14,8 @@ pub enum AIError {
     InvalidApiKey,
     #[error("Rate limited")]
     RateLimited,
-    #[error("Model not found: {0}")]
-    ModelNotFound(String),
     #[error("Provider not available: {0}")]
     ProviderNotAvailable(String),
-    #[error("Premium feature required: {0}")]
-    PremiumRequired(String),
 }
 
 /// Cached cowork capabilities
@@ -29,7 +25,7 @@ pub struct CachedCapabilities {
     pub fetched_at: std::time::Instant,
 }
 
-/// Manager for AI providers - uses rainy-sdk for premium, Gemini for free tier
+/// Manager for AI providers - uses rainy-sdk for paid plans, Gemini for free tier
 pub struct AIProviderManager {
     keychain: KeychainManager,
     gemini: GeminiProvider,
@@ -72,21 +68,23 @@ impl AIProviderManager {
             }
         }
 
-        // Fallback to free tier
+        // Fallback to free plan
         CoworkCapabilities::free()
     }
 
-    /// Check if user has premium access
-    pub async fn is_premium(&mut self) -> bool {
-        self.get_capabilities().await.tier.is_premium()
+    /// Check if user has a paid plan
+    #[allow(dead_code)]
+    pub async fn has_paid_plan(&mut self) -> bool {
+        self.get_capabilities().await.plan.is_paid()
     }
 
-    /// Get current tier
-    pub async fn get_tier(&mut self) -> CoworkTier {
-        self.get_capabilities().await.tier
+    /// Get current plan
+    #[allow(dead_code)]
+    pub async fn get_plan(&mut self) -> CoworkPlan {
+        self.get_capabilities().await.plan
     }
 
-    /// List available providers based on tier
+    /// List available providers based on plan
     pub async fn list_providers(&mut self) -> Vec<AIProviderConfig> {
         let caps = self.get_capabilities().await;
         let mut providers = vec![];
@@ -100,13 +98,13 @@ impl AIProviderManager {
             requires_api_key: true,
         });
 
-        // Show Rainy API if premium
-        if caps.tier.is_premium() {
+        // Show Rainy API if paid
+        if caps.plan.is_paid() {
             providers.insert(
                 0,
                 AIProviderConfig {
                     provider: ProviderType::RainyApi,
-                    name: format!("Rainy API ({})", caps.tier_name),
+                    name: format!("Rainy API ({})", caps.plan_name),
                     model: "gpt-4o".to_string(),
                     is_available: true,
                     requires_api_key: true,
@@ -117,15 +115,15 @@ impl AIProviderManager {
         providers
     }
 
-    /// Get available models based on tier
+    /// Get available models based on plan
     pub async fn get_models(&mut self, provider: &str) -> Result<Vec<String>, String> {
         match provider {
             "rainy_api" => {
                 let caps = self.get_capabilities().await;
-                if caps.tier.is_premium() {
+                if caps.plan.is_paid() {
                     Ok(caps.models)
                 } else {
-                    Err("Premium subscription required for Rainy API models".to_string())
+                    Err("Upgrade to a paid plan to access Rainy API models".to_string())
                 }
             }
             "gemini" => Ok(self.gemini.available_models()),
@@ -188,19 +186,26 @@ impl AIProviderManager {
     {
         match provider {
             ProviderType::RainyApi => {
-                // Use rainy-sdk for premium access
+                // Use rainy-sdk for paid access
                 let caps = self.get_capabilities().await;
-                if !caps.tier.is_premium() {
+                if !caps.plan.is_paid() {
                     return Err(
-                        "Premium subscription required. Please add a Rainy API key.".to_string()
+                        "Upgrade to a paid plan to use Rainy API. Add a Rainy API key.".to_string(),
                     );
                 }
 
                 if !caps.can_use_model(model) {
                     return Err(format!(
-                        "Model {} not available for {} tier",
-                        model, caps.tier_name
+                        "Model {} not available on {} plan",
+                        model, caps.plan_name
                     ));
+                }
+
+                if !caps.can_make_request() {
+                    if let Some(msg) = &caps.upgrade_message {
+                        return Err(msg.clone());
+                    }
+                    return Err("Usage limit reached. Upgrade for more access.".to_string());
                 }
 
                 on_progress(10, Some("Connecting to Rainy API...".to_string()));
@@ -235,7 +240,7 @@ impl AIProviderManager {
         }
     }
 
-    /// Check if a feature is available based on tier
+    /// Check if a feature is available based on plan
     pub async fn can_use_feature(&mut self, feature: &str) -> bool {
         self.get_capabilities().await.can_use_feature(feature)
     }

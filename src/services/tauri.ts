@@ -144,6 +144,46 @@ export async function hasApiKey(provider: string): Promise<boolean> {
     return invoke<boolean>('has_api_key', { provider });
 }
 
+// ============ Cowork Status Types ============
+
+export interface CoworkFeatures {
+    web_research: boolean;
+    document_export: boolean;
+    image_analysis: boolean;
+    priority_support: boolean;
+}
+
+export interface CoworkUsage {
+    used: number;
+    limit: number;
+    credits_used: number;
+    credits_ceiling: number;
+    resets_at: string;
+}
+
+export type CoworkPlan = 'free' | 'go_plus' | 'plus' | 'pro' | 'pro_plus';
+
+export interface CoworkStatus {
+    has_paid_plan: boolean;
+    plan: CoworkPlan;
+    plan_name: string;
+    is_valid: boolean;
+    models: string[];
+    features: CoworkFeatures;
+    usage: CoworkUsage;
+    upgrade_message: string | null;
+}
+
+// ============ Cowork Commands ============
+
+export async function getCoworkStatus(): Promise<CoworkStatus> {
+    return invoke<CoworkStatus>('get_cowork_status');
+}
+
+export async function canUseFeature(feature: string): Promise<boolean> {
+    return invoke<boolean>('can_use_feature', { feature });
+}
+
 // ============ File Commands ============
 
 export async function setWorkspace(path: string, name: string): Promise<Workspace> {

@@ -11,11 +11,14 @@ use tokio::sync::Mutex;
 /// Cowork status response for frontend
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CoworkStatus {
-    pub is_premium: bool,
-    pub tier: String,
-    pub tier_name: String,
+    pub has_paid_plan: bool,
+    pub plan: String,
+    pub plan_name: String,
+    pub is_valid: bool,
     pub models: Vec<String>,
     pub features: CoworkFeaturesDto,
+    pub usage: CoworkUsageDto,
+    pub upgrade_message: Option<String>,
 }
 
 /// Feature flags DTO for frontend
@@ -24,7 +27,17 @@ pub struct CoworkFeaturesDto {
     pub web_research: bool,
     pub document_export: bool,
     pub image_analysis: bool,
-    pub automation: bool,
+    pub priority_support: bool,
+}
+
+/// Usage tracking DTO for frontend
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CoworkUsageDto {
+    pub used: u32,
+    pub limit: u32,
+    pub credits_used: f32,
+    pub credits_ceiling: f32,
+    pub resets_at: String,
 }
 
 /// List available AI providers
@@ -113,20 +126,29 @@ pub async fn get_cowork_status(
     let caps = manager.get_capabilities().await;
 
     Ok(CoworkStatus {
-        is_premium: caps.tier.is_premium(),
-        tier: format!("{:?}", caps.tier).to_lowercase(),
-        tier_name: caps.tier_name,
+        has_paid_plan: caps.plan.is_paid(),
+        plan: format!("{:?}", caps.plan).to_lowercase(),
+        plan_name: caps.plan_name,
+        is_valid: caps.is_valid,
         models: caps.models,
         features: CoworkFeaturesDto {
             web_research: caps.features.web_research,
             document_export: caps.features.document_export,
             image_analysis: caps.features.image_analysis,
-            automation: caps.features.automation,
+            priority_support: caps.features.priority_support,
         },
+        usage: CoworkUsageDto {
+            used: caps.usage.used,
+            limit: caps.usage.limit,
+            credits_used: caps.usage.credits_used,
+            credits_ceiling: caps.usage.credits_ceiling,
+            resets_at: caps.usage.resets_at,
+        },
+        upgrade_message: caps.upgrade_message,
     })
 }
 
-/// Check if a premium feature is available
+/// Check if a feature is available
 #[tauri::command]
 pub async fn can_use_feature(
     feature: String,
