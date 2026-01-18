@@ -5,7 +5,37 @@ All notable changes to Rainy Cowork will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-01-17
+
+### Added - Phase 2: Core AI Features Foundation
+
+**Rust Backend (`src-tauri/src/`)**
+- `models/mod.rs` - Data models: Task, FileChange, Workspace, TaskEvent, FileVersion
+- `commands/` - Tauri commands for tasks, AI, and file operations (18 commands total)
+- `services/task_manager.rs` - TaskManager with DashMap, async execution, progress channels
+- `services/file_manager.rs` - FileManager with workspace-based versioning (`.rainy-versions/`)
+- `ai/provider.rs` - AIProvider trait abstraction and AIProviderManager
+- `ai/rainy_api.rs` - Rainy API provider (Enosis Labs) with OpenAI-compatible format
+- `ai/gemini.rs` - Google Gemini provider for direct user API keys
+- `ai/keychain.rs` - macOS Keychain integration via `security-framework`
+
+**Frontend Hooks & Services (`src/`)**
+- `services/tauri.ts` - Typed wrappers for all Tauri commands with Channel support
+- `hooks/useTauriTask.ts` - Task management hook with event-driven updates
+- `hooks/useAIProvider.ts` - AI provider management with Keychain integration
+
+**Dependencies Added**
+- Rust: tokio, reqwest, dashmap, uuid, chrono, thiserror, security-framework, tracing
+- Tauri plugins: fs, dialog, notification
+- Frontend: @tauri-apps/plugin-fs, plugin-dialog, plugin-notification
+
+### Changed
+- Updated `Cargo.toml` with Phase 2 dependencies
+- Updated `capabilities/default.json` with fs, dialog, notification permissions
+- Rewrote `lib.rs` to wire all modules and register 18 commands
+
 ## [0.1.1] - 2026-01-17
+
 
 ### Changed
 - **macOS Tahoe-style UI redesign** - Premium floating elements with glassmorphism
