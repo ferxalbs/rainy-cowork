@@ -1,27 +1,32 @@
 # Rainy Cowork Roadmap
 
-## Current Version: v0.2.1
+## Current Version: v0.3.0
 
-### v0.3.0 - Phase 3: Advanced Features (In Progress)
+### v0.3.0 - Phase 3: Advanced Features ✅
 
-**Web Browsing & Research**
-- [ ] MCP Server Integration (Playwright/Chrome MCP Tools)
-- [ ] URL content extraction (Rust-native HTML→Markdown)
-- [ ] Content caching and rate limiting
+**Content Extraction (Complete)**
+- [x] URL content extraction (Rust-native HTML→Markdown)
+- [x] Content caching with DashMap
+- [x] TypeScript hooks for frontend
 
-**Document Generation**
+**Tavily Web Search (Complete)**
+- [x] Tavily SDK integration in rainy-api-v2
+- [x] Search endpoint: POST /api/v1/search
+- [x] Extract endpoint: POST /api/v1/search/extract
+- [x] Cowork plan gating for premium feature
+
+**Document Generation (In Progress)**
 - [ ] Template-based document generation (Rust)
 - [ ] Markdown export with handlebars templates
 - [ ] AI-assisted document creation (Premium/Cowork)
 
-**Image Processing**
+**Image Processing (Planned)**
 - [ ] Metadata extraction (EXIF, dimensions)
 - [ ] Thumbnail generation
 - [ ] AI vision analysis (Premium/Cowork)
 
-**macOS Deep Integration**
+**macOS Deep Integration (Planned)**
 - [ ] Menu bar quick access
-- [ ] System tray with task status
 - [ ] Shortcuts app integration
 
 ---
@@ -30,30 +35,9 @@
 
 > ⚠️ Requires Google OAuth verification
 
-**Gmail Integration**
 - [ ] OAuth2 authentication flow
-- [ ] Email reading and composition
-- [ ] AI-assisted draft creation
-
-**Google Calendar**
-- [ ] Event listing and viewing
-- [ ] Event creation via AI commands
-
----
-
-### v0.4.0 - Web Search (Planned)
-
-**Rainy API v2 Integration**
-- [ ] Web search endpoint integration
-- [ ] Search result aggregation
-- [ ] AI-powered result summarization
-- [ ] Multi-source search (Premium)
-
-**Alternative: MCP Server Approach**
-> 💡 Consider Playwright MCP or Chrome MCP Tools for browser automation:
-> - Real-time web interaction
-> - JavaScript-rendered content
-> - Form filling and navigation
+- [ ] Gmail reading and composition
+- [ ] Calendar event management
 
 ---
 
@@ -70,11 +54,11 @@
 | Feature | Free (OSS) | Premium (Cowork) |
 |---------|------------|------------------|
 | URL Content Extraction | ✅ | ✅ |
+| **Web Search (Tavily)** | ❌ | ✅ |
 | Document Templates | ✅ | ✅ |
 | Image Metadata | ✅ | ✅ |
 | AI Document Generation | ❌ | ✅ |
 | AI Vision Analysis | ❌ | ✅ |
-| Web Search (v0.4.0) | Limited | Unlimited |
 | Email/Calendar | ❌ | ✅ |
 
 ---

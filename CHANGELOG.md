@@ -31,7 +31,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Documentation**
 - `ROADMAP.md` - Public roadmap with version milestones
-- Web search deferred to v0.4.0 (Rainy API v2)
+
+**Tavily Web Search (rainy-api-v2)**
+- `services/tavily.ts` - Tavily SDK wrapper:
+  - Search with depth, domains, answer options
+  - Content extraction from URLs
+  - Singleton pattern with environment initialization
+- `routes/search.ts` - Search API endpoints:
+  - `POST /api/v1/search` - Web search with Zod validation
+  - `POST /api/v1/search/extract` - Content extraction
+  - Cowork plan `web_research` feature gating
+
 
 ## [0.2.1] - 2026-01-18
 
