@@ -2,6 +2,7 @@
 // Updated for Rainy API + Gemini provider model
 
 export * from './web';
+export * from './document';
 
 /**
  * Task status enum for tracking task lifecycle

@@ -42,8 +42,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `POST /api/v1/search/extract` - Content extraction
   - Cowork plan `web_research` feature gating
 
+### Added - Phase 3: Document Generation (Milestone 3.2)
 
-## [0.2.1] - 2026-01-18
+**Rust Backend (`src-tauri/src/`)**
+- `services/document.rs` - Document generation service:
+  - Handlebars template engine
+  - 4 built-in templates (meeting notes, project report, email, quick note)
+  - Markdown → HTML conversion
+- `commands/document.rs` - Tauri commands:
+  - `list_document_templates` - List all templates
+  - `get_template` - Get specific template
+  - `generate_document` - Generate from template + context
+  - `markdown_to_html` - Convert markdown to HTML
+
+**Frontend (`src/`)**
+- `types/document.ts` - TemplateInfo, GeneratedDocument types
+- `hooks/useDocument.ts` - React hook for document generation
+
+**Dependencies**
+- `handlebars` v6 - Template rendering
+
 
 
 ### Added - Cowork Plan Integration
