@@ -29,3 +29,5 @@ rainy-sdk
 rainy-api-v2
 .agent/rules/cowork-architecture.md
 COWORK_INFO.md
+
+*.md

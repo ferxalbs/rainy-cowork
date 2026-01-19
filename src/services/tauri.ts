@@ -319,6 +319,8 @@ export interface WorkspaceAnalysis {
 
 // ============ AI Agent Types ============
 
+export type TaskIntent = 'question' | 'command';
+
 export interface PlannedStep {
     type: 'createFile' | 'modifyFile' | 'moveFile' | 'deleteFile' | 'organizeFolder' | 'batchRename' | 'analyzeContent';
     path?: string;
@@ -335,6 +337,8 @@ export interface PlannedStep {
 export interface TaskPlan {
     id: string;
     instruction: string;
+    intent: TaskIntent;
+    answer?: string;
     steps: PlannedStep[];
     estimatedChanges: number;
     requiresConfirmation: boolean;

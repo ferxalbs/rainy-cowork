@@ -66,7 +66,7 @@ export function useCoworkAgent(): UseCoworkAgentReturn {
         // Add agent thinking message
         const thinkingId = addMessage({
             type: 'agent',
-            content: 'Analyzing your request and creating a plan...',
+            content: 'Thinking...',
             isLoading: true,
         });
 
@@ -74,28 +74,47 @@ export function useCoworkAgent(): UseCoworkAgentReturn {
 
         try {
             const plan = await tauri.planTask(instruction, workspacePath);
+
+            // Handle QUESTIONS - show answer directly, no plan
+            if (plan.intent === 'question' && plan.answer) {
+                updateMessage(thinkingId, {
+                    content: plan.answer,
+                    isLoading: false,
+                });
+                // Don't set currentPlan for questions
+                setIsPlanning(false);
+                return;
+            }
+
+            // Handle COMMANDS - show plan with steps
             setCurrentPlan(plan);
 
-            // Update thinking message with plan
-            const planSummary = plan.steps.map((step, i) =>
-                `${i + 1}. ${step.description}`
-            ).join('\n');
-
-            updateMessage(thinkingId, {
-                content: `I've created a plan with ${plan.steps.length} step(s):\n\n${planSummary}${plan.warnings.length > 0 ? `\n\n⚠️ Warnings:\n${plan.warnings.join('\n')}` : ''}`,
-                isLoading: false,
-                plan,
-            });
-
-            if (plan.requiresConfirmation) {
-                addMessage({
-                    type: 'system',
-                    content: 'This plan includes destructive operations. Please review and confirm to proceed.',
+            if (plan.steps.length === 0) {
+                updateMessage(thinkingId, {
+                    content: `I understand you want to "${instruction}", but I couldn't find any specific operations to perform. Could you be more specific about what files you'd like me to work with?`,
+                    isLoading: false,
                 });
+            } else {
+                const planSummary = plan.steps.map((step, i) =>
+                    `${i + 1}. ${step.description}`
+                ).join('\n');
+
+                updateMessage(thinkingId, {
+                    content: `I've created a plan with ${plan.steps.length} step(s):\n\n${planSummary}${plan.warnings.length > 0 ? `\n\n⚠️ Warnings:\n${plan.warnings.join('\n')}` : ''}`,
+                    isLoading: false,
+                    plan,
+                });
+
+                if (plan.requiresConfirmation) {
+                    addMessage({
+                        type: 'system',
+                        content: '⚠️ This plan includes operations that may modify or delete files. Please review and confirm to proceed.',
+                    });
+                }
             }
         } catch (error) {
             updateMessage(thinkingId, {
-                content: `Failed to create plan: ${error}`,
+                content: `Sorry, I encountered an error: ${error}`,
                 isLoading: false,
             });
         } finally {

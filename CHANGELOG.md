@@ -36,8 +36,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `rayon` v1.10 - Parallel processing (available for future optimization)
 - `dirs` v5.0 - Cross-platform directories for trash location
 
+### Added - CoworkPanel UI
+
+**Frontend Components**
+- `components/cowork/CoworkPanel.tsx` - Chat-style AI agent interface:
+  - Message bubbles for user/agent conversations
+  - Natural language input with Enter to send
+  - Quick actions (Analyze, Organize by type)
+  - Plan preview with Execute/Cancel buttons
+  - Real-time progress during execution
+- `hooks/useCoworkAgent.ts` - React hook for agent state management
+- Sidebar integration: "AI Cowork" item in AI Studio section
+
+### Improved - AI Agent Intelligence
+
+**Question vs Command Detection**
+- AI now classifies intent as "question" or "command"
+- Questions receive direct answers (e.g., "What files are here?" → list of files)
+- Commands create executable plans (e.g., "Organize by type" → plan with steps)
+
+**Enhanced User Experience**
+- Clearer messaging for empty plans
+- Better error messages with actionable suggestions
+- Professional confirmation dialogs for destructive operations
+
 ### Fixed
 - State type mismatch in file commands (`FileManager` → `Arc<FileManager>`)
+- Empty plan display for questions (now shows direct answers instead)
 
 ## [0.3.1] - 2026-01-19
 
