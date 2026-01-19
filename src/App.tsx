@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { TahoeLayout, TaskInput, TaskCard, FileTable, SettingsPanel, AIDocumentPanel, AIResearchPanel } from "./components";
+import { CoworkPanel } from "./components/cowork";
 import { Separator, Button } from "@heroui/react";
 import { Zap, CheckCircle2, ListTodo, Settings, AlertCircle, FileText, Search, FolderPlus } from "lucide-react";
 import { useTauriTask, useAIProvider, useFolderManager } from "./hooks";
@@ -173,7 +174,7 @@ function App() {
   }[activeSection] || { icon: <Zap className="size-5 text-blue-500 shrink-0" />, label: "Tasks" };
 
   // Check if we're in AI Studio section
-  const isAIStudioSection = activeSection === 'documents' || activeSection === 'research';
+  const isAIStudioSection = activeSection === 'documents' || activeSection === 'research' || activeSection === 'cowork';
 
   return (
     <>
@@ -224,6 +225,16 @@ function App() {
             <div className="animate-appear">
               {activeFolder ? (
                 <AIResearchPanel />
+              ) : (
+                <NoFolderGate onAddFolder={addFolder} />
+              )}
+            </div>
+          )}
+
+          {activeSection === 'cowork' && (
+            <div className="animate-appear h-[calc(100vh-120px)]">
+              {activeFolder ? (
+                <CoworkPanel workspacePath={activeFolder.path} />
               ) : (
                 <NoFolderGate onAddFolder={addFolder} />
               )}

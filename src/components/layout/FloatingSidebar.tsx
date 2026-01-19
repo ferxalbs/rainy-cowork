@@ -142,6 +142,12 @@ export function FloatingSidebar({
                 {expandedSections.aiStudio && (
                     <div className="space-y-0.5 mt-1">
                         <SidebarItem
+                            icon={<Sparkles className="size-4" />}
+                            label="AI Cowork"
+                            isActive={activeSection === "cowork"}
+                            onClick={() => onNavigate?.("cowork")}
+                        />
+                        <SidebarItem
                             icon={<FileText className="size-4" />}
                             label="Documents"
                             isActive={activeSection === "documents"}
