@@ -3,13 +3,12 @@
 
 use crate::models::{FileChange, Workspace};
 use crate::services::FileManager;
+use std::sync::Arc;
 use tauri::State;
 
 /// Select a workspace folder using native dialog
 #[tauri::command]
 pub async fn select_workspace() -> Result<Option<Workspace>, String> {
-    
-
     // This will be called from the frontend using the dialog plugin
     // The actual dialog is handled by the frontend
     Ok(None)
@@ -20,7 +19,7 @@ pub async fn select_workspace() -> Result<Option<Workspace>, String> {
 pub async fn set_workspace(
     path: String,
     name: String,
-    file_manager: State<'_, FileManager>,
+    file_manager: State<'_, Arc<FileManager>>,
 ) -> Result<Workspace, String> {
     file_manager.set_workspace(path, name).await
 }
@@ -28,7 +27,7 @@ pub async fn set_workspace(
 /// Get current workspace
 #[tauri::command]
 pub async fn get_workspace(
-    file_manager: State<'_, FileManager>,
+    file_manager: State<'_, Arc<FileManager>>,
 ) -> Result<Option<Workspace>, String> {
     Ok(file_manager.get_workspace().await)
 }
@@ -37,7 +36,7 @@ pub async fn get_workspace(
 #[tauri::command]
 pub async fn list_directory(
     path: String,
-    file_manager: State<'_, FileManager>,
+    file_manager: State<'_, Arc<FileManager>>,
 ) -> Result<Vec<FileEntry>, String> {
     file_manager.list_directory(&path).await
 }
@@ -46,7 +45,7 @@ pub async fn list_directory(
 #[tauri::command]
 pub async fn read_file(
     path: String,
-    file_manager: State<'_, FileManager>,
+    file_manager: State<'_, Arc<FileManager>>,
 ) -> Result<String, String> {
     file_manager.read_file(&path).await
 }
@@ -57,7 +56,7 @@ pub async fn write_file(
     path: String,
     content: String,
     task_id: Option<String>,
-    file_manager: State<'_, FileManager>,
+    file_manager: State<'_, Arc<FileManager>>,
 ) -> Result<FileChange, String> {
     file_manager.write_file(&path, &content, task_id).await
 }
@@ -67,7 +66,7 @@ pub async fn write_file(
 pub async fn create_snapshot(
     path: String,
     task_id: String,
-    file_manager: State<'_, FileManager>,
+    file_manager: State<'_, Arc<FileManager>>,
 ) -> Result<String, String> {
     file_manager.create_snapshot(&path, &task_id).await
 }
@@ -76,7 +75,7 @@ pub async fn create_snapshot(
 #[tauri::command]
 pub async fn rollback_file(
     version_id: String,
-    file_manager: State<'_, FileManager>,
+    file_manager: State<'_, Arc<FileManager>>,
 ) -> Result<(), String> {
     file_manager.rollback(&version_id).await
 }
@@ -85,7 +84,7 @@ pub async fn rollback_file(
 #[tauri::command]
 pub async fn list_file_changes(
     task_id: Option<String>,
-    file_manager: State<'_, FileManager>,
+    file_manager: State<'_, Arc<FileManager>>,
 ) -> Result<Vec<FileChange>, String> {
     file_manager.list_changes(task_id).await
 }

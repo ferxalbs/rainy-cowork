@@ -252,3 +252,200 @@ export async function removeUserFolder(id: string): Promise<void> {
 export async function updateFolderAccess(id: string): Promise<void> {
     return invoke<void>('update_folder_access', { id });
 }
+
+// ============ File Operations Types (AI Agent) ============
+
+export type ConflictStrategy = 'skip' | 'overwrite' | 'rename' | 'ask';
+export type OrganizeStrategy = 'by_type' | 'by_date' | 'by_extension' | 'by_content';
+export type FileOpType = 'move' | 'copy' | 'rename' | 'delete' | 'create' | 'create_folder';
+
+export interface FileOpChange {
+    id: string;
+    operation: FileOpType;
+    sourcePath: string;
+    destPath?: string;
+    timestamp: string;
+    reversible: boolean;
+}
+
+export interface RenamePreview {
+    original: string;
+    newName: string;
+    hasConflict: boolean;
+}
+
+export interface OrganizeResult {
+    filesMoved: number;
+    foldersCreated: number;
+    skipped: number;
+    errors: string[];
+    changes: FileOpChange[];
+}
+
+export interface FileTypeStats {
+    count: number;
+    totalSize: number;
+    extensions: string[];
+}
+
+export interface FileInfo {
+    path: string;
+    name: string;
+    size: number;
+    modified: string;
+}
+
+export interface DuplicateGroup {
+    size: number;
+    files: string[];
+}
+
+export interface OptimizationSuggestion {
+    suggestionType: 'delete_duplicates' | 'archive_old_files' | 'organize_by_type' | 'compress_images' | 'clean_temp_files';
+    description: string;
+    potentialSavings?: number;
+    affectedFiles: string[];
+}
+
+export interface WorkspaceAnalysis {
+    totalFiles: number;
+    totalFolders: number;
+    totalSizeBytes: number;
+    fileTypes: Record<string, FileTypeStats>;
+    largestFiles: FileInfo[];
+    duplicateCandidates: DuplicateGroup[];
+    suggestions: OptimizationSuggestion[];
+}
+
+// ============ AI Agent Types ============
+
+export interface PlannedStep {
+    type: 'createFile' | 'modifyFile' | 'moveFile' | 'deleteFile' | 'organizeFolder' | 'batchRename' | 'analyzeContent';
+    path?: string;
+    source?: string;
+    destination?: string;
+    content?: string;
+    instruction?: string;
+    strategy?: OrganizeStrategy;
+    files?: string[];
+    pattern?: string;
+    description: string;
+}
+
+export interface TaskPlan {
+    id: string;
+    instruction: string;
+    steps: PlannedStep[];
+    estimatedChanges: number;
+    requiresConfirmation: boolean;
+    warnings: string[];
+    createdAt: string;
+}
+
+export interface ExecutionResult {
+    taskId: string;
+    success: boolean;
+    totalSteps: number;
+    completedSteps: number;
+    totalChanges: number;
+    changes: FileOpChange[];
+    errors: string[];
+    durationMs: number;
+}
+
+export type AgentEvent =
+    | { event: 'planningStarted'; data: { taskId: string } }
+    | { event: 'planReady'; data: { taskId: string; plan: TaskPlan } }
+    | { event: 'stepStarted'; data: { taskId: string; stepIndex: number; description: string } }
+    | { event: 'stepCompleted'; data: { taskId: string; stepIndex: number; changes: FileOpChange[] } }
+    | { event: 'stepFailed'; data: { taskId: string; stepIndex: number; error: string } }
+    | { event: 'progress'; data: { taskId: string; progress: number; message: string } }
+    | { event: 'completed'; data: { taskId: string; totalChanges: number } }
+    | { event: 'failed'; data: { taskId: string; error: string } }
+    | { event: 'confirmationRequired'; data: { taskId: string; message: string; affectedFiles: string[] } };
+
+// ============ File Operations Commands ============
+
+export async function moveFiles(
+    paths: string[],
+    destination: string,
+    onConflict?: ConflictStrategy
+): Promise<FileOpChange[]> {
+    return invoke<FileOpChange[]>('move_files', { paths, destination, onConflict });
+}
+
+export async function organizeFolder(
+    path: string,
+    strategy: OrganizeStrategy,
+    dryRun?: boolean
+): Promise<OrganizeResult> {
+    return invoke<OrganizeResult>('organize_folder', { path, strategy, dryRun });
+}
+
+export async function batchRename(
+    files: string[],
+    pattern: string,
+    find?: string,
+    replace?: string,
+    counterStart?: number,
+    previewOnly?: boolean
+): Promise<RenamePreview[]> {
+    return invoke<RenamePreview[]>('batch_rename', {
+        files,
+        pattern,
+        find,
+        replace,
+        counterStart,
+        previewOnly,
+    });
+}
+
+export async function safeDeleteFiles(paths: string[]): Promise<FileOpChange[]> {
+    return invoke<FileOpChange[]>('safe_delete_files', { paths });
+}
+
+export async function analyzeWorkspace(path: string): Promise<WorkspaceAnalysis> {
+    return invoke<WorkspaceAnalysis>('analyze_workspace', { path });
+}
+
+export async function undoFileOperation(operationId: string): Promise<FileOpChange[]> {
+    return invoke<FileOpChange[]>('undo_file_operation', { operationId });
+}
+
+export async function listFileOperations(): Promise<[string, string, string][]> {
+    return invoke<[string, string, string][]>('list_file_operations');
+}
+
+// ============ AI Agent Commands ============
+
+export async function planTask(
+    instruction: string,
+    workspacePath: string
+): Promise<TaskPlan> {
+    return invoke<TaskPlan>('plan_task', { instruction, workspacePath });
+}
+
+export async function executeAgentTask(
+    planId: string,
+    onEvent: (event: AgentEvent) => void
+): Promise<ExecutionResult> {
+    const channel = new Channel<AgentEvent>();
+    channel.onmessage = onEvent;
+
+    return invoke<ExecutionResult>('execute_agent_task', {
+        planId,
+        onEvent: channel,
+    });
+}
+
+export async function getAgentPlan(planId: string): Promise<TaskPlan | null> {
+    return invoke<TaskPlan | null>('get_agent_plan', { planId });
+}
+
+export async function cancelAgentPlan(planId: string): Promise<void> {
+    return invoke<void>('cancel_agent_plan', { planId });
+}
+
+export async function agentAnalyzeWorkspace(path: string): Promise<WorkspaceAnalysis> {
+    return invoke<WorkspaceAnalysis>('agent_analyze_workspace', { path });
+}

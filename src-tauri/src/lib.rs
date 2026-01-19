@@ -9,7 +9,8 @@ mod services;
 
 use ai::AIProviderManager;
 use services::{
-    DocumentService, FileManager, FolderManager, ImageService, TaskManager, WebResearchService,
+    CoworkAgent, DocumentService, FileManager, FileOperationEngine, FolderManager, ImageService,
+    TaskManager, WebResearchService,
 };
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -23,7 +24,17 @@ pub fn run() {
     let task_manager = TaskManager::new(ai_provider.clone());
 
     // Initialize file manager
-    let file_manager = FileManager::new();
+    let file_manager = Arc::new(FileManager::new());
+
+    // Initialize file operation engine (AI-driven operations)
+    let file_ops = Arc::new(FileOperationEngine::new());
+
+    // Initialize cowork agent (natural language file operations)
+    let cowork_agent = Arc::new(CoworkAgent::new(
+        ai_provider.clone(),
+        file_ops.clone(),
+        file_manager.clone(),
+    ));
 
     // Initialize web research service
     let web_research = WebResearchService::new();
@@ -46,6 +57,8 @@ pub fn run() {
         // Managed state
         .manage(task_manager)
         .manage(file_manager)
+        .manage(file_ops)
+        .manage(cowork_agent)
         .manage(web_research)
         .manage(document_service)
         .manage(image_service)
@@ -69,6 +82,15 @@ pub fn run() {
                 let fm = app_handle.state::<FolderManager>();
                 if let Err(e) = fm.init().await {
                     tracing::error!("Failed to init folder manager: {}", e);
+                }
+            });
+
+            // Initialize file operation engine in background
+            let app_handle2 = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                let ops = app_handle2.state::<Arc<FileOperationEngine>>();
+                if let Err(e) = ops.init().await {
+                    tracing::error!("Failed to init file operation engine: {}", e);
                 }
             });
 
@@ -124,6 +146,20 @@ pub fn run() {
             commands::list_user_folders,
             commands::remove_user_folder,
             commands::update_folder_access,
+            // File Operations commands (NEW - AI Agent)
+            commands::move_files,
+            commands::organize_folder,
+            commands::batch_rename,
+            commands::safe_delete_files,
+            commands::analyze_workspace,
+            commands::undo_file_operation,
+            commands::list_file_operations,
+            // Agent commands (NEW - AI Agent)
+            commands::plan_task,
+            commands::execute_agent_task,
+            commands::get_agent_plan,
+            commands::cancel_agent_plan,
+            commands::agent_analyze_workspace,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
