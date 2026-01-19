@@ -5,12 +5,59 @@ All notable changes to Rainy Cowork will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.3.0] - 2026-01-18
+## [0.3.1] - 2026-01-19
 
-### Added - Phase 3: Content Extraction (Milestone 3.1)
+### Added - Folder Upload & Project System
 
 **Rust Backend (`src-tauri/src/`)**
-- `services/web_research.rs` - Web content extraction service:
+- `models/folder.rs` - UserFolder model with persistence:
+  - ID, path, name, accessType
+  - `addedAt` and `lastAccessed` timestamps for history ordering
+- `services/folder_manager.rs` - Folder management service:
+  - JSON persistence in app data directory
+  - Add/remove/list folders
+  - `update_last_accessed()` for recent ordering
+  - Automatic sorting by most recent first
+- `commands/folder.rs` - Tauri commands:
+  - `add_user_folder` - Add folder via picker
+  - `list_user_folders` - Get all folders (sorted by recent)
+  - `remove_user_folder` - Delete a folder
+  - `update_folder_access` - Update last accessed timestamp
+
+**Frontend (`src/`)**
+- `hooks/useFolderManager.ts` - React hook for folder operations:
+  - Native folder picker via `@tauri-apps/plugin-dialog`
+  - Automatic refresh and ordering
+- `services/tauri.ts` - UserFolder type and bindings
+
+### Added - Folder UX Enhancements
+
+- **Active Folder Indicator** - Visual highlighting in sidebar when a project is selected
+- **Recent Project Ordering** - Folders sorted by `lastAccessed` (most recent first)
+- **Workspace Title Header** - "Rainy Cowork in [path]" displayed in main content when a folder is active
+
+**Frontend Changes**
+- `components/layout/TahoeLayout.tsx` - Added workspace title header with folder icon
+- `components/layout/FloatingSidebar.tsx` - Added `activeFolderId` prop for highlighting
+- `App.tsx` - Active folder state tracking, calls `updateFolderAccess` on selection
+
+### Added - Folder Requirement Gate
+
+- **System blocked without folder** - Tasks and AI features require an active folder
+- `NoFolderGate` component prompts users to select a folder before using the system
+- Clear messaging: "To get started, select a folder where Rainy Cowork will work"
+
+### Technical
+- Folders persist in `~/.tauri/com.enosislabs.rainycowork/user_folders.json`
+- macOS/Windows folder picker handled via Tauri dialog plugin
+- Existing `dialog:allow-open` capability already configured
+
+## [0.3.0] - 2026-01-18
+
+### Added - Phase 3: Web Research
+
+**Rust Backend (`src-tauri/src/`)**
+- `services/web_research.rs` - Web Research service:
   - URL fetching with reqwest
   - HTML-to-Markdown conversion (Rust-native via scraper)
   - DashMap caching with 5-minute TTL
@@ -21,7 +68,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `clear_web_cache` - Clear cached content
 
 **Frontend (`src/`)**
-- `types/web.ts` - WebContent and WebCacheStats types
+- `types/web.ts` - WebResearchContent and WebCacheStats types
 - `hooks/useWebResearch.ts` - React hook for content extraction
 
 **Dependencies**
@@ -42,7 +89,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `POST /api/v1/search/extract` - Content extraction
   - Cowork plan `web_research` feature gating
 
-### Added - Phase 3: Document Generation (Milestone 3.2)
+### Added - Phase 3: Document Generation
 
 **Rust Backend (`src-tauri/src/`)**
 - `services/document.rs` - Document generation service:
@@ -62,7 +109,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 **Dependencies**
 - `handlebars` v6 - Template rendering
 
-### Added - Phase 3: Image Processing (Milestone 3.3)
+### Added - Phase 3: Image Processing
 
 **Rust Backend (`src-tauri/src/`)**
 - `services/image.rs` - Image processing service:

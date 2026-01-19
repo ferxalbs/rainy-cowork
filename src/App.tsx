@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { TahoeLayout, TaskInput, TaskCard, FileTable, SettingsPanel, AIDocumentPanel, AIResearchPanel } from "./components";
 import { Separator, Button } from "@heroui/react";
-import { Zap, CheckCircle2, ListTodo, Settings, AlertCircle, FileText, Search } from "lucide-react";
+import { Zap, CheckCircle2, ListTodo, Settings, AlertCircle, FileText, Search, FolderPlus } from "lucide-react";
 import { useTauriTask, useAIProvider, useFolderManager } from "./hooks";
 import type { Task, ProviderType, Folder, FileChange } from "./types";
 import * as tauri from "./services/tauri";
@@ -209,87 +209,102 @@ function App() {
             </div>
           )}
 
-          {/* AI Studio Sections */}
+          {/* AI Studio Sections - Require active folder */}
           {activeSection === 'documents' && (
             <div className="animate-appear">
-              <AIDocumentPanel />
+              {activeFolder ? (
+                <AIDocumentPanel />
+              ) : (
+                <NoFolderGate onAddFolder={addFolder} />
+              )}
             </div>
           )}
 
           {activeSection === 'research' && (
             <div className="animate-appear">
-              <AIResearchPanel />
+              {activeFolder ? (
+                <AIResearchPanel />
+              ) : (
+                <NoFolderGate onAddFolder={addFolder} />
+              )}
             </div>
           )}
 
           {/* Task Sections - Only show when not in AI Studio */}
           {!isAIStudioSection && (
             <>
-              {/* Task Input Section */}
-              <div className="floating-card p-5 animate-appear">
-                <TaskInput onSubmit={handleTaskSubmit} isLoading={isLoading} />
-              </div>
-
-              {/* Tasks Section */}
-              {displayTasks.length > 0 && (
-                <section className="space-y-4">
-                  <div className="flex items-center gap-2 px-1">
-                    {sectionTitle.icon}
-                    <h2 className="text-base font-semibold">{sectionTitle.label}</h2>
-                    <span className="text-sm text-muted-foreground">({displayTasks.length})</span>
+              {/* Folder Gate - Show prompt if no folder is selected */}
+              {!activeFolder ? (
+                <NoFolderGate onAddFolder={addFolder} />
+              ) : (
+                <>
+                  {/* Task Input Section */}
+                  <div className="floating-card p-5 animate-appear">
+                    <TaskInput onSubmit={handleTaskSubmit} isLoading={isLoading} />
                   </div>
-                  <div className="space-y-3">
-                    {displayTasks.map((task) => (
-                      <TaskCard
-                        key={task.id}
-                        task={convertTask(task)}
-                        onPause={handleTaskPause}
-                        onStop={handleTaskStop}
-                      />
-                    ))}
-                  </div>
-                </section>
-              )}
 
-              {/* Divider */}
-              {displayTasks.length > 0 && fileChanges.length > 0 && <Separator />}
+                  {/* Tasks Section */}
+                  {displayTasks.length > 0 && (
+                    <section className="space-y-4">
+                      <div className="flex items-center gap-2 px-1">
+                        {sectionTitle.icon}
+                        <h2 className="text-base font-semibold">{sectionTitle.label}</h2>
+                        <span className="text-sm text-muted-foreground">({displayTasks.length})</span>
+                      </div>
+                      <div className="space-y-3">
+                        {displayTasks.map((task) => (
+                          <TaskCard
+                            key={task.id}
+                            task={convertTask(task)}
+                            onPause={handleTaskPause}
+                            onStop={handleTaskStop}
+                          />
+                        ))}
+                      </div>
+                    </section>
+                  )}
 
-              {/* File Changes Section */}
-              {fileChanges.length > 0 && <FileTable changes={fileChanges} />}
+                  {/* Divider */}
+                  {displayTasks.length > 0 && fileChanges.length > 0 && <Separator />}
 
-              {/* Empty State */}
-              {tasks.length === 0 && (
-                <div className="floating-card p-8 text-center animate-appear">
-                  <div className="space-y-3">
-                    <div className="size-14 mx-auto bg-muted/50 rounded-2xl flex items-center justify-center">
-                      <Zap className="size-7 text-muted-foreground" />
+                  {/* File Changes Section */}
+                  {fileChanges.length > 0 && <FileTable changes={fileChanges} />}
+
+                  {/* Empty State */}
+                  {tasks.length === 0 && (
+                    <div className="floating-card p-8 text-center animate-appear">
+                      <div className="space-y-3">
+                        <div className="size-14 mx-auto bg-muted/50 rounded-2xl flex items-center justify-center">
+                          <Zap className="size-7 text-muted-foreground" />
+                        </div>
+                        <p className="text-base font-medium text-foreground">
+                          No tasks yet
+                        </p>
+                        <p className="text-sm text-muted-foreground max-w-xs mx-auto">
+                          Type a task above to get started with your AI assistant. Press ⌘+Enter to submit.
+                        </p>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onPress={() => setSettingsOpen(true)}
+                          className="mt-2"
+                        >
+                          <Settings className="size-4" />
+                          Configure API Keys
+                        </Button>
+                      </div>
                     </div>
-                    <p className="text-base font-medium text-foreground">
-                      No tasks yet
-                    </p>
-                    <p className="text-sm text-muted-foreground max-w-xs mx-auto">
-                      Type a task above to get started with your AI assistant. Press ⌘+Enter to submit.
-                    </p>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onPress={() => setSettingsOpen(true)}
-                      className="mt-2"
-                    >
-                      <Settings className="size-4" />
-                      Configure API Keys
-                    </Button>
-                  </div>
-                </div>
-              )}
+                  )}
 
-              {/* Empty section state */}
-              {tasks.length > 0 && displayTasks.length === 0 && (
-                <div className="floating-card p-6 text-center animate-appear">
-                  <p className="text-sm text-muted-foreground">
-                    No {activeSection} tasks
-                  </p>
-                </div>
+                  {/* Empty section state */}
+                  {tasks.length > 0 && displayTasks.length === 0 && (
+                    <div className="floating-card p-6 text-center animate-appear">
+                      <p className="text-sm text-muted-foreground">
+                        No {activeSection} tasks
+                      </p>
+                    </div>
+                  )}
+                </>
               )}
             </>
           )}
@@ -302,6 +317,40 @@ function App() {
         onClose={() => setSettingsOpen(false)}
       />
     </>
+  );
+}
+
+/**
+ * Gate component shown when no folder is selected.
+ * Prompts user to select a project folder before using the system.
+ */
+function NoFolderGate({ onAddFolder }: { onAddFolder: () => void }) {
+  return (
+    <div className="floating-card p-8 text-center animate-appear">
+      <div className="space-y-4">
+        <div className="size-16 mx-auto bg-primary/10 rounded-2xl flex items-center justify-center">
+          <FolderPlus className="size-8 text-primary" />
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-lg font-semibold text-foreground">
+            Select a Project Folder
+          </h2>
+          <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+            To get started, select a folder where Rainy Cowork will work.
+            All files, documents, and AI-generated content will be saved there.
+          </p>
+        </div>
+        <Button
+          variant="primary"
+          size="md"
+          onPress={onAddFolder}
+          className="mt-2"
+        >
+          <FolderPlus className="size-4" />
+          Add Folder
+        </Button>
+      </div>
+    </div>
   );
 }
 
