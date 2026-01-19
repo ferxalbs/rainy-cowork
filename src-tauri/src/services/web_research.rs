@@ -18,6 +18,8 @@ pub enum WebResearchError {
     InvalidUrl(String),
     #[error("Content extraction failed: {0}")]
     ExtractionError(String),
+    /// Rate limited response - for future use when implementing rate limiting
+    #[allow(dead_code)]
     #[error("Rate limited: try again in {0} seconds")]
     RateLimited(u64),
 }

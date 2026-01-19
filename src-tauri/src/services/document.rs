@@ -5,7 +5,6 @@
 use handlebars::{Handlebars, RenderError};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::Arc;
 use thiserror::Error;
 
 /// Error types for document generation
@@ -15,8 +14,12 @@ pub enum DocumentError {
     TemplateNotFound(String),
     #[error("Render error: {0}")]
     RenderError(#[from] RenderError),
+    /// For future context validation
+    #[allow(dead_code)]
     #[error("Invalid context: {0}")]
     InvalidContext(String),
+    /// For future export functionality
+    #[allow(dead_code)]
     #[error("Export error: {0}")]
     ExportError(String),
 }
@@ -403,7 +406,7 @@ impl DocumentService {
         context: &serde_json::Value,
     ) -> Result<GeneratedDocument, DocumentError> {
         // Check template exists
-        let template = self
+        let _template = self
             .templates
             .get(template_id)
             .ok_or_else(|| DocumentError::TemplateNotFound(template_id.to_string()))?;

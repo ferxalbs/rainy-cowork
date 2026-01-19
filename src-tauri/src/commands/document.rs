@@ -2,9 +2,7 @@
 // Tauri commands for document creation and template management
 // Part of Rainy Cowork Phase 3 - Milestone 3.2
 
-use crate::services::document::{
-    DocumentService, DocumentTemplate, GeneratedDocument, TemplateCategory,
-};
+use crate::services::document::{DocumentService, DocumentTemplate, TemplateCategory};
 use serde::{Deserialize, Serialize};
 use tauri::{command, State};
 
@@ -64,10 +62,12 @@ pub struct GenerateDocumentResponse {
 
 /// List all available document templates
 #[command]
-pub fn list_document_templates(
-    service: State<'_, DocumentService>,
-) -> Vec<TemplateInfo> {
-    service.list_templates().iter().map(|t| TemplateInfo::from(*t)).collect()
+pub fn list_document_templates(service: State<'_, DocumentService>) -> Vec<TemplateInfo> {
+    service
+        .list_templates()
+        .iter()
+        .map(|t| TemplateInfo::from(*t))
+        .collect()
 }
 
 /// Get templates by category

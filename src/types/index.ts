@@ -3,6 +3,7 @@
 
 export * from './web';
 export * from './document';
+export * from './image';
 
 /**
  * Task status enum for tracking task lifecycle

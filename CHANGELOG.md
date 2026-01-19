@@ -62,6 +62,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 **Dependencies**
 - `handlebars` v6 - Template rendering
 
+### Added - Phase 3: Image Processing (Milestone 3.3)
+
+**Rust Backend (`src-tauri/src/`)**
+- `services/image.rs` - Image processing service:
+  - EXIF metadata extraction (camera, date, GPS, settings)
+  - Thumbnail generation (base64 PNG)
+  - Image dimensions and format detection
+- `commands/image.rs` - Tauri commands:
+  - `get_image_metadata` - Full metadata + EXIF
+  - `generate_thumbnail` - Resized preview image
+  - `get_image_dimensions` - Quick width/height
+  - `is_image_supported` - Format check
+
+**Frontend (`src/`)**
+- `types/image.ts` - ImageMetadata, ExifData, ThumbnailResult types
+- `hooks/useImage.ts` - React hook for image operations
+
+**Dependencies**
+- `image` v0.25 - Image processing
+- `kamadak-exif` v0.5 - EXIF parsing
+- `base64` v0.22 - Thumbnail encoding
 
 
 ### Added - Cowork Plan Integration

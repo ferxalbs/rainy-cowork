@@ -8,7 +8,7 @@ mod models;
 mod services;
 
 use ai::AIProviderManager;
-use services::{DocumentService, FileManager, TaskManager, WebResearchService};
+use services::{DocumentService, FileManager, ImageService, TaskManager, WebResearchService};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -29,6 +29,9 @@ pub fn run() {
     // Initialize document service
     let document_service = DocumentService::new();
 
+    // Initialize image service
+    let image_service = ImageService::new();
+
     tauri::Builder::default()
         // Plugins
         .plugin(tauri_plugin_opener::init())
@@ -40,6 +43,7 @@ pub fn run() {
         .manage(file_manager)
         .manage(web_research)
         .manage(document_service)
+        .manage(image_service)
         .manage(ai_provider) // Arc<Mutex<AIProviderManager>>
         // Commands
         .invoke_handler(tauri::generate_handler![
@@ -81,6 +85,11 @@ pub fn run() {
             commands::get_template,
             commands::generate_document,
             commands::markdown_to_html,
+            // Image commands
+            commands::get_image_metadata,
+            commands::generate_thumbnail,
+            commands::get_image_dimensions,
+            commands::is_image_supported,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
