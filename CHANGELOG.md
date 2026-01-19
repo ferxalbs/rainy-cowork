@@ -5,7 +5,36 @@ All notable changes to Rainy Cowork will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-01-18
+
+### Added - Phase 3: Content Extraction (Milestone 3.1)
+
+**Rust Backend (`src-tauri/src/`)**
+- `services/web_research.rs` - Web content extraction service:
+  - URL fetching with reqwest
+  - HTML-to-Markdown conversion (Rust-native via scraper)
+  - DashMap caching with 5-minute TTL
+  - Error handling with `WebResearchError` enum
+- `commands/web.rs` - Tauri commands:
+  - `fetch_web_content` - Extract content from URL
+  - `get_web_cache_stats` - Cache statistics
+  - `clear_web_cache` - Clear cached content
+
+**Frontend (`src/`)**
+- `types/web.ts` - WebContent and WebCacheStats types
+- `hooks/useWebResearch.ts` - React hook for content extraction
+
+**Dependencies**
+- `scraper` v0.23 - HTML parsing
+- `url` v2.5 - URL validation
+- `regex` v1.11 - Markdown cleanup
+
+**Documentation**
+- `ROADMAP.md` - Public roadmap with version milestones
+- Web search deferred to v0.4.0 (Rainy API v2)
+
 ## [0.2.1] - 2026-01-18
+
 
 ### Added - Cowork Plan Integration
 

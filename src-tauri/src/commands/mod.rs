@@ -4,7 +4,9 @@
 pub mod ai;
 pub mod file;
 pub mod task;
+pub mod web;
 
 pub use ai::*;
 pub use file::*;
 pub use task::*;
+pub use web::*;

@@ -1,6 +1,8 @@
 // Rainy Cowork - Type Definitions
 // Updated for Rainy API + Gemini provider model
 
+export * from './web';
+
 /**
  * Task status enum for tracking task lifecycle
  */
