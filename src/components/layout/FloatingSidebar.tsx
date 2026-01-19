@@ -12,6 +12,8 @@ import {
     Shield,
     Palette,
     Plus,
+    FileText,
+    Search,
 } from "lucide-react";
 import { useState } from "react";
 import type { Folder } from "../../types";
@@ -46,6 +48,7 @@ export function FloatingSidebar({
     const [expandedSections, setExpandedSections] = useState({
         folders: true,
         tasks: true,
+        aiStudio: true,
         settings: false,
     });
 
@@ -119,6 +122,33 @@ export function FloatingSidebar({
                             badge={taskCounts.completed > 0 ? taskCounts.completed : undefined}
                             isActive={activeSection === "completed"}
                             onClick={() => onNavigate?.("completed")}
+                        />
+                    </div>
+                )}
+            </div>
+
+            <Separator className="my-1 mx-2" />
+
+            {/* AI Studio Section */}
+            <div className="p-2 pt-1">
+                <SectionHeader
+                    label="AI Studio"
+                    isExpanded={expandedSections.aiStudio}
+                    onToggle={() => toggleSection("aiStudio")}
+                />
+                {expandedSections.aiStudio && (
+                    <div className="space-y-0.5 mt-1">
+                        <SidebarItem
+                            icon={<FileText className="size-4" />}
+                            label="Documents"
+                            isActive={activeSection === "documents"}
+                            onClick={() => onNavigate?.("documents")}
+                        />
+                        <SidebarItem
+                            icon={<Search className="size-4" />}
+                            label="Research"
+                            isActive={activeSection === "research"}
+                            onClick={() => onNavigate?.("research")}
                         />
                     </div>
                 )}

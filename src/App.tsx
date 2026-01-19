@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
-import { TahoeLayout, TaskInput, TaskCard, FileTable, SettingsPanel } from "./components";
+import { TahoeLayout, TaskInput, TaskCard, FileTable, SettingsPanel, AIDocumentPanel, AIResearchPanel } from "./components";
 import { Separator, Button } from "@heroui/react";
-import { Zap, CheckCircle2, ListTodo, Settings, AlertCircle } from "lucide-react";
+import { Zap, CheckCircle2, ListTodo, Settings, AlertCircle, FileText, Search } from "lucide-react";
 import { useTauriTask, useAIProvider } from "./hooks";
 import type { Task, ProviderType, Folder, FileChange } from "./types";
 import * as tauri from "./services/tauri";
@@ -148,7 +148,12 @@ function App() {
     running: { icon: <Zap className="size-5 text-blue-500 shrink-0" />, label: "Active Tasks" },
     completed: { icon: <CheckCircle2 className="size-5 text-green-500 shrink-0" />, label: "Completed Tasks" },
     queued: { icon: <ListTodo className="size-5 text-orange-500 shrink-0" />, label: "Queued Tasks" },
+    documents: { icon: <FileText className="size-5 text-accent shrink-0" />, label: "AI Documents" },
+    research: { icon: <Search className="size-5 text-accent shrink-0" />, label: "AI Research" },
   }[activeSection] || { icon: <Zap className="size-5 text-blue-500 shrink-0" />, label: "Tasks" };
+
+  // Check if we're in AI Studio section
+  const isAIStudioSection = activeSection === 'documents' || activeSection === 'research';
 
   return (
     <>
@@ -180,71 +185,89 @@ function App() {
             </div>
           )}
 
-          {/* Task Input Section */}
-          <div className="floating-card p-5 animate-appear">
-            <TaskInput onSubmit={handleTaskSubmit} isLoading={isLoading} />
-          </div>
-
-          {/* Tasks Section */}
-          {displayTasks.length > 0 && (
-            <section className="space-y-4">
-              <div className="flex items-center gap-2 px-1">
-                {sectionTitle.icon}
-                <h2 className="text-base font-semibold">{sectionTitle.label}</h2>
-                <span className="text-sm text-muted-foreground">({displayTasks.length})</span>
-              </div>
-              <div className="space-y-3">
-                {displayTasks.map((task) => (
-                  <TaskCard
-                    key={task.id}
-                    task={convertTask(task)}
-                    onPause={handleTaskPause}
-                    onStop={handleTaskStop}
-                  />
-                ))}
-              </div>
-            </section>
+          {/* AI Studio Sections */}
+          {activeSection === 'documents' && (
+            <div className="animate-appear">
+              <AIDocumentPanel />
+            </div>
           )}
 
-          {/* Divider */}
-          {displayTasks.length > 0 && fileChanges.length > 0 && <Separator />}
+          {activeSection === 'research' && (
+            <div className="animate-appear">
+              <AIResearchPanel />
+            </div>
+          )}
 
-          {/* File Changes Section */}
-          {fileChanges.length > 0 && <FileTable changes={fileChanges} />}
+          {/* Task Sections - Only show when not in AI Studio */}
+          {!isAIStudioSection && (
+            <>
+              {/* Task Input Section */}
+              <div className="floating-card p-5 animate-appear">
+                <TaskInput onSubmit={handleTaskSubmit} isLoading={isLoading} />
+              </div>
 
-          {/* Empty State */}
-          {tasks.length === 0 && (
-            <div className="floating-card p-8 text-center animate-appear">
-              <div className="space-y-3">
-                <div className="size-14 mx-auto bg-muted/50 rounded-2xl flex items-center justify-center">
-                  <Zap className="size-7 text-muted-foreground" />
+              {/* Tasks Section */}
+              {displayTasks.length > 0 && (
+                <section className="space-y-4">
+                  <div className="flex items-center gap-2 px-1">
+                    {sectionTitle.icon}
+                    <h2 className="text-base font-semibold">{sectionTitle.label}</h2>
+                    <span className="text-sm text-muted-foreground">({displayTasks.length})</span>
+                  </div>
+                  <div className="space-y-3">
+                    {displayTasks.map((task) => (
+                      <TaskCard
+                        key={task.id}
+                        task={convertTask(task)}
+                        onPause={handleTaskPause}
+                        onStop={handleTaskStop}
+                      />
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {/* Divider */}
+              {displayTasks.length > 0 && fileChanges.length > 0 && <Separator />}
+
+              {/* File Changes Section */}
+              {fileChanges.length > 0 && <FileTable changes={fileChanges} />}
+
+              {/* Empty State */}
+              {tasks.length === 0 && (
+                <div className="floating-card p-8 text-center animate-appear">
+                  <div className="space-y-3">
+                    <div className="size-14 mx-auto bg-muted/50 rounded-2xl flex items-center justify-center">
+                      <Zap className="size-7 text-muted-foreground" />
+                    </div>
+                    <p className="text-base font-medium text-foreground">
+                      No tasks yet
+                    </p>
+                    <p className="text-sm text-muted-foreground max-w-xs mx-auto">
+                      Type a task above to get started with your AI assistant. Press ⌘+Enter to submit.
+                    </p>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onPress={() => setSettingsOpen(true)}
+                      className="mt-2"
+                    >
+                      <Settings className="size-4" />
+                      Configure API Keys
+                    </Button>
+                  </div>
                 </div>
-                <p className="text-base font-medium text-foreground">
-                  No tasks yet
-                </p>
-                <p className="text-sm text-muted-foreground max-w-xs mx-auto">
-                  Type a task above to get started with your AI assistant. Press ⌘+Enter to submit.
-                </p>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onPress={() => setSettingsOpen(true)}
-                  className="mt-2"
-                >
-                  <Settings className="size-4" />
-                  Configure API Keys
-                </Button>
-              </div>
-            </div>
-          )}
+              )}
 
-          {/* Empty section state */}
-          {tasks.length > 0 && displayTasks.length === 0 && (
-            <div className="floating-card p-6 text-center animate-appear">
-              <p className="text-sm text-muted-foreground">
-                No {activeSection} tasks
-              </p>
-            </div>
+              {/* Empty section state */}
+              {tasks.length > 0 && displayTasks.length === 0 && (
+                <div className="floating-card p-6 text-center animate-appear">
+                  <p className="text-sm text-muted-foreground">
+                    No {activeSection} tasks
+                  </p>
+                </div>
+              )}
+            </>
           )}
         </div>
       </TahoeLayout>

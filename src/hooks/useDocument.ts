@@ -1,5 +1,5 @@
 // useDocument Hook
-// React hook for document generation
+// React hook for document generation with AI agent support
 // Part of Rainy Cowork Phase 3
 
 import { useState, useCallback, useEffect } from 'react';
@@ -10,6 +10,10 @@ import type {
     DocumentContext,
     TemplateCategory,
 } from '../types/document';
+import type { AgentResult } from '../types/agent';
+
+// API base URL for agent endpoints  
+const API_BASE = 'https://rainy-api-v2-179843975974.us-west1.run.app/api/v1';
 
 interface UseDocumentReturn {
     /** All available templates */
@@ -22,14 +26,18 @@ interface UseDocumentReturn {
     isLoading: boolean;
     /** Error message */
     error: string | null;
+    /** AI generation in progress */
+    isAiGenerating: boolean;
     /** Load all templates */
     loadTemplates: () => Promise<void>;
     /** Get templates by category */
     getByCategory: (category: TemplateCategory) => Promise<TemplateInfo[]>;
     /** Select a template */
     selectTemplate: (templateId: string) => Promise<void>;
-    /** Generate document from template */
+    /** Generate document from template (local Rust) */
     generate: (templateId: string, context: DocumentContext) => Promise<GeneratedDocument>;
+    /** Generate document with AI agent (remote) */
+    generateWithAI: (prompt: string, templateId?: string, context?: Record<string, unknown>) => Promise<AgentResult | null>;
     /** Convert markdown to HTML */
     toHtml: (markdown: string) => Promise<string>;
     /** Clear generated document */
@@ -37,30 +45,38 @@ interface UseDocumentReturn {
 }
 
 /**
- * Hook for document generation
+ * Helper to get API key
+ */
+async function getApiKey(): Promise<string | null> {
+    try {
+        return await invoke<string | null>('get_api_key', { provider: 'rainy' });
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Hook for document generation with AI support
  *
  * @example
  * ```tsx
  * const {
  *   templates,
- *   selectedTemplate,
- *   generate,
+ *   generate,        // Local template-based generation
+ *   generateWithAI,  // AI-powered generation
  *   generatedDoc,
- *   isLoading
+ *   isLoading,
+ *   isAiGenerating
  * } = useDocument();
  *
- * // Load templates on mount
- * useEffect(() => { loadTemplates(); }, []);
+ * // Template-based (local/fast)
+ * const doc = await generate('meeting_notes', { title: 'Sprint' });
  *
- * // Generate document
- * const handleGenerate = async () => {
- *   const doc = await generate('meeting_notes', {
- *     title: 'Sprint Planning',
- *     date: '2026-01-18',
- *     attendees: 'Team A'
- *   });
- *   console.log(doc.content);
- * };
+ * // AI-powered (remote/smart)
+ * const aiDoc = await generateWithAI(
+ *   'Create meeting notes for our product launch discussion',
+ *   'meeting_notes'
+ * );
  * ```
  */
 export function useDocument(): UseDocumentReturn {
@@ -68,6 +84,7 @@ export function useDocument(): UseDocumentReturn {
     const [selectedTemplate, setSelectedTemplate] = useState<TemplateInfo | null>(null);
     const [generatedDoc, setGeneratedDoc] = useState<GeneratedDocument | null>(null);
     const [isLoading, setIsLoading] = useState(false);
+    const [isAiGenerating, setIsAiGenerating] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const loadTemplates = useCallback(async (): Promise<void> => {
@@ -105,6 +122,7 @@ export function useDocument(): UseDocumentReturn {
         }
     }, []);
 
+    // Local template-based generation (Rust backend)
     const generate = useCallback(async (
         templateId: string,
         context: DocumentContext
@@ -124,6 +142,81 @@ export function useDocument(): UseDocumentReturn {
             throw new Error(message);
         } finally {
             setIsLoading(false);
+        }
+    }, []);
+
+    // AI-powered generation (remote agent)
+    const generateWithAI = useCallback(async (
+        prompt: string,
+        templateId?: string,
+        context?: Record<string, unknown>
+    ): Promise<AgentResult | null> => {
+        setIsAiGenerating(true);
+        setError(null);
+
+        try {
+            const apiKey = await getApiKey();
+            if (!apiKey) {
+                throw new Error('No API key configured. Please add your Rainy API key in settings.');
+            }
+
+            const response = await fetch(`${API_BASE}/agents/document`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`,
+                },
+                body: JSON.stringify({
+                    prompt,
+                    templateId,
+                    context,
+                    async: false, // Synchronous for now
+                }),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+
+                // Check if upgrade is required
+                if (response.status === 403 && errorData.upgrade_required) {
+                    throw new Error(errorData.message || 'Upgrade to Cowork Plus for AI document generation');
+                }
+
+                throw new Error(errorData.message || `HTTP ${response.status}`);
+            }
+
+            const data = await response.json();
+
+            const result: AgentResult = {
+                success: true,
+                content: typeof data.result === 'string' ? data.result : JSON.stringify(data.result, null, 2),
+                network: data.network,
+                generatedAt: data.generatedAt,
+            };
+
+            // Also update generatedDoc for compatibility
+            if (result.content) {
+                const html = await invoke<string>('markdown_to_html', { markdown: result.content }).catch(() => '');
+                setGeneratedDoc({
+                    id: crypto.randomUUID(),
+                    templateId: templateId || 'ai_generated',
+                    content: result.content,
+                    html,
+                    generatedAt: result.generatedAt || new Date().toISOString(),
+                    wordCount: result.content.split(/\s+/).length,
+                });
+            }
+
+            return result;
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'AI generation failed';
+            setError(message);
+            return {
+                success: false,
+                error: message,
+            };
+        } finally {
+            setIsAiGenerating(false);
         }
     }, []);
 
@@ -152,10 +245,12 @@ export function useDocument(): UseDocumentReturn {
         generatedDoc,
         isLoading,
         error,
+        isAiGenerating,
         loadTemplates,
         getByCategory,
         selectTemplate,
         generate,
+        generateWithAI,
         toHtml,
         clearGenerated,
     };
