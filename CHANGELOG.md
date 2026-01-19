@@ -55,6 +55,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Questions receive direct answers (e.g., "What files are here?" → list of files)
 - Commands create executable plans (e.g., "Organize by type" → plan with steps)
 
+**Smart Provider Selection (Production-Ready)**
+- Auto-selects best AI provider based on user's Cowork plan:
+  - Paid users → Rainy API (GPT-4o preferred, GPT-4o-mini fallback)
+  - Free users → Google Gemini (gemini-2.5-flash)
+- Automatic fallback if primary provider fails
+- Model attribution in every response ("_Powered by gpt-4o via Rainy API_")
+
 **Enhanced User Experience**
 - Clearer messaging for empty plans
 - Better error messages with actionable suggestions
@@ -63,6 +70,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - State type mismatch in file commands (`FileManager` → `Arc<FileManager>`)
 - Empty plan display for questions (now shows direct answers instead)
+- Hardcoded Gemini provider (now uses smart selection)
 
 ## [0.3.1] - 2026-01-19
 

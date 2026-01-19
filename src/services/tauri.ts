@@ -321,6 +321,12 @@ export interface WorkspaceAnalysis {
 
 export type TaskIntent = 'question' | 'command';
 
+export interface ModelInfo {
+    provider: string;
+    model: string;
+    planTier: string;
+}
+
 export interface PlannedStep {
     type: 'createFile' | 'modifyFile' | 'moveFile' | 'deleteFile' | 'organizeFolder' | 'batchRename' | 'analyzeContent';
     path?: string;
@@ -339,6 +345,7 @@ export interface TaskPlan {
     instruction: string;
     intent: TaskIntent;
     answer?: string;
+    modelUsed?: ModelInfo;
     steps: PlannedStep[];
     estimatedChanges: number;
     requiresConfirmation: boolean;

@@ -75,10 +75,15 @@ export function useCoworkAgent(): UseCoworkAgentReturn {
         try {
             const plan = await tauri.planTask(instruction, workspacePath);
 
+            // Build model attribution footer
+            const modelFooter = plan.modelUsed
+                ? `\n\n_Powered by ${plan.modelUsed.model} via ${plan.modelUsed.provider}_`
+                : '';
+
             // Handle QUESTIONS - show answer directly, no plan
             if (plan.intent === 'question' && plan.answer) {
                 updateMessage(thinkingId, {
-                    content: plan.answer,
+                    content: plan.answer + modelFooter,
                     isLoading: false,
                 });
                 // Don't set currentPlan for questions
@@ -91,7 +96,7 @@ export function useCoworkAgent(): UseCoworkAgentReturn {
 
             if (plan.steps.length === 0) {
                 updateMessage(thinkingId, {
-                    content: `I understand you want to "${instruction}", but I couldn't find any specific operations to perform. Could you be more specific about what files you'd like me to work with?`,
+                    content: `I understand you want to "${instruction}", but I couldn't find any specific operations to perform. Could you be more specific about what files you'd like me to work with?${modelFooter}`,
                     isLoading: false,
                 });
             } else {
@@ -100,7 +105,7 @@ export function useCoworkAgent(): UseCoworkAgentReturn {
                 ).join('\n');
 
                 updateMessage(thinkingId, {
-                    content: `I've created a plan with ${plan.steps.length} step(s):\n\n${planSummary}${plan.warnings.length > 0 ? `\n\n⚠️ Warnings:\n${plan.warnings.join('\n')}` : ''}`,
+                    content: `I've created a plan with ${plan.steps.length} step(s):\n\n${planSummary}${plan.warnings.length > 0 ? `\n\n⚠️ Warnings:\n${plan.warnings.join('\n')}` : ''}${modelFooter}`,
                     isLoading: false,
                     plan,
                 });
