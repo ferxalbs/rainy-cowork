@@ -5,9 +5,9 @@ import {
     FileCode,
     ChevronDown,
     ChevronRight,
-    CheckCircle2,
-    Timer,
-    ListTodo,
+    // CheckCircle2, // v0.4.8: Tasks section
+    // Timer, // v0.4.8: Tasks section
+    // ListTodo, // v0.4.8: Tasks section
     Sparkles,
     Shield,
     Palette,
@@ -44,7 +44,7 @@ export function FloatingSidebar({
     onFolderSelect,
     onNavigate,
     activeSection = "running",
-    taskCounts = { completed: 0, running: 0, queued: 0 },
+    taskCounts: _taskCounts = { completed: 0, running: 0, queued: 0 }, // v0.4.8: Tasks section
     onAddFolder,
 }: FloatingSidebarProps) {
     const [expandedSections, setExpandedSections] = useState({
@@ -96,7 +96,17 @@ export function FloatingSidebar({
 
             <Separator className="my-1 mx-2" />
 
-            {/* Tasks Section */}
+            {/* Cowork - Main Action */}
+            <div className="p-2 pt-1">
+                <SidebarItem
+                    icon={<Sparkles className="size-4" />}
+                    label="Cowork"
+                    isActive={activeSection === "cowork" || activeSection === "running"}
+                    onClick={() => onNavigate?.("cowork")}
+                />
+            </div>
+
+            {/* Tasks Section - Hidden for v0.4.8 multi-folder feature 
             <div className="p-2 pt-1">
                 <SectionHeader
                     label="Tasks"
@@ -129,24 +139,19 @@ export function FloatingSidebar({
                     </div>
                 )}
             </div>
+            */}
 
             <Separator className="my-1 mx-2" />
 
-            {/* AI Studio Section */}
+            {/* Tools Section */}
             <div className="p-2 pt-1">
                 <SectionHeader
-                    label="AI Studio"
+                    label="Tools"
                     isExpanded={expandedSections.aiStudio}
                     onToggle={() => toggleSection("aiStudio")}
                 />
                 {expandedSections.aiStudio && (
                     <div className="space-y-0.5 mt-1">
-                        <SidebarItem
-                            icon={<Sparkles className="size-4" />}
-                            label="AI Cowork"
-                            isActive={activeSection === "cowork"}
-                            onClick={() => onNavigate?.("cowork")}
-                        />
                         <SidebarItem
                             icon={<FileText className="size-4" />}
                             label="Documents"

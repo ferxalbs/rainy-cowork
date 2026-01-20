@@ -1,28 +1,25 @@
 import { useState, useCallback, useEffect } from "react";
-import { TahoeLayout, TaskInput, TaskCard, FileTable, SettingsPanel, AIDocumentPanel, AIResearchPanel } from "./components";
+import { TahoeLayout, TaskCard, SettingsPanel, AIDocumentPanel, AIResearchPanel } from "./components";
 import { SettingsPage } from "./components/settings";
 import { CoworkPanel } from "./components/cowork";
-import { Separator, Button } from "@heroui/react";
-import { Zap, CheckCircle2, ListTodo, Settings, AlertCircle, FileText, Search, FolderPlus } from "lucide-react";
+import { Button } from "@heroui/react";
+import { Zap, CheckCircle2, ListTodo, AlertCircle, FileText, Search, FolderPlus } from "lucide-react";
 import { useTauriTask, useAIProvider, useFolderManager } from "./hooks";
-import type { Task, ProviderType, Folder, FileChange } from "./types";
+import type { Task, Folder } from "./types";
 import * as tauri from "./services/tauri";
 
 function App() {
   // Tauri hooks
   const {
     tasks,
-    isLoading,
     error: taskError,
-    createTask,
-    executeTask,
     pauseTask,
     resumeTask,
     cancelTask,
     refreshTasks
   } = useTauriTask();
 
-  const { hasApiKey, refreshProviders } = useAIProvider();
+  const { refreshProviders } = useAIProvider();
 
   // Folder management hook
   const {
@@ -41,7 +38,6 @@ function App() {
 
   const [activeSection, setActiveSection] = useState("running");
   const [activeFolder, setActiveFolder] = useState<Folder | null>(null);
-  const [fileChanges, setFileChanges] = useState<FileChange[]>([]);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -57,42 +53,6 @@ function App() {
     running: tasks.filter((t) => t.status === "running" || t.status === "paused").length,
     queued: tasks.filter((t) => t.status === "queued").length,
   };
-
-  // Handle new task submission
-  const handleTaskSubmit = useCallback(async (
-    description: string,
-    provider: ProviderType,
-    model: string
-  ) => {
-    setSubmitError(null);
-
-    // Check if API key is configured
-    const providerId = provider === 'rainyApi' ? 'rainy_api' : 'gemini';
-    if (!hasApiKey(providerId)) {
-      setSubmitError(`Please configure your ${provider === 'rainyApi' ? 'Rainy API' : 'Gemini'} API key in Settings first.`);
-      setSettingsOpen(true);
-      return;
-    }
-
-    try {
-      // Create task via Tauri
-      const task = await createTask(description, provider, model);
-
-      // Execute the task
-      await executeTask(task.id);
-
-      // Refresh file changes after task completes
-      const changes = await tauri.listFileChanges(task.id);
-      if (changes.length > 0) {
-        setFileChanges(prev => [...changes.map(c => ({
-          ...c,
-          timestamp: new Date(c.timestamp),
-        })), ...prev]);
-      }
-    } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : String(err));
-    }
-  }, [createTask, executeTask, hasApiKey]);
 
   // Handle task pause
   const handleTaskPause = useCallback(async (taskId: string) => {
@@ -256,7 +216,7 @@ function App() {
             </div>
           )}
 
-          {/* Task Sections - Only show when not in AI Studio or Settings */}
+          {/* Default View - CoworkPanel when no special section selected */}
           {!isAIStudioSection && !isSettingsSection && (
             <>
               {/* Folder Gate - Show prompt if no folder is selected */}
@@ -264,14 +224,9 @@ function App() {
                 <NoFolderGate onAddFolder={addFolder} />
               ) : (
                 <>
-                  {/* Task Input Section */}
-                  <div className="floating-card p-5 animate-appear">
-                    <TaskInput onSubmit={handleTaskSubmit} isLoading={isLoading} />
-                  </div>
-
-                  {/* Tasks Section */}
-                  {displayTasks.length > 0 && (
-                    <section className="space-y-4">
+                  {/* Task Queue Sections - Show when Running/Queued/Completed selected */}
+                  {(activeSection === 'running' || activeSection === 'queued' || activeSection === 'completed') && displayTasks.length > 0 ? (
+                    <section className="space-y-4 animate-appear">
                       <div className="flex items-center gap-2 px-1">
                         {sectionTitle.icon}
                         <h2 className="text-base font-semibold">{sectionTitle.label}</h2>
@@ -288,46 +243,10 @@ function App() {
                         ))}
                       </div>
                     </section>
-                  )}
-
-                  {/* Divider */}
-                  {displayTasks.length > 0 && fileChanges.length > 0 && <Separator />}
-
-                  {/* File Changes Section */}
-                  {fileChanges.length > 0 && <FileTable changes={fileChanges} />}
-
-                  {/* Empty State */}
-                  {tasks.length === 0 && (
-                    <div className="floating-card p-8 text-center animate-appear">
-                      <div className="space-y-3">
-                        <div className="size-14 mx-auto bg-muted/50 rounded-2xl flex items-center justify-center">
-                          <Zap className="size-7 text-muted-foreground" />
-                        </div>
-                        <p className="text-base font-medium text-foreground">
-                          No tasks yet
-                        </p>
-                        <p className="text-sm text-muted-foreground max-w-xs mx-auto">
-                          Type a task above to get started with your AI assistant. Press ⌘+Enter to submit.
-                        </p>
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onPress={() => setSettingsOpen(true)}
-                          className="mt-2"
-                        >
-                          <Settings className="size-4" />
-                          Configure API Keys
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Empty section state */}
-                  {tasks.length > 0 && displayTasks.length === 0 && (
-                    <div className="floating-card p-6 text-center animate-appear">
-                      <p className="text-sm text-muted-foreground">
-                        No {activeSection} tasks
-                      </p>
+                  ) : (
+                    /* CoworkPanel - Central Default View */
+                    <div className="animate-appear h-[calc(100vh-120px)]">
+                      <CoworkPanel workspacePath={activeFolder.path} />
                     </div>
                   )}
                 </>
