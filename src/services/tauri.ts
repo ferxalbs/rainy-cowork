@@ -460,3 +460,48 @@ export async function cancelAgentPlan(planId: string): Promise<void> {
 export async function agentAnalyzeWorkspace(path: string): Promise<WorkspaceAnalysis> {
     return invoke<WorkspaceAnalysis>('agent_analyze_workspace', { path });
 }
+
+// ============ Settings Types ============
+
+export interface ModelOption {
+    id: string;
+    name: string;
+    description: string;
+    thinkingLevel: string;
+    isPremium: boolean;
+    isAvailable: boolean;
+    provider: string;
+}
+
+export interface UserSettings {
+    selectedModel: string;
+    theme: string;
+    notificationsEnabled: boolean;
+}
+
+// ============ Settings Commands ============
+
+export async function getUserSettings(): Promise<UserSettings> {
+    return invoke<UserSettings>('get_user_settings');
+}
+
+export async function getSelectedModel(): Promise<string> {
+    return invoke<string>('get_selected_model');
+}
+
+export async function setSelectedModel(model: string): Promise<void> {
+    return invoke<void>('set_selected_model', { model });
+}
+
+export async function setTheme(theme: string): Promise<void> {
+    return invoke<void>('set_theme', { theme });
+}
+
+export async function setNotifications(enabled: boolean): Promise<void> {
+    return invoke<void>('set_notifications', { enabled });
+}
+
+export async function getAvailableModels(): Promise<ModelOption[]> {
+    return invoke<ModelOption[]>('get_available_models');
+}
+

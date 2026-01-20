@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { TahoeLayout, TaskInput, TaskCard, FileTable, SettingsPanel, AIDocumentPanel, AIResearchPanel } from "./components";
+import { SettingsPage } from "./components/settings";
 import { CoworkPanel } from "./components/cowork";
 import { Separator, Button } from "@heroui/react";
 import { Zap, CheckCircle2, ListTodo, Settings, AlertCircle, FileText, Search, FolderPlus } from "lucide-react";
@@ -176,6 +177,10 @@ function App() {
   // Check if we're in AI Studio section
   const isAIStudioSection = activeSection === 'documents' || activeSection === 'research' || activeSection === 'cowork';
 
+  // Check if we're in Settings section
+  const isSettingsSection = activeSection.startsWith('settings-');
+  const settingsTab = isSettingsSection ? activeSection.replace('settings-', '') : 'models';
+
   return (
     <>
       <TahoeLayout
@@ -241,8 +246,18 @@ function App() {
             </div>
           )}
 
-          {/* Task Sections - Only show when not in AI Studio */}
-          {!isAIStudioSection && (
+          {/* Settings Section */}
+          {isSettingsSection && (
+            <div className="animate-appear h-[calc(100vh-120px)]">
+              <SettingsPage
+                initialTab={settingsTab}
+                onBack={() => handleNavigate('running')}
+              />
+            </div>
+          )}
+
+          {/* Task Sections - Only show when not in AI Studio or Settings */}
+          {!isAIStudioSection && !isSettingsSection && (
             <>
               {/* Folder Gate - Show prompt if no folder is selected */}
               {!activeFolder ? (

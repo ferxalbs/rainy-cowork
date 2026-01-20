@@ -174,9 +174,24 @@ export function FloatingSidebar({
                 />
                 {expandedSections.settings && (
                     <div className="space-y-0.5 mt-1">
-                        <SidebarItem icon={<Sparkles className="size-4" />} label="AI Provider" />
-                        <SidebarItem icon={<Shield className="size-4" />} label="Permissions" />
-                        <SidebarItem icon={<Palette className="size-4" />} label="Appearance" />
+                        <SidebarItem
+                            icon={<Sparkles className="size-4" />}
+                            label="AI Provider"
+                            isActive={activeSection === "settings-models"}
+                            onClick={() => onNavigate?.("settings-models")}
+                        />
+                        <SidebarItem
+                            icon={<Shield className="size-4" />}
+                            label="Permissions"
+                            isActive={activeSection === "settings-permissions"}
+                            onClick={() => onNavigate?.("settings-permissions")}
+                        />
+                        <SidebarItem
+                            icon={<Palette className="size-4" />}
+                            label="Appearance"
+                            isActive={activeSection === "settings-appearance"}
+                            onClick={() => onNavigate?.("settings-appearance")}
+                        />
                     </div>
                 )}
             </div>

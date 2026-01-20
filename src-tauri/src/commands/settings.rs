@@ -1,0 +1,70 @@
+// Rainy Cowork - Settings Commands
+// Tauri commands for user settings and model selection
+
+use crate::ai::provider::AIProviderManager;
+use crate::services::settings::{ModelOption, SettingsManager, UserSettings};
+use std::sync::Arc;
+use tauri::State;
+use tokio::sync::Mutex;
+
+/// Get all user settings
+#[tauri::command]
+pub async fn get_user_settings(
+    settings: State<'_, Arc<Mutex<SettingsManager>>>,
+) -> Result<UserSettings, String> {
+    let settings = settings.lock().await;
+    Ok(settings.get_settings().clone())
+}
+
+/// Get currently selected model
+#[tauri::command]
+pub async fn get_selected_model(
+    settings: State<'_, Arc<Mutex<SettingsManager>>>,
+) -> Result<String, String> {
+    let settings = settings.lock().await;
+    Ok(settings.get_selected_model().to_string())
+}
+
+/// Set selected model
+#[tauri::command]
+pub async fn set_selected_model(
+    model: String,
+    settings: State<'_, Arc<Mutex<SettingsManager>>>,
+) -> Result<(), String> {
+    let mut settings = settings.lock().await;
+    settings.set_selected_model(model)
+}
+
+/// Set theme
+#[tauri::command]
+pub async fn set_theme(
+    theme: String,
+    settings: State<'_, Arc<Mutex<SettingsManager>>>,
+) -> Result<(), String> {
+    let mut settings = settings.lock().await;
+    settings.set_theme(theme)
+}
+
+/// Set notifications enabled
+#[tauri::command]
+pub async fn set_notifications(
+    enabled: bool,
+    settings: State<'_, Arc<Mutex<SettingsManager>>>,
+) -> Result<(), String> {
+    let mut settings = settings.lock().await;
+    settings.set_notifications(enabled)
+}
+
+/// Get available models based on user's plan
+#[tauri::command]
+pub async fn get_available_models(
+    ai_provider: State<'_, Arc<Mutex<AIProviderManager>>>,
+) -> Result<Vec<ModelOption>, String> {
+    let mut provider = ai_provider.lock().await;
+    let caps = provider.get_capabilities().await;
+
+    Ok(SettingsManager::get_available_models(
+        caps.plan.is_paid(),
+        &caps.models,
+    ))
+}

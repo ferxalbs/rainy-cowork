@@ -7,6 +7,7 @@ pub mod file;
 pub mod file_ops;
 pub mod folder;
 pub mod image;
+pub mod settings;
 pub mod task;
 pub mod web;
 
@@ -16,5 +17,6 @@ pub use file::*;
 pub use file_ops::*;
 pub use folder::*;
 pub use image::*;
+pub use settings::*;
 pub use task::*;
 pub use web::*;

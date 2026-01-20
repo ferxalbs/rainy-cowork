@@ -10,7 +10,7 @@ mod services;
 use ai::AIProviderManager;
 use services::{
     CoworkAgent, DocumentService, FileManager, FileOperationEngine, FolderManager, ImageService,
-    TaskManager, WebResearchService,
+    SettingsManager, TaskManager, WebResearchService,
 };
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -45,6 +45,9 @@ pub fn run() {
     // Initialize image service
     let image_service = ImageService::new();
 
+    // Initialize settings manager
+    let settings_manager = Arc::new(Mutex::new(SettingsManager::new()));
+
     // Initialize folder manager (requires app handle for data dir)
     // We'll initialize it in setup since we need the app handle
 
@@ -63,6 +66,7 @@ pub fn run() {
         .manage(document_service)
         .manage(image_service)
         .manage(ai_provider) // Arc<Mutex<AIProviderManager>>
+        .manage(settings_manager) // Arc<Mutex<SettingsManager>>
         .setup(|app| {
             use tauri::Manager;
 
@@ -160,6 +164,13 @@ pub fn run() {
             commands::get_agent_plan,
             commands::cancel_agent_plan,
             commands::agent_analyze_workspace,
+            // Settings commands
+            commands::get_user_settings,
+            commands::get_selected_model,
+            commands::set_selected_model,
+            commands::set_theme,
+            commands::set_notifications,
+            commands::get_available_models,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
