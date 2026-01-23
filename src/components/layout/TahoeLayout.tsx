@@ -59,7 +59,23 @@ export function TahoeLayout({
             />
 
             {/* Header with controls - inline, not floating */}
-            <header className="flex items-center justify-end h-10 px-4 shrink-0">
+            <header className="flex items-center justify-between h-10 px-4 shrink-0 relative">
+                {/* Left Side: Workspace Info */}
+                <div className={`relative z-20 window-no-drag flex items-center gap-2 max-w-[60%] overflow-hidden transition-[padding] duration-200 pointer-events-none ${!isWindows ? "pl-[78px]" : ""}`}>
+                    {workspacePath && (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground animate-appear pointer-events-auto">
+                            <FolderOpen className="size-4 shrink-0" />
+                            <span className="font-medium text-foreground truncate max-w-[300px]" title={workspacePath}>
+                                {workspacePath.split('/').pop() || workspacePath}
+                            </span>
+                            <span className="opacity-50 text-xs hidden sm:inline-block truncate max-w-[200px]" title={workspacePath}>
+                                {workspacePath.replace(workspacePath.split('/').pop() || '', '')}
+                            </span>
+                        </div>
+                    )}
+                </div>
+
+                {/* Right Side: Window Controls */}
                 <div className="relative z-20 window-no-drag flex items-center gap-2">
                     {/* Theme Toggle */}
                     <div className="flex items-center gap-1.5">
@@ -120,19 +136,6 @@ export function TahoeLayout({
                 {/* Main Content - Glass Surface */}
                 <main className="flex-1 overflow-y-auto p-6 rounded-3xl bg-white/70 dark:bg-black/20 backdrop-blur-2xl backdrop-saturate-150 shadow-2xl border border-white/20 dark:border-white/10">
                     <div className="max-w-3xl mx-auto select-text">
-                        {/* Workspace Title */}
-                        {workspacePath && (
-                            <div className="flex items-center gap-2 mb-6 pb-4 border-b border-border/50">
-                                <FolderOpen className="size-5 text-primary" />
-                                <h1 className="text-lg font-semibold">
-                                    Rainy Cowork
-                                    <span className="text-muted-foreground font-normal"> in </span>
-                                    <span className="text-foreground/80 font-mono text-sm bg-muted/50 px-2 py-0.5 rounded">
-                                        {workspacePath}
-                                    </span>
-                                </h1>
-                            </div>
-                        )}
                         {children}
                     </div>
                 </main>
