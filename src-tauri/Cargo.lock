@@ -3749,9 +3749,9 @@ dependencies = [
 
 [[package]]
 name = "rainy-sdk"
-version = "0.5.1"
+version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5a671413e9f8e0783eb036222329929db0531b47baee9656224cc0702e9b8467"
+checksum = "d44c123faa702875931a1ed56c76f630451d306075f349ad5e23b12c73fccc9c"
 dependencies = [
  "anyhow",
  "base64 0.22.1",

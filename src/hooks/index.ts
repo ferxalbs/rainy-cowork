@@ -5,3 +5,6 @@ export { useAIProvider } from './useAIProvider';
 export { useCoworkStatus } from './useCoworkStatus';
 export { useAgent } from './useAgent';
 export { useFolderManager } from './useFolderManager';
+export { useCoworkKeys } from './useCoworkKeys';
+export { useCoworkBilling } from './useCoworkBilling';
+export { useTheme } from './useTheme';

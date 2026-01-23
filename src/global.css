@@ -51,13 +51,14 @@
 
 /* ============================================
    LIGHT THEME - macOS Tahoe (Rose/Pink tint)
+   Default theme - Can be overridden by JS theme system
    ============================================ */
 :root {
   --radius: 16px;
 
   /* Base - Warm pink/rose tint like Tahoe */
-  --background: oklch(0.98 0.005 20); /* Lighter background for better contrast */
-  --foreground: oklch(0.15 0.02 20);  /* Darker text for readability */
+  --background: oklch(0.98 0.005 20);
+  --foreground: oklch(0.15 0.02 20);
 
   /* Card & Surface - White with subtle warmth */
   --card: oklch(1 0 0);
@@ -75,10 +76,10 @@
 
   /* Muted - Soft rose gray */
   --muted: oklch(0.94 0.005 20);
-  --muted-foreground: oklch(0.40 0.02 20); /* Darker for better text visibility */
+  --muted-foreground: oklch(0.40 0.02 20);
 
   /* Accent - Vibrant Blue/Purple for visibility */
-  --accent: oklch(0.55 0.22 255); /* Matches primary for consistency in light mode */
+  --accent: oklch(0.55 0.22 255);
   --accent-foreground: oklch(1 0 0);
 
   /* Destructive */
@@ -106,14 +107,15 @@
 
 /* ============================================
    DARK THEME - macOS Tahoe Dark
+   Can be overridden by JS theme system
    ============================================ */
 .dark {
   /* Base - Deep charcoal/slate (Better contrast than pitch black) */
   --background: oklch(0.12 0.01 260);
-  --foreground: oklch(0.98 0.005 260); /* Brighter white */
+  --foreground: oklch(0.98 0.005 260);
 
   /* Card & Surface - Slightly lighter than background */
-  --card: oklch(0.16 0.01 260); /* Clearly distinguished card surface */
+  --card: oklch(0.16 0.01 260);
   --card-foreground: oklch(0.98 0 0);
   --popover: oklch(0.16 0.01 260);
   --popover-foreground: oklch(0.98 0 0);
@@ -128,10 +130,10 @@
 
   /* Muted - Distinct from background */
   --muted: oklch(0.22 0.01 260);
-  --muted-foreground: oklch(0.70 0.01 260); /* MUCH Lighter for readability */
+  --muted-foreground: oklch(0.70 0.01 260);
 
   /* Accent - Vibrant Blue/Purple (Visible against dark) */
-  --accent: oklch(0.65 0.20 255); /* Bright enough for text, rich enough for bg */
+  --accent: oklch(0.65 0.20 255);
   --accent-foreground: oklch(1 0 0);
 
   /* Destructive */
@@ -139,12 +141,12 @@
   --destructive-foreground: oklch(1 0 0);
 
   /* Borders & Input */
-  --border: oklch(0.30 0.01 260); /* Visible borders */
-  --input: oklch(0.30 0.01 260);  /* Visible input boundaries */
+  --border: oklch(0.30 0.01 260);
+  --input: oklch(0.30 0.01 260);
   --ring: oklch(0.65 0.20 255);
 
   /* Sidebar - Translucent dark */
-  --sidebar: oklch(0.14 0.01 260 / 95%); /* Less transparent for clarity */
+  --sidebar: oklch(0.14 0.01 260 / 95%);
   --sidebar-foreground: oklch(0.98 0 0);
   --sidebar-primary: oklch(0.65 0.20 255);
   --sidebar-accent: oklch(0.22 0.01 260);

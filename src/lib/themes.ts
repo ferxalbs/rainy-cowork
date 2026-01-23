@@ -1,0 +1,278 @@
+import type { Theme } from '../types/theme';
+
+/**
+ * Rainy Cowork - Premium Theme System
+ * 4 Modern Themes with Perfect Day/Night Adaptation
+ */
+
+export const themes: Record<string, Theme> = {
+  'cosmic-gold': {
+    name: 'cosmic-gold',
+    displayName: 'Cosmic Gold',
+    description: 'Luxury gold accents with cosmic elegance',
+    icon: '✨',
+    colors: {
+      light: {
+        // Warm cream base with gold accents
+        background: 'oklch(0.98 0.01 85)',
+        foreground: 'oklch(0.15 0.02 85)',
+        card: 'oklch(1 0 0)',
+        cardForeground: 'oklch(0.15 0.02 85)',
+        popover: 'oklch(1 0 0)',
+        popoverForeground: 'oklch(0.15 0.02 85)',
+        // Rich gold primary
+        primary: 'oklch(0.65 0.15 85)',
+        primaryForeground: 'oklch(0.98 0 0)',
+        secondary: 'oklch(0.96 0.01 85)',
+        secondaryForeground: 'oklch(0.20 0.02 85)',
+        muted: 'oklch(0.94 0.01 85)',
+        mutedForeground: 'oklch(0.45 0.02 85)',
+        // Amber accent
+        accent: 'oklch(0.70 0.15 75)',
+        accentForeground: 'oklch(0.98 0 0)',
+        destructive: 'oklch(0.55 0.22 25)',
+        destructiveForeground: 'oklch(0.98 0 0)',
+        border: 'oklch(0.88 0.02 85)',
+        input: 'oklch(0.88 0.02 85)',
+        ring: 'oklch(0.65 0.15 85)',
+        sidebar: 'oklch(0.98 0.01 85)',
+        sidebarForeground: 'oklch(0.15 0.02 85)',
+        sidebarPrimary: 'oklch(0.65 0.15 85)',
+        sidebarAccent: 'oklch(0.94 0.01 85)',
+        sidebarBorder: 'oklch(0.88 0.02 85)',
+      },
+      dark: {
+        // Deep space black with gold highlights
+        background: 'oklch(0.10 0.02 85)',
+        foreground: 'oklch(0.98 0.01 85)',
+        card: 'oklch(0.14 0.02 85)',
+        cardForeground: 'oklch(0.98 0 0)',
+        popover: 'oklch(0.14 0.02 85)',
+        popoverForeground: 'oklch(0.98 0 0)',
+        // Bright gold primary
+        primary: 'oklch(0.75 0.18 85)',
+        primaryForeground: 'oklch(0.10 0.02 85)',
+        secondary: 'oklch(0.20 0.02 85)',
+        secondaryForeground: 'oklch(0.98 0 0)',
+        muted: 'oklch(0.20 0.02 85)',
+        mutedForeground: 'oklch(0.75 0.01 85)',
+        // Vibrant amber accent
+        accent: 'oklch(0.80 0.18 75)',
+        accentForeground: 'oklch(0.10 0.02 85)',
+        destructive: 'oklch(0.60 0.20 25)',
+        destructiveForeground: 'oklch(1 0 0)',
+        border: 'oklch(0.28 0.02 85)',
+        input: 'oklch(0.28 0.02 85)',
+        ring: 'oklch(0.75 0.18 85)',
+        sidebar: 'oklch(0.12 0.02 85)',
+        sidebarForeground: 'oklch(0.98 0 0)',
+        sidebarPrimary: 'oklch(0.75 0.18 85)',
+        sidebarAccent: 'oklch(0.20 0.02 85)',
+        sidebarBorder: 'oklch(0.28 0.02 85)',
+      },
+    },
+  },
+
+  'cosmic-night': {
+    name: 'cosmic-night',
+    displayName: 'Cosmic Night',
+    description: 'Deep space blues with stellar purple accents',
+    icon: '🌌',
+    colors: {
+      light: {
+        // Soft lavender base
+        background: 'oklch(0.97 0.02 280)',
+        foreground: 'oklch(0.15 0.03 280)',
+        card: 'oklch(1 0 0)',
+        cardForeground: 'oklch(0.15 0.03 280)',
+        popover: 'oklch(1 0 0)',
+        popoverForeground: 'oklch(0.15 0.03 280)',
+        // Deep cosmic blue
+        primary: 'oklch(0.50 0.20 265)',
+        primaryForeground: 'oklch(0.98 0 0)',
+        secondary: 'oklch(0.95 0.02 280)',
+        secondaryForeground: 'oklch(0.20 0.03 280)',
+        muted: 'oklch(0.93 0.02 280)',
+        mutedForeground: 'oklch(0.45 0.03 280)',
+        // Purple accent
+        accent: 'oklch(0.60 0.22 290)',
+        accentForeground: 'oklch(0.98 0 0)',
+        destructive: 'oklch(0.55 0.22 25)',
+        destructiveForeground: 'oklch(0.98 0 0)',
+        border: 'oklch(0.87 0.03 280)',
+        input: 'oklch(0.87 0.03 280)',
+        ring: 'oklch(0.50 0.20 265)',
+        sidebar: 'oklch(0.97 0.02 280)',
+        sidebarForeground: 'oklch(0.15 0.03 280)',
+        sidebarPrimary: 'oklch(0.50 0.20 265)',
+        sidebarAccent: 'oklch(0.93 0.02 280)',
+        sidebarBorder: 'oklch(0.87 0.03 280)',
+      },
+      dark: {
+        // Deep cosmic void
+        background: 'oklch(0.08 0.03 265)',
+        foreground: 'oklch(0.98 0.02 280)',
+        card: 'oklch(0.12 0.03 265)',
+        cardForeground: 'oklch(0.98 0 0)',
+        popover: 'oklch(0.12 0.03 265)',
+        popoverForeground: 'oklch(0.98 0 0)',
+        // Bright stellar blue
+        primary: 'oklch(0.65 0.25 265)',
+        primaryForeground: 'oklch(0.98 0 0)',
+        secondary: 'oklch(0.18 0.03 265)',
+        secondaryForeground: 'oklch(0.98 0 0)',
+        muted: 'oklch(0.18 0.03 265)',
+        mutedForeground: 'oklch(0.75 0.02 280)',
+        // Vibrant purple accent
+        accent: 'oklch(0.70 0.25 290)',
+        accentForeground: 'oklch(0.98 0 0)',
+        destructive: 'oklch(0.60 0.20 25)',
+        destructiveForeground: 'oklch(1 0 0)',
+        border: 'oklch(0.25 0.03 265)',
+        input: 'oklch(0.25 0.03 265)',
+        ring: 'oklch(0.65 0.25 265)',
+        sidebar: 'oklch(0.10 0.03 265)',
+        sidebarForeground: 'oklch(0.98 0 0)',
+        sidebarPrimary: 'oklch(0.65 0.25 265)',
+        sidebarAccent: 'oklch(0.18 0.03 265)',
+        sidebarBorder: 'oklch(0.25 0.03 265)',
+      },
+    },
+  },
+
+  'jujutsu-kaisen': {
+    name: 'jujutsu-kaisen',
+    displayName: 'Jujutsu Kaisen',
+    description: 'Cursed energy with crimson and shadow',
+    icon: '⚡',
+    colors: {
+      light: {
+        // Clean white with red accents
+        background: 'oklch(0.99 0.005 20)',
+        foreground: 'oklch(0.12 0.02 20)',
+        card: 'oklch(1 0 0)',
+        cardForeground: 'oklch(0.12 0.02 20)',
+        popover: 'oklch(1 0 0)',
+        popoverForeground: 'oklch(0.12 0.02 20)',
+        // Deep crimson red
+        primary: 'oklch(0.45 0.25 25)',
+        primaryForeground: 'oklch(0.98 0 0)',
+        secondary: 'oklch(0.96 0.005 20)',
+        secondaryForeground: 'oklch(0.18 0.02 20)',
+        muted: 'oklch(0.94 0.005 20)',
+        mutedForeground: 'oklch(0.42 0.02 20)',
+        // Bright red accent
+        accent: 'oklch(0.55 0.28 25)',
+        accentForeground: 'oklch(0.98 0 0)',
+        destructive: 'oklch(0.50 0.25 25)',
+        destructiveForeground: 'oklch(0.98 0 0)',
+        border: 'oklch(0.90 0.01 20)',
+        input: 'oklch(0.90 0.01 20)',
+        ring: 'oklch(0.45 0.25 25)',
+        sidebar: 'oklch(0.99 0.005 20)',
+        sidebarForeground: 'oklch(0.12 0.02 20)',
+        sidebarPrimary: 'oklch(0.45 0.25 25)',
+        sidebarAccent: 'oklch(0.94 0.005 20)',
+        sidebarBorder: 'oklch(0.90 0.01 20)',
+      },
+      dark: {
+        // Cursed shadow realm
+        background: 'oklch(0.09 0.02 20)',
+        foreground: 'oklch(0.98 0.005 20)',
+        card: 'oklch(0.13 0.02 20)',
+        cardForeground: 'oklch(0.98 0 0)',
+        popover: 'oklch(0.13 0.02 20)',
+        popoverForeground: 'oklch(0.98 0 0)',
+        // Blood red primary
+        primary: 'oklch(0.60 0.28 25)',
+        primaryForeground: 'oklch(0.98 0 0)',
+        secondary: 'oklch(0.19 0.02 20)',
+        secondaryForeground: 'oklch(0.98 0 0)',
+        muted: 'oklch(0.19 0.02 20)',
+        mutedForeground: 'oklch(0.75 0.005 20)',
+        // Intense crimson accent
+        accent: 'oklch(0.65 0.30 25)',
+        accentForeground: 'oklch(0.98 0 0)',
+        destructive: 'oklch(0.60 0.25 25)',
+        destructiveForeground: 'oklch(1 0 0)',
+        border: 'oklch(0.27 0.02 20)',
+        input: 'oklch(0.27 0.02 20)',
+        ring: 'oklch(0.60 0.28 25)',
+        sidebar: 'oklch(0.11 0.02 20)',
+        sidebarForeground: 'oklch(0.98 0 0)',
+        sidebarPrimary: 'oklch(0.60 0.28 25)',
+        sidebarAccent: 'oklch(0.19 0.02 20)',
+        sidebarBorder: 'oklch(0.27 0.02 20)',
+      },
+    },
+  },
+
+  'anime-style': {
+    name: 'anime-style',
+    displayName: 'Anime Style',
+    description: 'Vibrant colors with kawaii energy',
+    icon: '🌸',
+    colors: {
+      light: {
+        // Soft pastel pink base
+        background: 'oklch(0.98 0.02 340)',
+        foreground: 'oklch(0.15 0.03 340)',
+        card: 'oklch(1 0 0)',
+        cardForeground: 'oklch(0.15 0.03 340)',
+        popover: 'oklch(1 0 0)',
+        popoverForeground: 'oklch(0.15 0.03 340)',
+        // Vibrant magenta
+        primary: 'oklch(0.55 0.25 330)',
+        primaryForeground: 'oklch(0.98 0 0)',
+        secondary: 'oklch(0.96 0.02 340)',
+        secondaryForeground: 'oklch(0.20 0.03 340)',
+        muted: 'oklch(0.94 0.02 340)',
+        mutedForeground: 'oklch(0.45 0.03 340)',
+        // Bright cyan accent
+        accent: 'oklch(0.65 0.20 200)',
+        accentForeground: 'oklch(0.98 0 0)',
+        destructive: 'oklch(0.55 0.22 25)',
+        destructiveForeground: 'oklch(0.98 0 0)',
+        border: 'oklch(0.88 0.03 340)',
+        input: 'oklch(0.88 0.03 340)',
+        ring: 'oklch(0.55 0.25 330)',
+        sidebar: 'oklch(0.98 0.02 340)',
+        sidebarForeground: 'oklch(0.15 0.03 340)',
+        sidebarPrimary: 'oklch(0.55 0.25 330)',
+        sidebarAccent: 'oklch(0.94 0.02 340)',
+        sidebarBorder: 'oklch(0.88 0.03 340)',
+      },
+      dark: {
+        // Deep purple night
+        background: 'oklch(0.10 0.03 300)',
+        foreground: 'oklch(0.98 0.02 340)',
+        card: 'oklch(0.14 0.03 300)',
+        cardForeground: 'oklch(0.98 0 0)',
+        popover: 'oklch(0.14 0.03 300)',
+        popoverForeground: 'oklch(0.98 0 0)',
+        // Neon magenta
+        primary: 'oklch(0.70 0.28 330)',
+        primaryForeground: 'oklch(0.98 0 0)',
+        secondary: 'oklch(0.20 0.03 300)',
+        secondaryForeground: 'oklch(0.98 0 0)',
+        muted: 'oklch(0.20 0.03 300)',
+        mutedForeground: 'oklch(0.75 0.02 340)',
+        // Electric cyan accent
+        accent: 'oklch(0.75 0.22 200)',
+        accentForeground: 'oklch(0.10 0.03 300)',
+        destructive: 'oklch(0.60 0.20 25)',
+        destructiveForeground: 'oklch(1 0 0)',
+        border: 'oklch(0.28 0.03 300)',
+        input: 'oklch(0.28 0.03 300)',
+        ring: 'oklch(0.70 0.28 330)',
+        sidebar: 'oklch(0.12 0.03 300)',
+        sidebarForeground: 'oklch(0.98 0 0)',
+        sidebarPrimary: 'oklch(0.70 0.28 330)',
+        sidebarAccent: 'oklch(0.20 0.03 300)',
+        sidebarBorder: 'oklch(0.28 0.03 300)',
+      },
+    },
+  },
+};
+
+export const defaultTheme: Theme = themes['cosmic-gold'];

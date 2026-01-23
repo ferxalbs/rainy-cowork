@@ -4,6 +4,8 @@
 export * from './web';
 export * from './document';
 export * from './image';
+export * from './theme';
+export * from './agent';
 
 /**
  * Task status enum for tracking task lifecycle
