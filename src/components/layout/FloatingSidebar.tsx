@@ -1,13 +1,10 @@
-import { Separator } from "@heroui/react";
+import { Separator, Button } from "@heroui/react";
 import {
     FolderOpen,
     Download,
     FileCode,
     ChevronDown,
     ChevronRight,
-    // CheckCircle2, // v0.4.8: Tasks section
-    // Timer, // v0.4.8: Tasks section
-    // ListTodo, // v0.4.8: Tasks section
     Sparkles,
     Shield,
     Palette,
@@ -44,7 +41,7 @@ export function FloatingSidebar({
     onFolderSelect,
     onNavigate,
     activeSection = "running",
-    taskCounts: _taskCounts = { completed: 0, running: 0, queued: 0 }, // v0.4.8: Tasks section
+    taskCounts: _taskCounts = { completed: 0, running: 0, queued: 0 },
     onAddFolder,
 }: FloatingSidebarProps) {
     const [expandedSections, setExpandedSections] = useState({
@@ -105,41 +102,6 @@ export function FloatingSidebar({
                     onClick={() => onNavigate?.("cowork")}
                 />
             </div>
-
-            {/* Tasks Section - Hidden for v0.4.8 multi-folder feature 
-            <div className="p-2 pt-1">
-                <SectionHeader
-                    label="Tasks"
-                    isExpanded={expandedSections.tasks}
-                    onToggle={() => toggleSection("tasks")}
-                />
-                {expandedSections.tasks && (
-                    <div className="space-y-0.5 mt-1">
-                        <SidebarItem
-                            icon={<Timer className="size-4" />}
-                            label="Running"
-                            badge={taskCounts.running > 0 ? taskCounts.running : undefined}
-                            isActive={activeSection === "running"}
-                            onClick={() => onNavigate?.("running")}
-                        />
-                        <SidebarItem
-                            icon={<ListTodo className="size-4" />}
-                            label="Queued"
-                            badge={taskCounts.queued > 0 ? taskCounts.queued : undefined}
-                            isActive={activeSection === "queued"}
-                            onClick={() => onNavigate?.("queued")}
-                        />
-                        <SidebarItem
-                            icon={<CheckCircle2 className="size-4" />}
-                            label="Completed"
-                            badge={taskCounts.completed > 0 ? taskCounts.completed : undefined}
-                            isActive={activeSection === "completed"}
-                            onClick={() => onNavigate?.("completed")}
-                        />
-                    </div>
-                )}
-            </div>
-            */}
 
             <Separator className="my-1 mx-2" />
 
@@ -246,16 +208,18 @@ function SidebarItem({
     isActive?: boolean;
     onClick?: () => void;
 }) {
+    // HeroUI v3: Use "secondary" for active state (or primary if preferred), "ghost" for inactive
+    // visual variants: solid, faded, bordered, light, flat, ghost
     return (
-        <button
-            className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors group ${isActive
-                ? "bg-accent text-foreground font-medium"
-                : "text-foreground/80 hover:bg-accent/50 hover:text-foreground"
+        <Button
+            variant={isActive ? "secondary" : "ghost"}
+            className={`w-full justify-start gap-2 h-9 px-3 text-sm font-normal group ${isActive
+                ? "font-medium"
+                : "text-foreground/80 hover:text-foreground"
                 }`}
-            data-selected={isActive}
-            onClick={onClick}
+            onPress={onClick}
         >
-            <span className={`size-4 shrink-0 transition-discrete ${isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground"}`}>
+            <span className={`size-4 shrink-0 transition-colors ${isActive ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"}`}>
                 {icon}
             </span>
             <span className="truncate flex-1 text-left">{label}</span>
@@ -263,13 +227,13 @@ function SidebarItem({
                 <span
                     className={`text-xs px-1.5 py-0.5 rounded-full ${badgeColor === "blue"
                         ? "bg-blue-500/20 text-blue-500"
-                        : "bg-muted text-muted-foreground"
+                        : "bg-default-200 text-default-500"
                         }`}
                 >
                     {badge}
                 </span>
             )}
-        </button>
+        </Button>
     );
 }
 

@@ -3,6 +3,7 @@ import { FloatingSidebar } from "./FloatingSidebar";
 import { Button, Avatar, Switch } from "@heroui/react";
 import { Settings, Moon, Sun, Maximize2, Minus, X, FolderOpen } from "lucide-react";
 import type { Folder } from "../../types";
+import { useTheme } from "../../hooks/useTheme";
 
 interface TahoeLayoutProps {
     children: ReactNode;
@@ -33,23 +34,19 @@ export function TahoeLayout({
     activeSection,
     taskCounts,
 }: TahoeLayoutProps) {
-    const [isDark, setIsDark] = useState(false);
+    const { mode, setMode } = useTheme();
     const [isWindows, setIsWindows] = useState(false);
 
     useEffect(() => {
         // Detect OS
         const platform = navigator.platform.toLowerCase();
         setIsWindows(platform.includes("win"));
-
-        // Check system preference
-        const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-        setIsDark(prefersDark);
-        document.documentElement.classList.toggle("dark", prefersDark);
     }, []);
 
+    const isDark = mode === 'dark';
+
     const toggleTheme = (selected: boolean) => {
-        setIsDark(selected);
-        document.documentElement.classList.toggle("dark", selected);
+        setMode(selected ? 'dark' : 'light');
     };
 
     return (

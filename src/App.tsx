@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import { TahoeLayout, TaskCard, SettingsPanel, AIDocumentPanel, AIResearchPanel } from "./components";
 import { SettingsPage } from "./components/settings";
 import { CoworkPanel } from "./components/cowork";
-import { Button } from "@heroui/react";
+import { Button, Card } from "@heroui/react";
 import { Zap, CheckCircle2, ListTodo, AlertCircle, FileText, Search, FolderPlus } from "lucide-react";
 import { useTauriTask, useAIProvider, useFolderManager } from "./hooks";
 import type { Task, Folder } from "./types";
@@ -157,7 +157,7 @@ function App() {
         <div className="space-y-6">
           {/* Error Display */}
           {(submitError || taskError) && (
-            <div className="floating-card p-4 border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30 animate-appear">
+            <div className="p-4 border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30 animate-appear rounded-xl">
               <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
                 <AlertCircle className="size-4 shrink-0" />
                 <p className="text-sm">{submitError || taskError}</p>
@@ -271,7 +271,7 @@ function App() {
  */
 function NoFolderGate({ onAddFolder }: { onAddFolder: () => void }) {
   return (
-    <div className="floating-card p-8 text-center animate-appear">
+    <Card className="p-8 text-center animate-appear">
       <div className="space-y-4">
         <div className="size-16 mx-auto bg-primary/10 rounded-2xl flex items-center justify-center">
           <FolderPlus className="size-8 text-primary" />
@@ -295,7 +295,7 @@ function NoFolderGate({ onAddFolder }: { onAddFolder: () => void }) {
           Add Folder
         </Button>
       </div>
-    </div>
+    </Card>
   );
 }
 
