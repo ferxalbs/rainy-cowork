@@ -3,7 +3,6 @@
 
 import { useState, useEffect, useCallback } from "react";
 import {
-  Card,
   Button,
   Tabs,
   Switch,
@@ -223,7 +222,7 @@ export function SettingsPage({
       </div>
 
       {/* Tabs Content */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto py-4">
         <Tabs
           selectedKey={activeTab}
           onSelectionChange={(key) => setActiveTab(key as string)}
@@ -286,10 +285,10 @@ export function SettingsPage({
             ) : (
               <>
                 {/* Current Plan */}
-                <Card className="p-4 bg-accent/5 border-accent/20">
+                <div className="p-4 rounded-xl bg-muted/50 border border-border/50">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Sparkles className="size-5 text-accent" />
+                      <Sparkles className="size-5 text-primary" />
                       <span className="font-medium">
                         Current Plan: {planName}
                       </span>
@@ -297,6 +296,7 @@ export function SettingsPage({
                     {!hasPaidPlan && (
                       <Button
                         variant="primary"
+                        color="primary"
                         size="sm"
                         onPress={() =>
                           window.open(
@@ -310,7 +310,7 @@ export function SettingsPage({
                       </Button>
                     )}
                   </div>
-                </Card>
+                </div>
 
                 {/* Free Tier Models */}
                 <div>
@@ -319,12 +319,12 @@ export function SettingsPage({
                   </h3>
                   <div className="grid gap-3">
                     {freeModels.map((model) => (
-                      <Card
+                      <div
                         key={model.id}
-                        className={`p-4 cursor-pointer transition-all hover:border-accent/50 ${
+                        className={`p-4 rounded-xl border transition-all cursor-pointer ${
                           selectedModel === model.id
-                            ? "border-accent bg-accent/5"
-                            : ""
+                            ? "bg-muted/50 border-primary/50"
+                            : "bg-transparent border-transparent hover:bg-muted/30"
                         }`}
                         onClick={() => handleSelectModel(model.id)}
                       >
@@ -333,7 +333,7 @@ export function SettingsPage({
                             <div className="flex items-center gap-2">
                               <span className="font-medium">{model.name}</span>
                               {selectedModel === model.id && (
-                                <span className="text-xs bg-accent/20 text-accent px-2 py-0.5 rounded-full flex items-center gap-1">
+                                <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full flex items-center gap-1">
                                   <Check className="size-3" />
                                   Active
                                 </span>
@@ -351,8 +351,8 @@ export function SettingsPage({
                           <div
                             className={`size-5 rounded-full border-2 flex items-center justify-center ${
                               selectedModel === model.id
-                                ? "border-accent bg-accent"
-                                : "border-muted-foreground"
+                                ? "border-primary bg-primary"
+                                : "border-muted-foreground/30"
                             }`}
                           >
                             {selectedModel === model.id && (
@@ -360,7 +360,7 @@ export function SettingsPage({
                             )}
                           </div>
                         </div>
-                      </Card>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -373,14 +373,14 @@ export function SettingsPage({
                   </h3>
                   <div className="grid gap-3">
                     {premiumModels.map((model) => (
-                      <Card
+                      <div
                         key={model.id}
-                        className={`p-4 transition-all ${
+                        className={`p-4 rounded-xl border transition-all ${
                           model.isAvailable && selectedModel === model.id
-                            ? "border-accent bg-accent/5 cursor-pointer"
+                            ? "bg-muted/50 border-primary/50 cursor-pointer"
                             : model.isAvailable
-                              ? "cursor-pointer hover:border-accent/50"
-                              : "opacity-60 cursor-not-allowed"
+                              ? "bg-transparent border-transparent hover:bg-muted/30 cursor-pointer"
+                              : "opacity-60 cursor-not-allowed bg-transparent border-transparent"
                         }`}
                         onClick={() =>
                           model.isAvailable && handleSelectModel(model.id)
@@ -395,7 +395,7 @@ export function SettingsPage({
                               )}
                               {model.isAvailable &&
                                 selectedModel === model.id && (
-                                  <span className="text-xs bg-accent/20 text-accent px-2 py-0.5 rounded-full flex items-center gap-1">
+                                  <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full flex items-center gap-1">
                                     <Check className="size-3" />
                                     Active
                                   </span>
@@ -409,8 +409,8 @@ export function SettingsPage({
                             <div
                               className={`size-5 rounded-full border-2 flex items-center justify-center ${
                                 selectedModel === model.id
-                                  ? "border-accent bg-accent"
-                                  : "border-muted-foreground"
+                                  ? "border-primary bg-primary"
+                                  : "border-muted-foreground/30"
                               }`}
                             >
                               {selectedModel === model.id && (
@@ -420,6 +420,7 @@ export function SettingsPage({
                           ) : (
                             <Button
                               variant="secondary"
+                              color="secondary"
                               size="sm"
                               onPress={() =>
                                 window.open(
@@ -432,7 +433,7 @@ export function SettingsPage({
                             </Button>
                           )}
                         </div>
-                      </Card>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -457,7 +458,10 @@ export function SettingsPage({
               const showKey = showKeys[provider.id];
 
               return (
-                <Card key={provider.id} className="p-4">
+                <div
+                  key={provider.id}
+                  className="p-4 rounded-xl border bg-muted/50 border-border/50"
+                >
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
@@ -555,7 +559,7 @@ export function SettingsPage({
                       </div>
                     )}
                   </div>
-                </Card>
+                </div>
               );
             })}
           </Tabs.Panel>
@@ -563,7 +567,7 @@ export function SettingsPage({
           {/* Subscription Tab */}
           <Tabs.Panel id="subscription" className="space-y-6">
             {/* Current Plan & Usage */}
-            <Card className="p-4">
+            <div className="p-4 rounded-xl border bg-muted/50 border-border/50">
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -636,7 +640,7 @@ export function SettingsPage({
                   </div>
                 )}
               </div>
-            </Card>
+            </div>
 
             {/* Available Plans */}
             <div>
@@ -657,12 +661,12 @@ export function SettingsPage({
                       const isLoading = checkoutLoading === plan.id;
 
                       return (
-                        <Card
+                        <div
                           key={plan.id}
-                          className={`p-4 transition-all ${
+                          className={`p-4 rounded-xl border transition-all ${
                             isCurrentPlan
                               ? "border-accent bg-accent/5"
-                              : "hover:border-accent/50 cursor-pointer"
+                              : "bg-transparent border-border/50 hover:bg-muted/30 cursor-pointer"
                           }`}
                         >
                           <div className="space-y-3">
@@ -713,7 +717,7 @@ export function SettingsPage({
                               </Button>
                             )}
                           </div>
-                        </Card>
+                        </div>
                       );
                     })}
                 </div>
@@ -742,7 +746,7 @@ export function SettingsPage({
                   <Spinner size="sm" />
                 </div>
               ) : coworkApiKeys.length === 0 ? (
-                <Card className="p-6 text-center">
+                <div className="p-6 text-center rounded-xl border border-dashed border-border/50">
                   <Key className="size-8 mx-auto text-muted-foreground mb-2" />
                   <p className="text-muted-foreground text-sm">
                     No API keys yet
@@ -750,13 +754,13 @@ export function SettingsPage({
                   <p className="text-muted-foreground text-xs mt-1">
                     Create a key to use with the Rainy SDK
                   </p>
-                </Card>
+                </div>
               ) : (
                 <div className="space-y-2">
                   {coworkApiKeys.map((key) => (
-                    <Card
+                    <div
                       key={key.id}
-                      className="p-3 flex items-center justify-between"
+                      className="p-3 flex items-center justify-between rounded-xl border border-border/50 bg-muted/50"
                     >
                       <div>
                         <span className="font-medium">{key.name}</span>
@@ -777,7 +781,7 @@ export function SettingsPage({
                       >
                         <Trash2 className="size-4 text-red-500" />
                       </Button>
-                    </Card>
+                    </div>
                   ))}
                 </div>
               )}
@@ -785,7 +789,7 @@ export function SettingsPage({
               {/* New Key Modal */}
               {showNewKeyModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                  <Card className="p-6 w-96 max-w-[90vw]">
+                  <div className="p-6 w-96 max-w-[90vw] rounded-xl border bg-background shadow-xl">
                     <h3 className="font-semibold text-lg mb-4">
                       {newKeyValue ? "API Key Created" : "Create New API Key"}
                     </h3>
@@ -864,7 +868,7 @@ export function SettingsPage({
                         </div>
                       </div>
                     )}
-                  </Card>
+                  </div>
                 </div>
               )}
             </div>
@@ -875,7 +879,7 @@ export function SettingsPage({
             <ThemeSelector />
 
             {/* Premium Animations Group */}
-            {/* Premium Animations Group */}
+
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <div className="flex flex-col gap-1">
