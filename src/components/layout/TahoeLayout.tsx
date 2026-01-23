@@ -164,8 +164,8 @@ export function TahoeLayout({
           taskCounts={taskCounts}
         />
 
-        {/* Main Content - Glass Surface */}
-        <main className="flex-1 overflow-y-auto p-6 rounded-3xl bg-white/70 dark:bg-black/20 backdrop-blur-2xl backdrop-saturate-150 shadow-2xl border border-white/20 dark:border-white/10">
+        {/* Main Content - Transparent Surface */}
+        <main className="flex-1 overflow-y-auto p-6">
           <div className="max-w-3xl mx-auto select-text">{children}</div>
         </main>
       </div>
