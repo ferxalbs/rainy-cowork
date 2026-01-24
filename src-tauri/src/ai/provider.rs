@@ -42,9 +42,9 @@ impl AIProviderManager {
         }
     }
 
-    /// Get Rainy SDK client if API key is configured
-    async fn get_rainy_client(&self) -> Option<RainyClient> {
-        let api_key = self.keychain.get_key("rainy_api").ok()??;
+    /// Get Rainy SDK client for Cowork if API key is configured
+    async fn get_cowork_client(&self) -> Option<RainyClient> {
+        let api_key = self.keychain.get_key("cowork_api").ok()??;
         RainyClient::with_api_key(&api_key).ok()
     }
 
@@ -58,7 +58,7 @@ impl AIProviderManager {
         }
 
         // Fetch from SDK
-        if let Some(client) = self.get_rainy_client().await {
+        if let Some(client) = self.get_cowork_client().await {
             if let Ok(caps) = client.get_cowork_capabilities().await {
                 self.cached_caps = Some(CachedCapabilities {
                     capabilities: caps.clone(),
@@ -98,14 +98,38 @@ impl AIProviderManager {
             requires_api_key: true,
         });
 
-        // Show Rainy API if paid
+        // Show Rainy API (Pay-As-You-Go)
+        // Always available as option, user provides key
+        providers.insert(
+            0,
+            AIProviderConfig {
+                provider: ProviderType::RainyApi,
+                name: "Rainy API".to_string(),
+                model: "gpt-4o".to_string(),
+                is_available: true,
+                requires_api_key: true,
+            },
+        );
+
+        // Show Cowork Subscription if valid
         if caps.profile.plan.is_paid() {
             providers.insert(
-                0,
+                1,
                 AIProviderConfig {
-                    provider: ProviderType::RainyApi,
-                    name: format!("Rainy API ({})", caps.profile.plan.name),
-                    model: "gpt-4o".to_string(),
+                    provider: ProviderType::CoworkApi,
+                    name: format!("Cowork ({})", caps.profile.plan.name),
+                    model: "gemini-3-pro-preview".to_string(),
+                    is_available: true,
+                    requires_api_key: true,
+                },
+            );
+        } else {
+            providers.insert(
+                1,
+                AIProviderConfig {
+                    provider: ProviderType::CoworkApi,
+                    name: "Cowork Subscription".to_string(),
+                    model: "gemini-3-pro-preview".to_string(),
                     is_available: true,
                     requires_api_key: true,
                 },
@@ -119,11 +143,21 @@ impl AIProviderManager {
     pub async fn get_models(&mut self, provider: &str) -> Result<Vec<String>, String> {
         match provider {
             "rainy_api" => {
+                // Standard Rainy API supports all models (subject to key permission/credits)
+                Ok(vec![
+                    "gpt-4o".to_string(),
+                    "gpt-4o-mini".to_string(),
+                    "gpt-4-turbo".to_string(),
+                    "claude-3.5-sonnet".to_string(),
+                    "claude-3-opus".to_string(),
+                ])
+            }
+            "cowork_api" => {
                 let caps = self.get_capabilities().await;
                 if caps.profile.plan.is_paid() {
                     Ok(caps.models)
                 } else {
-                    Err("Upgrade to a paid plan to access Rainy API models".to_string())
+                    Err("Upgrade to a paid plan to access Cowork models".to_string())
                 }
             }
             "gemini" => Ok(self.gemini.available_models()),
@@ -135,10 +169,20 @@ impl AIProviderManager {
     pub async fn validate_api_key(&self, provider: &str, api_key: &str) -> Result<bool, String> {
         match provider {
             "rainy_api" => {
-                // Validate by trying to create client and check capabilities
+                // Validate generic Rainy API key
                 match RainyClient::with_api_key(api_key) {
-                    Ok(client) => match client.get_cowork_capabilities().await {
-                        Ok(caps) => Ok(caps.is_valid),
+                    Ok(client) => match client.list_available_models().await {
+                        Ok(_) => Ok(true),
+                        Err(_) => Ok(false),
+                    },
+                    Err(_) => Ok(false),
+                }
+            }
+            "cowork_api" => {
+                // Validate Cowork key and profile
+                match RainyClient::with_api_key(api_key) {
+                    Ok(client) => match client.get_cowork_profile().await {
+                        Ok(_) => Ok(true),
                         Err(_) => Ok(false),
                     },
                     Err(_) => Ok(false),
@@ -186,12 +230,32 @@ impl AIProviderManager {
     {
         match provider {
             ProviderType::RainyApi => {
-                // Use rainy-sdk for paid access
+                // Standard Rainy API (Pay-as-you-go)
+                // Just needs a valid key, no plan checks
+                let api_key = self
+                    .keychain
+                    .get_key("rainy_api")
+                    .map_err(|e| e.to_string())?
+                    .ok_or("No Rainy API key found")?;
+
+                on_progress(10, Some("Connecting to Rainy API...".to_string()));
+                let client = RainyClient::with_api_key(api_key).map_err(|e| e.to_string())?;
+
+                on_progress(30, Some("Sending request...".to_string()));
+                let result = client
+                    .simple_chat(model, prompt)
+                    .await
+                    .map_err(|e| e.to_string())?;
+
+                on_progress(100, Some("Complete".to_string()));
+                Ok(result)
+            }
+            ProviderType::CoworkApi => {
+                // Cowork Subscription (Credits)
+                // Needs checks for capabilities/plan
                 let caps = self.get_capabilities().await;
                 if !caps.profile.plan.is_paid() {
-                    return Err(
-                        "Upgrade to a paid plan to use Rainy API. Add a Rainy API key.".to_string(),
-                    );
+                    return Err("Upgrade to a paid plan to use Cowork API.".to_string());
                 }
 
                 if !caps.can_use_model(model) {
@@ -208,15 +272,20 @@ impl AIProviderManager {
                     return Err("Usage limit reached. Upgrade for more access.".to_string());
                 }
 
-                on_progress(10, Some("Connecting to Rainy API...".to_string()));
+                // We need the key specifically for Cowork (might be different from rainy_api key)
+                // But get_capabilities uses "rainy_api" key in get_rainy_client().
+                // We should separate keys storage.
 
-                let client = self
-                    .get_rainy_client()
-                    .await
-                    .ok_or("No Rainy API key configured")?;
+                let api_key = self
+                    .keychain
+                    .get_key("cowork_api")
+                    .map_err(|e| e.to_string())?
+                    .ok_or("No Cowork API key found")?;
+
+                on_progress(10, Some("Connecting to Cowork API...".to_string()));
+                let client = RainyClient::with_api_key(api_key).map_err(|e| e.to_string())?;
 
                 on_progress(30, Some("Sending request...".to_string()));
-
                 let result = client
                     .simple_chat(model, prompt)
                     .await

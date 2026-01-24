@@ -17,7 +17,7 @@ export type TaskStatus = 'queued' | 'running' | 'paused' | 'completed' | 'failed
  * - rainyApi: Enosis Labs backend (GPT-4, Claude, etc. via OpenAI format)
  * - gemini: User's own Google Gemini API key
  */
-export type ProviderType = 'rainyApi' | 'gemini';
+export type ProviderType = 'rainyApi' | 'coworkApi' | 'gemini';
 
 /**
  * File operation types for tracking changes
@@ -107,11 +107,19 @@ export interface AppSettings {
 export const AI_PROVIDERS: AIProvider[] = [
     {
         id: 'rainyApi',
-        name: 'Rainy API',
+        name: 'Rainy API (Pay-As-You-Go)',
         model: 'gpt-4o',
         isAvailable: true,
         requiresApiKey: true,
-        description: 'Access GPT-4, Claude & more via Enosis Labs',
+        description: 'Standard API usage (1:1 Dollar/Token)',
+    },
+    {
+        id: 'coworkApi',
+        name: 'Cowork Subscription',
+        model: 'gemini-3-pro-preview',
+        isAvailable: true,
+        requiresApiKey: true,
+        description: 'Monthly credits plan (Free, Plus, Pro)',
     },
     {
         id: 'gemini',
@@ -128,6 +136,12 @@ export const AI_PROVIDERS: AIProvider[] = [
  */
 export const PROVIDER_MODELS: Record<ProviderType, string[]> = {
     rainyApi: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'claude-3.5-sonnet', 'claude-3-opus'],
+    coworkApi: [
+        'gemini-3-pro-preview',
+        'gemini-3-flash-preview',
+        'gemini-2.5-pro',
+        'gemini-2.5-flash',
+    ],
     gemini: [
         // Gemini 3 - Latest with thinking levels
         'gemini-3-pro-preview',

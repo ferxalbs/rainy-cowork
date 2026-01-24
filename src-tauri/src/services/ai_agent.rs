@@ -269,54 +269,71 @@ impl CoworkAgent {
     ) -> Result<(String, ModelInfo), String> {
         let mut provider = self.ai_provider.lock().await;
 
-        // Check user's plan capabilities
+        // Check user's plan capabilities (Cowork)
         let caps = provider.get_capabilities().await;
 
-        // Try Rainy API first if user has paid plan
+        // 1. Try Cowork Subscription first (Already paid)
         if caps.profile.plan.is_paid() && caps.can_make_request() {
-            // Use the first available model from SDK's caps.models (already prioritized by tier)
-            // The SDK returns models in order of quality/preference
-            let preferred_model = caps.models.first().map(|s| s.as_str()).unwrap_or("gpt-4o"); // Fallback if models list is empty
+            // Use the first available model from SDK's caps.models
+            let preferred_model = caps.models.first().map(|s| s.as_str()).unwrap_or("gpt-4o");
 
             match provider
-                .execute_prompt(&ProviderType::RainyApi, preferred_model, prompt, |_, _| {})
+                .execute_prompt(&ProviderType::CoworkApi, preferred_model, prompt, |_, _| {})
                 .await
             {
                 Ok(response) => {
                     return Ok((
                         response,
                         ModelInfo {
-                            provider: "Rainy API".to_string(),
+                            provider: "Cowork Subscription".to_string(),
                             model: preferred_model.to_string(),
                             plan_tier: caps.profile.plan.name.clone(),
                         },
                     ));
                 }
                 Err(e) => {
-                    // Log error but continue to fallback
-                    tracing::warn!("Rainy API failed, falling back to Gemini: {}", e);
+                    tracing::warn!("Cowork API failed, falling back: {}", e);
                 }
             }
         }
 
-        // Fallback to Gemini (free tier) - Use high-quality model for best results
-        // Free tier models: gemini-3-flash-minimal, gemini-3-flash-high, gemini-2.5-flash-lite
-        let gemini_model = "gemini-3-flash-high"; // Best quality for complex file operations
+        // 2. Try Rainy API (Pay-As-You-Go) if key exists
+        // We verify key existence first to avoid errors if not configured
+        if provider.has_api_key("rainy_api").await.unwrap_or(false) {
+            match provider
+                .execute_prompt(&ProviderType::RainyApi, "gpt-4o", prompt, |_, _| {})
+                .await
+            {
+                Ok(response) => {
+                    return Ok((
+                        response,
+                        ModelInfo {
+                            provider: "Rainy API (PAYG)".to_string(),
+                            model: "gpt-4o".to_string(),
+                            plan_tier: "Pay-As-You-Go".to_string(),
+                        },
+                    ));
+                }
+                Err(e) => {
+                    tracing::warn!("Rainy API failed, falling back: {}", e);
+                }
+            }
+        }
+
+        // 3. Fallback to Gemini (free tier / BYOK)
+        // Use high-quality model for best results
+        let gemini_model = "gemini-3-flash-high";
         let response = provider
             .execute_prompt(&ProviderType::Gemini, gemini_model, prompt, |_, _| {})
             .await
-            .map_err(|e| format!("AI request failed: {}", e))?;
+            .map_err(|e| format!("All AI providers failed. Last error: {}", e))?;
 
         Ok((
             response,
             ModelInfo {
                 provider: "Google Gemini".to_string(),
                 model: gemini_model.to_string(),
-                plan_tier: if caps.profile.plan.is_paid() {
-                    caps.profile.plan.name.clone()
-                } else {
-                    "Free".to_string()
-                },
+                plan_tier: "Free / BYOK".to_string(), // Cowork plan doesn't apply here directly unless we want to show it
             },
         ))
     }

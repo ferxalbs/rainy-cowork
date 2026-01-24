@@ -138,8 +138,11 @@ export function SettingsPage({
   }, []);
 
   // API key handlers
-  const getProviderId = (type: ProviderType) =>
-    type === "rainyApi" ? "rainy_api" : "gemini";
+  const getProviderId = (type: ProviderType) => {
+    if (type === "rainyApi") return "rainy_api";
+    if (type === "coworkApi") return "cowork_api";
+    return "gemini";
+  };
 
   const handleApiKeyChange = (provider: ProviderType, value: string) => {
     setApiKeyInputs((prev) => ({ ...prev, [provider]: value }));

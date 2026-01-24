@@ -23,8 +23,9 @@ pub enum TaskStatus {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum ProviderType {
-    RainyApi, // Primary backend from Enosis Labs
-    Gemini,   // User's own Google API key
+    RainyApi,  // Standard Pay-As-You-Go (1:1 Dollar)
+    CoworkApi, // Subscription-based (Credits)
+    Gemini,    // User's own Google API key
 }
 
 /// A single task step for detailed progress tracking
