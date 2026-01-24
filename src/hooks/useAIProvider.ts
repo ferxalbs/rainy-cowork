@@ -33,7 +33,10 @@ export function useAIProvider(): UseAIProviderResult {
             // Check which providers have stored keys
             const keyChecks = await Promise.all(
                 providerList.map(async (p) => {
-                    const providerId = p.provider === 'rainyApi' ? 'rainy_api' : 'gemini';
+                    let providerId = 'gemini';
+                    if (p.provider === 'rainyApi') providerId = 'rainy_api';
+                    else if (p.provider === 'coworkApi') providerId = 'cowork_api';
+                    
                     const key = await tauri.getApiKey(providerId);
                     return { provider: providerId, hasKey: key !== null };
                 })

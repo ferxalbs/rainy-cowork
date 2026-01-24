@@ -15,12 +15,9 @@ import {
 import {
   Bot,
   Key,
-  Palette,
-  Shield,
   Check,
   Lock,
   Sparkles,
-  TrendingUp,
   Eye,
   EyeOff,
   CreditCard,
@@ -55,7 +52,6 @@ export function SettingsPage({
 }: SettingsPageProps) {
   const themeContext = useContext(ThemeContext);
   const [activeTab, setActiveTab] = useState(initialTab);
-  const [models, setModels] = useState<tauri.ModelOption[]>([]);
   const [selectedModel, setSelectedModel] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -105,15 +101,26 @@ export function SettingsPage({
   >({});
   const [savingStatus, setSavingStatus] = useState<Record<string, boolean>>({});
 
+  const [coworkModelsData, setCoworkModelsData] =
+    useState<tauri.CoworkModelsResponse | null>(null);
+  const [rainyApiModels, setRainyApiModels] = useState<string[]>([]);
+  const [geminiModels, setGeminiModels] = useState<string[]>([]);
+
   // Load models and current selection
   useEffect(() => {
     async function loadData() {
       try {
-        const [availableModels, currentModel] = await Promise.all([
-          tauri.getAvailableModels(),
-          tauri.getSelectedModel(),
-        ]);
-        setModels(availableModels);
+        const [coworkData, rainyModels, geminiModelsList, currentModel] =
+          await Promise.all([
+            tauri.getCoworkModels().catch(() => null),
+            tauri.getProviderModels("rainy_api").catch(() => []),
+            tauri.getProviderModels("gemini").catch(() => []),
+            tauri.getSelectedModel(),
+          ]);
+
+        setCoworkModelsData(coworkData);
+        setRainyApiModels(rainyModels || []);
+        setGeminiModels(geminiModelsList || []);
         setSelectedModel(currentModel);
       } catch (error) {
         console.error("Failed to load settings:", error);
@@ -122,7 +129,7 @@ export function SettingsPage({
       }
     }
     loadData();
-  }, []);
+  }, [coworkStatus?.plan]); // Reload if plan changes
 
   // Handle model selection
   const handleSelectModel = useCallback(async (modelId: string) => {
@@ -208,9 +215,64 @@ export function SettingsPage({
     }
   };
 
-  // Group models by tier
-  const freeModels = models.filter((m) => !m.isPremium);
-  const premiumModels = models.filter((m) => m.isPremium);
+  // Helper to render model card
+  const ModelCard = ({
+    id,
+    name,
+    description,
+    isLocked = false,
+    isSelected = false,
+  }: {
+    id: string;
+    name: string;
+    description: string;
+    isLocked?: boolean;
+    isSelected?: boolean;
+  }) => (
+    <div
+      className={`p-4 rounded-xl border transition-all ${
+        isSelected
+          ? "bg-muted/50 border-primary/50 cursor-pointer"
+          : !isLocked
+            ? "bg-transparent border-transparent hover:bg-muted/30 cursor-pointer"
+            : "opacity-60 cursor-not-allowed bg-transparent border-transparent"
+      }`}
+      onClick={() => !isLocked && handleSelectModel(id)}
+    >
+      <div className="flex items-start justify-between">
+        <div className="flex-1">
+          <div className="flex items-center gap-2">
+            <span className="font-medium">{name}</span>
+            {isLocked && <Lock className="size-3 text-muted-foreground" />}
+            {isSelected && (
+              <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full flex items-center gap-1">
+                <Check className="size-3" />
+                Active
+              </span>
+            )}
+          </div>
+          <p className="text-sm text-muted-foreground mt-1">{description}</p>
+        </div>
+        {isSelected ? (
+          <div className="size-5 rounded-full border-2 border-primary bg-primary flex items-center justify-center">
+            <Check className="size-3 text-white" />
+          </div>
+        ) : !isLocked ? (
+          <div className="size-5 rounded-full border-2 border-muted-foreground/30" />
+        ) : (
+          <Button
+            variant="secondary"
+            size="sm"
+            onPress={() =>
+              window.open("https://enosislabs.com/pricing", "_blank")
+            }
+          >
+            Upgrade
+          </Button>
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
@@ -233,213 +295,109 @@ export function SettingsPage({
             className="w-full"
           >
             <Tabs.List className="mb-4 bg-muted/50 p-1 rounded-xl gap-1 backdrop-blur-xl border border-border/30">
-              <Tabs.Tab
-                id="models"
-                className="px-3 py-1.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground data-[selected=true]:text-foreground data-[selected=true]:bg-background data-[selected=true]:shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ring-offset-background"
-              >
-                <div className="flex items-center gap-2">
-                  <Bot className="size-4" />
-                  AI Models
-                </div>
-              </Tabs.Tab>
-              <Tabs.Tab
-                id="keys"
-                className="px-3 py-1.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground data-[selected=true]:text-foreground data-[selected=true]:bg-background data-[selected=true]:shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ring-offset-background"
-              >
-                <div className="flex items-center gap-2">
-                  <Key className="size-4" />
-                  API Keys
-                </div>
-              </Tabs.Tab>
-              <Tabs.Tab
-                id="subscription"
-                className="px-3 py-1.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground data-[selected=true]:text-foreground data-[selected=true]:bg-background data-[selected=true]:shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ring-offset-background"
-              >
-                <div className="flex items-center gap-2">
-                  <CreditCard className="size-4" />
-                  Subscription
-                </div>
-              </Tabs.Tab>
-              <Tabs.Tab
-                id="appearance"
-                className="px-3 py-1.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground data-[selected=true]:text-foreground data-[selected=true]:bg-background data-[selected=true]:shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ring-offset-background"
-              >
-                <div className="flex items-center gap-2">
-                  <Palette className="size-4" />
-                  Appearance
-                </div>
-              </Tabs.Tab>
-              <Tabs.Tab
-                id="permissions"
-                className="px-3 py-1.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground data-[selected=true]:text-foreground data-[selected=true]:bg-background data-[selected=true]:shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ring-offset-background"
-              >
-                <div className="flex items-center gap-2">
-                  <Shield className="size-4" />
-                  Permissions
-                </div>
-              </Tabs.Tab>
+              {/* ... (Tabs remain same) ... */}
+              <Tabs.Tab id="models">Models</Tabs.Tab>
+              <Tabs.Tab id="keys">API Keys</Tabs.Tab>
+              <Tabs.Tab id="subscription">Subscription</Tabs.Tab>
+              <Tabs.Tab id="appearance">Appearance</Tabs.Tab>
+              <Tabs.Tab id="permissions">Permissions</Tabs.Tab>
             </Tabs.List>
 
             {/* Models Tab */}
-            <Tabs.Panel id="models" className="space-y-6">
+            <Tabs.Panel id="models" className="space-y-8">
               {isLoading ? (
                 <div className="flex items-center justify-center py-12">
                   <Spinner size="lg" />
                 </div>
               ) : (
                 <>
-                  {/* Current Plan */}
-                  <div className="p-4 rounded-xl bg-muted/50 border border-border/50">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Sparkles className="size-5 text-primary" />
-                        <span className="font-medium">
-                          Current Plan: {planName}
-                        </span>
-                      </div>
-                      {!hasPaidPlan && (
-                        <Button
-                          variant="primary"
-                          size="sm"
-                          onPress={() =>
-                            window.open(
-                              "https://enosislabs.com/pricing",
-                              "_blank",
-                            )
-                          }
-                        >
-                          <TrendingUp className="size-4" />
-                          Upgrade
-                        </Button>
-                      )}
+                  {/* Current Plan Badge */}
+                  <div className="p-4 rounded-xl bg-muted/50 border border-border/50 flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="size-5 text-primary" />
+                      <span className="font-medium">
+                        Current Plan: {coworkModelsData?.plan_name || "Free"}
+                      </span>
                     </div>
+                    {coworkModelsData?.plan === "free" && (
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onPress={() =>
+                          window.open(
+                            "https://enosislabs.com/pricing",
+                            "_blank",
+                          )
+                        }
+                      >
+                        Upgrade
+                      </Button>
+                    )}
                   </div>
 
-                  {/* Free Tier Models */}
+                  {/* 1. Cowork Subscription Models */}
                   <div>
-                    <h3 className="text-sm font-medium text-muted-foreground mb-3">
+                    <h3 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
+                      <Sparkles className="size-4" />
+                      Subscription Models (Cowork)
+                    </h3>
+                    {coworkModelsData && coworkModelsData.models.length > 0 ? (
+                      <div className="grid gap-3">
+                        {coworkModelsData.models.map((model) => (
+                          <ModelCard
+                            key={model}
+                            id={model}
+                            name={model}
+                            description="Included in your plan"
+                            isSelected={selectedModel === model}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="p-6 rounded-xl border border-dashed text-center">
+                        <p className="text-muted-foreground text-sm">
+                          Upgrade to access premium Cowork models
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 2. Rainy API (PAYG) */}
+                  {hasApiKey("rainy_api") && (
+                    <div>
+                      <h3 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
+                        <Zap className="size-4" />
+                        Pay-As-You-Go Models (Rainy API)
+                      </h3>
+                      <div className="grid gap-3">
+                        {rainyApiModels.map((model) => (
+                          <ModelCard
+                            key={model}
+                            id={model}
+                            name={model}
+                            description="Billed per usage (1:1 Token)"
+                            isSelected={selectedModel === model}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 3. Free Tier (Gemini BYOK) */}
+                  <div>
+                    <h3 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
+                      <Bot className="size-4" />
                       Free Tier (Gemini BYOK)
                     </h3>
                     <div className="grid gap-3">
-                      {freeModels.map((model) => (
-                        <div
-                          key={model.id}
-                          className={`p-4 rounded-xl border transition-all cursor-pointer ${
-                            selectedModel === model.id
-                              ? "bg-muted/50 border-primary/50"
-                              : "bg-transparent border-transparent hover:bg-muted/30"
-                          }`}
-                          onClick={() => handleSelectModel(model.id)}
-                        >
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <span className="font-medium">
-                                  {model.name}
-                                </span>
-                                {selectedModel === model.id && (
-                                  <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full flex items-center gap-1">
-                                    <Check className="size-3" />
-                                    Active
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-sm text-muted-foreground mt-1">
-                                {model.description}
-                              </p>
-                              <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
-                                <span>Provider: {model.provider}</span>
-                                <span>•</span>
-                                <span>Thinking: {model.thinkingLevel}</span>
-                              </div>
-                            </div>
-                            <div
-                              className={`size-5 rounded-full border-2 flex items-center justify-center ${
-                                selectedModel === model.id
-                                  ? "border-primary bg-primary"
-                                  : "border-muted-foreground/30"
-                              }`}
-                            >
-                              {selectedModel === model.id && (
-                                <Check className="size-3 text-white" />
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Premium Models */}
-                  <div>
-                    <h3 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
-                      <Lock className="size-4" />
-                      Premium Models (Rainy API)
-                    </h3>
-                    <div className="grid gap-3">
-                      {premiumModels.map((model) => (
-                        <div
-                          key={model.id}
-                          className={`p-4 rounded-xl border transition-all ${
-                            model.isAvailable && selectedModel === model.id
-                              ? "bg-muted/50 border-primary/50 cursor-pointer"
-                              : model.isAvailable
-                                ? "bg-transparent border-transparent hover:bg-muted/30 cursor-pointer"
-                                : "opacity-60 cursor-not-allowed bg-transparent border-transparent"
-                          }`}
-                          onClick={() =>
-                            model.isAvailable && handleSelectModel(model.id)
-                          }
-                        >
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <span className="font-medium">
-                                  {model.name}
-                                </span>
-                                {!model.isAvailable && (
-                                  <Lock className="size-3 text-muted-foreground" />
-                                )}
-                                {model.isAvailable &&
-                                  selectedModel === model.id && (
-                                    <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full flex items-center gap-1">
-                                      <Check className="size-3" />
-                                      Active
-                                    </span>
-                                  )}
-                              </div>
-                              <p className="text-sm text-muted-foreground mt-1">
-                                {model.description}
-                              </p>
-                            </div>
-                            {model.isAvailable ? (
-                              <div
-                                className={`size-5 rounded-full border-2 flex items-center justify-center ${
-                                  selectedModel === model.id
-                                    ? "border-primary bg-primary"
-                                    : "border-muted-foreground/30"
-                                }`}
-                              >
-                                {selectedModel === model.id && (
-                                  <Check className="size-3 text-white" />
-                                )}
-                              </div>
-                            ) : (
-                              <Button
-                                variant="secondary"
-                                size="sm"
-                                onPress={() =>
-                                  window.open(
-                                    "https://enosislabs.com/pricing",
-                                    "_blank",
-                                  )
-                                }
-                              >
-                                Upgrade
-                              </Button>
-                            )}
-                          </div>
-                        </div>
+                      {geminiModels.map((model) => (
+                        <ModelCard
+                          key={model}
+                          id={model}
+                          name={model}
+                          description="Uses your own Gemini API Key"
+                          isSelected={selectedModel === model}
+                        />
                       ))}
                     </div>
                   </div>

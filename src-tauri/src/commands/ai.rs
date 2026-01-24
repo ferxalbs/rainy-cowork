@@ -117,6 +117,15 @@ pub async fn has_api_key(
     manager.has_api_key(&provider).await
 }
 
+/// Get Cowork available models specifically from the API
+#[tauri::command]
+pub async fn get_cowork_models(
+    provider_manager: State<'_, Arc<Mutex<AIProviderManager>>>,
+) -> Result<rainy_sdk::cowork::CoworkModelsResponse, String> {
+    let manager = provider_manager.lock().await;
+    manager.get_cowork_models_from_api().await
+}
+
 /// Get Cowork subscription status and capabilities
 #[tauri::command]
 pub async fn get_cowork_status(

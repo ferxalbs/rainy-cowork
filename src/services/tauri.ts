@@ -6,7 +6,7 @@ import { invoke, Channel } from '@tauri-apps/api/core';
 // ============ Types ============
 
 export type TaskStatus = 'queued' | 'running' | 'paused' | 'completed' | 'failed' | 'cancelled';
-export type ProviderType = 'rainyApi' | 'gemini';
+export type ProviderType = 'rainyApi' | 'coworkApi' | 'gemini';
 export type FileOperation = 'create' | 'modify' | 'delete' | 'move' | 'rename';
 
 export interface Task {
@@ -176,8 +176,20 @@ export interface CoworkStatus {
 
 // ============ Cowork Commands ============
 
+export interface CoworkModelsResponse {
+    plan: string;
+    plan_name: string;
+    model_access_level: string;
+    models: string[];
+    total_models: number;
+}
+
 export async function getCoworkStatus(): Promise<CoworkStatus> {
     return invoke<CoworkStatus>('get_cowork_status');
+}
+
+export async function getCoworkModels(): Promise<CoworkModelsResponse> {
+    return invoke<CoworkModelsResponse>('get_cowork_models');
 }
 
 export async function canUseFeature(feature: string): Promise<boolean> {

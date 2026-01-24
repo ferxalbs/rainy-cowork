@@ -72,6 +72,17 @@ impl AIProviderManager {
         CoworkCapabilities::free()
     }
 
+    /// Get cowork models directly from API (efficient)
+    pub async fn get_cowork_models_from_api(
+        &self,
+    ) -> Result<rainy_sdk::cowork::CoworkModelsResponse, String> {
+        if let Some(client) = self.get_cowork_client().await {
+            client.get_cowork_models().await.map_err(|e| e.to_string())
+        } else {
+            Err("No Cowork API key configured".to_string())
+        }
+    }
+
     /// Check if user has a paid plan
     #[allow(dead_code)]
     pub async fn has_paid_plan(&mut self) -> bool {

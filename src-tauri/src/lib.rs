@@ -120,6 +120,7 @@ pub fn run() {
             commands::get_provider_models,
             // Cowork status commands
             commands::get_cowork_status,
+            commands::get_cowork_models,
             commands::can_use_feature,
             // File commands
             commands::select_workspace,
