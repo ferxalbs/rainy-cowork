@@ -126,9 +126,9 @@ pub async fn get_cowork_status(
     let caps = manager.get_capabilities().await;
 
     Ok(CoworkStatus {
-        has_paid_plan: caps.plan.is_paid(),
-        plan: format!("{:?}", caps.plan).to_lowercase(),
-        plan_name: caps.plan_name,
+        has_paid_plan: caps.profile.plan.is_paid(),
+        plan: caps.profile.plan.id.clone(),
+        plan_name: caps.profile.plan.name.clone(),
         is_valid: caps.is_valid,
         models: caps.models,
         features: CoworkFeaturesDto {
@@ -138,11 +138,12 @@ pub async fn get_cowork_status(
             priority_support: caps.features.priority_support,
         },
         usage: CoworkUsageDto {
-            used: caps.usage.used,
-            limit: caps.usage.limit,
-            credits_used: caps.usage.credits_used,
-            credits_ceiling: caps.usage.credits_ceiling,
-            resets_at: caps.usage.resets_at,
+            used: caps.profile.usage.used,
+            limit: caps.profile.usage.limit,
+            credits_used: caps.profile.usage.credits_used,
+            // Assuming default or calculating if needed, as it was removed from Usage struct
+            credits_ceiling: 0.0,
+            resets_at: String::new(), // Not in new struct, provide default or fetch if available
         },
         upgrade_message: caps.upgrade_message,
     })

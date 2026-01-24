@@ -161,11 +161,11 @@ export interface CoworkUsage {
     resets_at: string;
 }
 
-export type CoworkPlan = 'free' | 'go_plus' | 'plus' | 'pro' | 'pro_plus';
+export type CoworkPlan = 'free' | 'go' | 'go_plus' | 'plus' | 'pro' | 'pro_plus';
 
 export interface CoworkStatus {
     has_paid_plan: boolean;
-    plan: CoworkPlan;
+    plan: string; // Changed from CoworkPlan union to string to support all backend IDs
     plan_name: string;
     is_valid: boolean;
     models: string[];

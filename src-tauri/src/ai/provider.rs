@@ -75,13 +75,13 @@ impl AIProviderManager {
     /// Check if user has a paid plan
     #[allow(dead_code)]
     pub async fn has_paid_plan(&mut self) -> bool {
-        self.get_capabilities().await.plan.is_paid()
+        self.get_capabilities().await.profile.plan.is_paid()
     }
 
     /// Get current plan
     #[allow(dead_code)]
     pub async fn get_plan(&mut self) -> CoworkPlan {
-        self.get_capabilities().await.plan
+        self.get_capabilities().await.profile.plan
     }
 
     /// List available providers based on plan
@@ -99,12 +99,12 @@ impl AIProviderManager {
         });
 
         // Show Rainy API if paid
-        if caps.plan.is_paid() {
+        if caps.profile.plan.is_paid() {
             providers.insert(
                 0,
                 AIProviderConfig {
                     provider: ProviderType::RainyApi,
-                    name: format!("Rainy API ({})", caps.plan_name),
+                    name: format!("Rainy API ({})", caps.profile.plan.name),
                     model: "gpt-4o".to_string(),
                     is_available: true,
                     requires_api_key: true,
@@ -120,7 +120,7 @@ impl AIProviderManager {
         match provider {
             "rainy_api" => {
                 let caps = self.get_capabilities().await;
-                if caps.plan.is_paid() {
+                if caps.profile.plan.is_paid() {
                     Ok(caps.models)
                 } else {
                     Err("Upgrade to a paid plan to access Rainy API models".to_string())
@@ -188,7 +188,7 @@ impl AIProviderManager {
             ProviderType::RainyApi => {
                 // Use rainy-sdk for paid access
                 let caps = self.get_capabilities().await;
-                if !caps.plan.is_paid() {
+                if !caps.profile.plan.is_paid() {
                     return Err(
                         "Upgrade to a paid plan to use Rainy API. Add a Rainy API key.".to_string(),
                     );
@@ -197,7 +197,7 @@ impl AIProviderManager {
                 if !caps.can_use_model(model) {
                     return Err(format!(
                         "Model {} not available on {} plan",
-                        model, caps.plan_name
+                        model, caps.profile.plan.name
                     ));
                 }
 

@@ -273,7 +273,7 @@ impl CoworkAgent {
         let caps = provider.get_capabilities().await;
 
         // Try Rainy API first if user has paid plan
-        if caps.plan.is_paid() && caps.can_make_request() {
+        if caps.profile.plan.is_paid() && caps.can_make_request() {
             // Use the first available model from SDK's caps.models (already prioritized by tier)
             // The SDK returns models in order of quality/preference
             let preferred_model = caps.models.first().map(|s| s.as_str()).unwrap_or("gpt-4o"); // Fallback if models list is empty
@@ -288,7 +288,7 @@ impl CoworkAgent {
                         ModelInfo {
                             provider: "Rainy API".to_string(),
                             model: preferred_model.to_string(),
-                            plan_tier: caps.plan_name.clone(),
+                            plan_tier: caps.profile.plan.name.clone(),
                         },
                     ));
                 }
@@ -312,8 +312,8 @@ impl CoworkAgent {
             ModelInfo {
                 provider: "Google Gemini".to_string(),
                 model: gemini_model.to_string(),
-                plan_tier: if caps.plan.is_paid() {
-                    caps.plan_name.clone()
+                plan_tier: if caps.profile.plan.is_paid() {
+                    caps.profile.plan.name.clone()
                 } else {
                     "Free".to_string()
                 },

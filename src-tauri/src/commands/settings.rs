@@ -64,7 +64,7 @@ pub async fn get_available_models(
     let caps = provider.get_capabilities().await;
 
     Ok(SettingsManager::get_available_models(
-        caps.plan.is_paid(),
+        caps.profile.plan.is_paid(),
         &caps.models,
     ))
 }
