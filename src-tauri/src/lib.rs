@@ -29,11 +29,15 @@ pub fn run() {
     // Initialize file operation engine (AI-driven operations)
     let file_ops = Arc::new(FileOperationEngine::new());
 
+    // Initialize settings manager
+    let settings_manager = Arc::new(Mutex::new(SettingsManager::new()));
+
     // Initialize cowork agent (natural language file operations)
     let cowork_agent = Arc::new(CoworkAgent::new(
         ai_provider.clone(),
         file_ops.clone(),
         file_manager.clone(),
+        settings_manager.clone(),
     ));
 
     // Initialize web research service
@@ -44,9 +48,6 @@ pub fn run() {
 
     // Initialize image service
     let image_service = ImageService::new();
-
-    // Initialize settings manager
-    let settings_manager = Arc::new(Mutex::new(SettingsManager::new()));
 
     // Initialize folder manager (requires app handle for data dir)
     // We'll initialize it in setup since we need the app handle

@@ -34,8 +34,12 @@ export function useAIProvider(): UseAIProviderResult {
             const keyChecks = await Promise.all(
                 providerList.map(async (p) => {
                     let providerId = 'gemini';
-                    if (p.provider === 'rainyApi') providerId = 'rainy_api';
-                    else if (p.provider === 'coworkApi') providerId = 'cowork_api';
+                    // Backend returns lowercase provider strings
+                    if (p.provider === 'rainyApi' || (p.provider as unknown as string) === 'rainyapi') {
+                        providerId = 'rainy_api';
+                    } else if (p.provider === 'coworkApi' || (p.provider as unknown as string) === 'coworkapi') {
+                        providerId = 'cowork_api';
+                    }
                     
                     const key = await tauri.getApiKey(providerId);
                     return { provider: providerId, hasKey: key !== null };

@@ -8,7 +8,7 @@ use crate::services::file_operations::{
     ConflictStrategy, FileOpChange, FileOpType, FileOperationEngine, OrganizeStrategy,
     WorkspaceAnalysis,
 };
-use crate::services::FileManager;
+use crate::services::{FileManager, SettingsManager};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -197,6 +197,7 @@ pub struct CoworkAgent {
     ai_provider: Arc<Mutex<AIProviderManager>>,
     file_ops: Arc<FileOperationEngine>,
     file_manager: Arc<FileManager>,
+    settings: Arc<Mutex<SettingsManager>>,
     /// Pending plans awaiting confirmation
     pending_plans: tokio::sync::RwLock<HashMap<String, TaskPlan>>,
 }
@@ -206,11 +207,13 @@ impl CoworkAgent {
         ai_provider: Arc<Mutex<AIProviderManager>>,
         file_ops: Arc<FileOperationEngine>,
         file_manager: Arc<FileManager>,
+        settings: Arc<Mutex<SettingsManager>>,
     ) -> Self {
         Self {
             ai_provider,
             file_ops,
             file_manager,
+            settings,
             pending_plans: tokio::sync::RwLock::new(HashMap::new()),
         }
     }
@@ -262,66 +265,132 @@ impl CoworkAgent {
         Ok(plan)
     }
 
-    /// Execute prompt with the best available provider, with automatic fallback
+    /// Execute prompt with the best available provider, respecting user preference
     async fn execute_with_best_provider(
         &self,
         prompt: &str,
     ) -> Result<(String, ModelInfo), String> {
-        let mut provider = self.ai_provider.lock().await;
+        let selected_model = {
+            let settings = self.settings.lock().await;
+            settings.get_selected_model().to_string()
+        };
 
-        // Check user's plan capabilities (Cowork)
+        let mut provider = self.ai_provider.lock().await;
+        // Check capabilities (refresh if needed)
         let caps = provider.get_capabilities().await;
 
-        // 1. Try Cowork Subscription first (Already paid)
-        if caps.profile.plan.is_paid() && caps.can_make_request() {
-            // Use the first available model from SDK's caps.models
-            let preferred_model = caps.models.first().map(|s| s.as_str()).unwrap_or("gpt-4o");
-
+        // 1. Try User Selected Model
+        // Is it a Cowork model supported by current plan?
+        if caps.profile.plan.is_paid() && caps.models.contains(&selected_model) {
+            if caps.can_make_request() {
+                match provider
+                    .execute_prompt(&ProviderType::CoworkApi, &selected_model, prompt, |_, _| {})
+                    .await
+                {
+                    Ok(response) => {
+                        return Ok((
+                            response,
+                            ModelInfo {
+                                provider: "Cowork Subscription".to_string(),
+                                model: selected_model,
+                                plan_tier: caps.profile.plan.name.clone(),
+                            },
+                        ));
+                    }
+                    Err(e) => {
+                        tracing::warn!("Selected Cowork model failed, falling back: {}", e);
+                    }
+                }
+            }
+        }
+        // Is it a generic Rainy API model? (If key exists)
+        else if provider.has_api_key("rainy_api").await.unwrap_or(false) {
+            // Rainy API usually supports most models. We try it if the name looks valid or just attempt it.
+            // For safety, we only route known OpenAI/Anthropic style IDs or if it matches "gpt" / "claude"
+            if selected_model.contains("gpt") || selected_model.contains("claude") {
+                match provider
+                    .execute_prompt(&ProviderType::RainyApi, &selected_model, prompt, |_, _| {})
+                    .await
+                {
+                    Ok(response) => {
+                        return Ok((
+                            response,
+                            ModelInfo {
+                                provider: "Rainy API".to_string(),
+                                model: selected_model,
+                                plan_tier: "Pay-As-You-Go".to_string(),
+                            },
+                        ));
+                    }
+                    Err(e) => {
+                        tracing::warn!("Selected Rainy API model failed, falling back: {}", e);
+                    }
+                }
+            }
+        }
+        // Is it a Gemini BYOK model?
+        else if selected_model.starts_with("gemini")
+            && provider.has_api_key("gemini").await.unwrap_or(false)
+        {
             match provider
+                .execute_prompt(&ProviderType::Gemini, &selected_model, prompt, |_, _| {})
+                .await
+            {
+                Ok(response) => {
+                    return Ok((
+                        response,
+                        ModelInfo {
+                            provider: "Google Gemini".to_string(),
+                            model: selected_model,
+                            plan_tier: "BYOK".to_string(),
+                        },
+                    ));
+                }
+                Err(e) => {
+                    tracing::warn!("Selected Gemini model failed, falling back: {}", e);
+                }
+            }
+        }
+
+        // ============ FALLBACK LOGIC ============
+        // If selected model failed or wasn't applicable, use smart defaults
+
+        // 1. Try Cowork default
+        if caps.profile.plan.is_paid() && caps.can_make_request() {
+            let preferred_model = caps.models.first().map(|s| s.as_str()).unwrap_or("gpt-4o");
+            if let Ok(response) = provider
                 .execute_prompt(&ProviderType::CoworkApi, preferred_model, prompt, |_, _| {})
                 .await
             {
-                Ok(response) => {
-                    return Ok((
-                        response,
-                        ModelInfo {
-                            provider: "Cowork Subscription".to_string(),
-                            model: preferred_model.to_string(),
-                            plan_tier: caps.profile.plan.name.clone(),
-                        },
-                    ));
-                }
-                Err(e) => {
-                    tracing::warn!("Cowork API failed, falling back: {}", e);
-                }
+                return Ok((
+                    response,
+                    ModelInfo {
+                        provider: "Cowork Subscription (Fallback)".to_string(),
+                        model: preferred_model.to_string(),
+                        plan_tier: caps.profile.plan.name.clone(),
+                    },
+                ));
             }
         }
 
-        // 2. Try Rainy API (Pay-As-You-Go) if key exists
-        // We verify key existence first to avoid errors if not configured
+        // 2. Try Rainy API default
         if provider.has_api_key("rainy_api").await.unwrap_or(false) {
-            match provider
+            if let Ok(response) = provider
                 .execute_prompt(&ProviderType::RainyApi, "gpt-4o", prompt, |_, _| {})
                 .await
             {
-                Ok(response) => {
-                    return Ok((
-                        response,
-                        ModelInfo {
-                            provider: "Rainy API (PAYG)".to_string(),
-                            model: "gpt-4o".to_string(),
-                            plan_tier: "Pay-As-You-Go".to_string(),
-                        },
-                    ));
-                }
-                Err(e) => {
-                    tracing::warn!("Rainy API failed, falling back: {}", e);
-                }
+                return Ok((
+                    response,
+                    ModelInfo {
+                        provider: "Rainy API (Fallback)".to_string(),
+                        model: "gpt-4o".to_string(),
+                        plan_tier: "Pay-As-You-Go".to_string(),
+                    },
+                ));
             }
         }
 
-        // 3. Fallback to Gemini (free tier / BYOK)
-        // Use high-quality model for best results
+        // 3. Fallback to Gemini (Free/BYOK)
         let gemini_model = "gemini-3-flash-high";
         let response = provider
             .execute_prompt(&ProviderType::Gemini, gemini_model, prompt, |_, _| {})
@@ -333,7 +402,7 @@ impl CoworkAgent {
             ModelInfo {
                 provider: "Google Gemini".to_string(),
                 model: gemini_model.to_string(),
-                plan_tier: "Free / BYOK".to_string(), // Cowork plan doesn't apply here directly unless we want to show it
+                plan_tier: "Free / BYOK".to_string(),
             },
         ))
     }

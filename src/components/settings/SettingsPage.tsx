@@ -425,23 +425,25 @@ export function SettingsPage({
                   )}
 
                   {/* 3. Free Tier (Gemini BYOK) */}
-                  <div>
-                    <h3 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
-                      <Bot className="size-4" />
-                      Free Tier (Gemini BYOK)
-                    </h3>
-                    <div className="grid gap-3">
-                      {geminiModels.map((model) => (
-                        <ModelCard
-                          key={model}
-                          id={model}
-                          name={model}
-                          description="Uses your own Gemini API Key"
-                          isSelected={selectedModel === model}
-                        />
-                      ))}
+                  {hasApiKey("gemini") && (
+                    <div>
+                      <h3 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
+                        <Bot className="size-4" />
+                        Free Tier (Gemini BYOK)
+                      </h3>
+                      <div className="grid gap-3">
+                        {geminiModels.map((model) => (
+                          <ModelCard
+                            key={model}
+                            id={model}
+                            name={model}
+                            description="Uses your own Gemini API Key"
+                            isSelected={selectedModel === model}
+                          />
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   {isSaving && (
                     <div className="fixed bottom-4 right-4 bg-accent text-white px-4 py-2 rounded-lg flex items-center gap-2">
