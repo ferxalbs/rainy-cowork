@@ -12,6 +12,7 @@ interface UseAIProviderResult {
     hasApiKey: (provider: string) => boolean;
     validateApiKey: (provider: string, apiKey: string) => Promise<boolean>;
     storeApiKey: (provider: string, apiKey: string) => Promise<void>;
+    getApiKey: (provider: string) => Promise<string | null>;
     deleteApiKey: (provider: string) => Promise<void>;
     getModels: (provider: string) => Promise<string[]>;
     refreshProviders: () => Promise<void>;
@@ -111,6 +112,15 @@ export function useAIProvider(): UseAIProviderResult {
         }
     }, []);
 
+    const getApiKey = useCallback(async (provider: string): Promise<string | null> => {
+        try {
+            return await tauri.getApiKey(provider);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : String(err));
+            return null;
+        }
+    }, []);
+
     return {
         providers,
         isLoading,
@@ -118,6 +128,7 @@ export function useAIProvider(): UseAIProviderResult {
         hasApiKey,
         validateApiKey,
         storeApiKey,
+        getApiKey, // Exposed
         deleteApiKey,
         getModels,
         refreshProviders,

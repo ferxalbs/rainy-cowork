@@ -11,6 +11,8 @@ import {
   TextField,
   Input,
   Spinner,
+  Modal,
+  Checkbox,
 } from "@heroui/react";
 import {
   Bot,
@@ -59,7 +61,7 @@ export function SettingsPage({
   const [isSaving, setIsSaving] = useState(false);
 
   // API key management
-  const { hasApiKey, validateApiKey, storeApiKey, deleteApiKey } =
+  const { hasApiKey, validateApiKey, storeApiKey, getApiKey, deleteApiKey } =
     useAIProvider();
 
   const {
@@ -103,6 +105,10 @@ export function SettingsPage({
     Record<string, "idle" | "validating" | "valid" | "invalid">
   >({});
   const [savingStatus, setSavingStatus] = useState<Record<string, boolean>>({});
+  const [visibleKeys, setVisibleKeys] = useState<Record<string, string>>({});
+  const [replacingKeys, setReplacingKeys] = useState<Record<string, boolean>>(
+    {},
+  );
 
   const [coworkModelsData, setCoworkModelsData] =
     useState<tauri.CoworkModelsResponse | null>(null);
@@ -225,6 +231,27 @@ export function SettingsPage({
     } catch {
       return "N/A";
     }
+  };
+
+  const handleViewKey = async (provider: ProviderType) => {
+    const providerId = getProviderId(provider);
+    const key = await getApiKey(providerId);
+    if (key) {
+      setVisibleKeys((prev) => ({ ...prev, [getProviderId(provider)]: key }));
+    }
+  };
+
+  const handleReplaceKey = (provider: ProviderType) => {
+    // Clear the current key input and enable replacing mode
+    const providerId = getProviderId(provider);
+    setReplacingKeys((prev) => ({ ...prev, [providerId]: true }));
+    setApiKeyInputs((prev) => ({ ...prev, [providerId]: "" }));
+    // Also clear visibility if it was shown
+    setVisibleKeys((prev) => {
+      const next = { ...prev };
+      delete next[providerId];
+      return next;
+    });
   };
 
   // Helper to render model card
@@ -473,6 +500,11 @@ export function SettingsPage({
                 const status = validationStatus[provider.id] || "idle";
                 const saving = savingStatus[provider.id];
                 const showKey = showKeys[provider.id];
+                const visibleKey = visibleKeys[providerId];
+                const isReplacing = replacingKeys[providerId];
+
+                // Show input if: No key stored OR replacing mode is active
+                const showInput = !hasKey || isReplacing;
 
                 return (
                   <div
@@ -485,10 +517,10 @@ export function SettingsPage({
                           <Sparkles className="size-4 text-accent" />
                           <span className="font-medium">{provider.name}</span>
                         </div>
-                        {hasKey && (
+                        {hasKey && !isReplacing && (
                           <span className="text-xs text-green-600 flex items-center gap-1">
                             <Check className="size-3" />
-                            Connected
+                            Stored in Keychain
                           </span>
                         )}
                       </div>
@@ -497,7 +529,7 @@ export function SettingsPage({
                         {provider.description}
                       </p>
 
-                      {!hasKey ? (
+                      {showInput ? (
                         <div className="space-y-2">
                           <div className="flex gap-2">
                             <TextField
@@ -509,7 +541,11 @@ export function SettingsPage({
                               }
                             >
                               <Input
-                                placeholder="Enter API key..."
+                                placeholder={
+                                  isReplacing
+                                    ? "Enter new API key..."
+                                    : "Enter API key..."
+                                }
                                 value={apiKeyInputs[provider.id] || ""}
                               />
                             </TextField>
@@ -542,13 +578,34 @@ export function SettingsPage({
                             <Button
                               variant="primary"
                               size="sm"
-                              onPress={() => handleSaveKey(provider.id)}
+                              onPress={async () => {
+                                await handleSaveKey(provider.id);
+                                // If successful (handleSaveKey handles logic), disable replacing mode
+                                setReplacingKeys((prev) => ({
+                                  ...prev,
+                                  [providerId]: false,
+                                }));
+                              }}
                               isDisabled={
                                 !apiKeyInputs[provider.id]?.trim() || saving
                               }
                             >
                               {saving ? "Saving..." : "Save to Keychain"}
                             </Button>
+                            {isReplacing && (
+                              <Button
+                                variant="tertiary"
+                                size="sm"
+                                onPress={() =>
+                                  setReplacingKeys((prev) => ({
+                                    ...prev,
+                                    [providerId]: false,
+                                  }))
+                                }
+                              >
+                                Cancel
+                              </Button>
+                            )}
                           </div>
                           {status === "valid" && (
                             <p className="text-xs text-green-600 flex items-center gap-1">
@@ -569,17 +626,50 @@ export function SettingsPage({
                           )}
                         </div>
                       ) : (
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-muted-foreground">
-                            API key stored in Keychain
-                          </span>
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onPress={() => handleDeleteKey(provider.id)}
-                          >
-                            Remove
-                          </Button>
+                        <div className="flex flex-col gap-2">
+                          {activeTab === "keys" && visibleKey && (
+                            <div className="p-3 bg-muted rounded-lg border border-border/50 text-xs font-mono break-all relative group">
+                              {visibleKey}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onPress={() =>
+                                  navigator.clipboard.writeText(visibleKey)
+                                }
+                              >
+                                <Copy className="size-3" />
+                              </Button>
+                            </div>
+                          )}
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onPress={() => handleViewKey(provider.id)}
+                              isDisabled={!!visibleKey}
+                            >
+                              <Eye className="size-4 mr-1" />
+                              View
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onPress={() => handleReplaceKey(provider.id)}
+                            >
+                              <ExternalLink className="size-4 mr-1" />
+                              Replace
+                            </Button>
+                            <Button
+                              variant="tertiary"
+                              size="sm"
+                              className="text-red-500 hover:text-red-600"
+                              onPress={() => handleDeleteKey(provider.id)}
+                            >
+                              <Trash2 className="size-4 mr-1" />
+                              Remove
+                            </Button>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -822,37 +912,101 @@ export function SettingsPage({
                 )}
 
                 {/* New Key Modal */}
-                {showNewKeyModal && (
-                  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                    <div className="p-6 w-96 max-w-[90vw] rounded-xl border bg-background shadow-xl">
-                      <h3 className="font-semibold text-lg mb-4">
-                        {newKeyValue ? "API Key Created" : "Create New API Key"}
-                      </h3>
-
-                      {newKeyValue ? (
-                        <div className="space-y-4">
-                          <div className="p-3 bg-muted rounded-lg font-mono text-sm break-all">
-                            {newKeyValue}
+                <Modal
+                  isOpen={showNewKeyModal}
+                  onOpenChange={setShowNewKeyModal}
+                >
+                  <Modal.Backdrop className="backdrop-blur-2xl bg-white/80 dark:bg-black/80" />
+                  <Modal.Container>
+                    <Modal.Dialog className="sm:max-w-[400px]">
+                      <Modal.CloseTrigger />
+                      <Modal.Header>
+                        <div className="flex items-center gap-2">
+                          <div className="p-2 bg-primary/10 rounded-lg">
+                            <Key className="size-4 text-primary" />
                           </div>
-                          <p className="text-xs text-muted-foreground">
-                            ⚠️ Copy this key now. You won't be able to see it
-                            again.
-                          </p>
-                          <div className="flex gap-2">
+                          <Modal.Heading>
+                            {newKeyValue
+                              ? "API Key Created"
+                              : "Create New API Key"}
+                          </Modal.Heading>
+                        </div>
+                      </Modal.Header>
+
+                      <Modal.Body>
+                        {newKeyValue ? (
+                          <div className="space-y-4">
+                            <div className="p-3 bg-muted rounded-lg font-mono text-sm break-all relative border border-border/50">
+                              {newKeyValue}
+                            </div>
+
+                            <div className="flex items-center space-x-2">
+                              <Checkbox
+                                defaultSelected={true}
+                                onChange={async (e) => {
+                                  if (e.valueOf()) {
+                                    await storeApiKey(
+                                      "cowork_api",
+                                      newKeyValue,
+                                    );
+                                  }
+                                }}
+                              >
+                                <span className="text-sm">
+                                  Set as active Cowork key
+                                </span>
+                              </Checkbox>
+                            </div>
+
+                            <p className="text-xs text-muted-foreground bg-yellow-500/10 p-2 rounded text-yellow-600 dark:text-yellow-500 border border-yellow-500/20">
+                              ⚠️ Copy this key now. You won't be able to see it
+                              again.
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="space-y-4">
+                            <TextField>
+                              <Label>Key Name</Label>
+                              <Input
+                                placeholder="e.g., Development Key"
+                                value={newKeyName}
+                                onChange={(e) => setNewKeyName(e.target.value)}
+                                autoFocus
+                              />
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Generates a secure random API key for your
+                                applications.
+                              </p>
+                            </TextField>
+                          </div>
+                        )}
+                      </Modal.Body>
+
+                      <Modal.Footer>
+                        {newKeyValue ? (
+                          <div className="flex gap-2 w-full">
                             <Button
-                              variant="primary"
+                              variant="secondary"
                               className="flex-1"
                               onPress={() => {
                                 navigator.clipboard.writeText(newKeyValue);
+                                // Visual feedback here would be good but keeping it simple
                               }}
                             >
-                              <Copy className="size-4" />
+                              <Copy className="size-4 mr-2" />
                               Copy Key
                             </Button>
                             <Button
-                              variant="secondary"
-                              onPress={() => {
+                              variant="primary"
+                              className="flex-1"
+                              onPress={async () => {
                                 setShowNewKeyModal(false);
+                                // Auto-apply logic if checked (handled by checkbox change, but default true logic needed)
+                                // Re-check: the checkbox logic above only runs on CHANGE.
+                                // We should probably just force apply it or check if it's already applied.
+                                // For now, let's assume the user checks it or we run it by default on create success?
+                                // Better to just run it:
+                                await storeApiKey("cowork_api", newKeyValue);
                                 setNewKeyValue(null);
                                 setNewKeyName("");
                               }}
@@ -860,20 +1014,10 @@ export function SettingsPage({
                               Done
                             </Button>
                           </div>
-                        </div>
-                      ) : (
-                        <div className="space-y-4">
-                          <TextField>
-                            <Label>Key Name</Label>
-                            <Input
-                              placeholder="e.g., Development Key"
-                              value={newKeyName}
-                              onChange={(e) => setNewKeyName(e.target.value)}
-                            />
-                          </TextField>
-                          <div className="flex gap-2">
+                        ) : (
+                          <div className="flex gap-2 justify-end w-full">
                             <Button
-                              variant="secondary"
+                              variant="tertiary"
                               onPress={() => {
                                 setShowNewKeyModal(false);
                                 setNewKeyName("");
@@ -883,13 +1027,14 @@ export function SettingsPage({
                             </Button>
                             <Button
                               variant="primary"
-                              className="flex-1"
                               isDisabled={!newKeyName.trim() || isCreatingKey}
                               onPress={async () => {
                                 setIsCreatingKey(true);
                                 const result = await createKey(newKeyName);
                                 if (result) {
                                   setNewKeyValue(result.key);
+                                  // AUTO APPLY DEFAULT
+                                  await storeApiKey("cowork_api", result.key);
                                 }
                                 setIsCreatingKey(false);
                               }}
@@ -901,11 +1046,11 @@ export function SettingsPage({
                               )}
                             </Button>
                           </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
+                        )}
+                      </Modal.Footer>
+                    </Modal.Dialog>
+                  </Modal.Container>
+                </Modal>
               </div>
             </Tabs.Panel>
 

@@ -2,12 +2,11 @@
  * useCoworkBilling Hook
  *
  * React hook for Cowork subscription management.
- * Handles plan listing, checkout, and subscription status.
+ * Handles plan listing, checkout, and subscription status via Tauri backend.
  */
 
 import { useCallback, useEffect, useState } from 'react';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://api.enosislabs.com';
+import * as tauri from '../services/tauri';
 
 export interface CoworkPlan {
     id: string;
@@ -52,98 +51,59 @@ export function useCoworkBilling(): UseCoworkBillingResult {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    const getAuthToken = useCallback(() => {
-        return localStorage.getItem('accessToken');
-    }, []);
-
     const refresh = useCallback(async () => {
         setIsLoading(true);
         setError(null);
 
         try {
-            // Fetch plans (public endpoint)
-            const plansResponse = await fetch(`${API_BASE_URL}/api/v1/cowork/billing/plans`);
-            if (plansResponse.ok) {
-                const plansData = await plansResponse.json();
-                setPlans(plansData.plans || []);
+            // Fetch subscription status via Tauri Backend
+            // This ensures we validation against the real rainy-sdk/backend state
+            const status = await tauri.getCoworkStatus();
+            
+            setSubscription({
+                hasSubscription: status.has_paid_plan,
+                plan: status.plan,
+                planName: status.plan_name,
+                status: status.is_valid ? 'active' : 'inactive',
+                usageThisMonth: status.usage.used,
+                creditsUsedThisMonth: status.usage.credits_used,
+                currentPeriodEnd: status.usage.resets_at
+            });
+
+            // Populate plans with data from status if available, or leave empty
+            // We avoid fetching from frontend to prevent SSL errors
+            if (status.plan) {
+                 // We could potentially reconstruct current plan info here
             }
 
-            // Fetch subscription status (requires auth)
-            const token = getAuthToken();
-            if (token) {
-                const subResponse = await fetch(`${API_BASE_URL}/api/v1/cowork/billing/subscription`, {
-                    headers: { 'Authorization': `Bearer ${token}` },
-                });
-                if (subResponse.ok) {
-                    const subData = await subResponse.json();
-                    setSubscription(subData);
-                }
-            }
         } catch (err) {
+            console.error(err);
             setError(err instanceof Error ? err.message : 'Failed to load billing info');
         } finally {
             setIsLoading(false);
         }
-    }, [getAuthToken]);
+    }, []);
 
     useEffect(() => {
         refresh();
     }, [refresh]);
 
+    // Simplified checkout - just opens the pricing page as requested by user ("modal" / external link)
     const checkout = useCallback(async (planId: string): Promise<string | null> => {
-        const token = getAuthToken();
-        if (!token) {
-            setError('Not authenticated');
-            return null;
-        }
-
-        try {
-            const response = await fetch(`${API_BASE_URL}/api/v1/cowork/billing/checkout-session`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ planId }),
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error?.message || 'Failed to create checkout');
-            }
-
-            const data = await response.json();
-            return data.url;
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to start checkout');
-            return null;
-        }
-    }, [getAuthToken]);
+       // Just open the pricing page directly
+       await import('@tauri-apps/plugin-opener').then(opener => {
+          opener.openUrl('https://enosislabs.com/pricing');
+       });
+       return null;
+    }, []);
 
     const openPortal = useCallback(async (): Promise<string | null> => {
-        const token = getAuthToken();
-        if (!token) {
-            setError('Not authenticated');
-            return null;
-        }
-
-        try {
-            const response = await fetch(`${API_BASE_URL}/api/v1/cowork/billing/portal`, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}` },
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to open billing portal');
-            }
-
-            const data = await response.json();
-            return data.url;
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to open portal');
-            return null;
-        }
-    }, [getAuthToken]);
+        // Just open the portal/account page directly
+       await import('@tauri-apps/plugin-opener').then(opener => {
+          opener.openUrl('https://enosislabs.com/account');
+       });
+       return null;
+    }, []);
 
     return {
         plans,
