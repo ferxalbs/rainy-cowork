@@ -30,4 +30,7 @@ rainy-api-v2
 .agent/rules/cowork-architecture.md
 COWORK_INFO.md
 
-*.md
+docs/*
+
+DESING_BASE.md
+MANUS_AI_INFO.md
