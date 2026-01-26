@@ -159,14 +159,14 @@ export function CoworkPanel({
   const isFallbackBadge = isFallback;
 
   return (
-    <div className="flex flex-col h-full bg-background/50 backdrop-blur-xl rounded-xl border border-border shadow-2xl relative overflow-hidden">
+    <div className="flex flex-col h-full bg-sidebar/20 dark:bg-black/10 backdrop-blur-2xl backdrop-saturate-200 rounded-2xl border border-white/10 dark:border-white/5 overflow-hidden ml-3 transition-all duration-300">
       {/* Decorative Gradient Background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 pointer-events-none opacity-30" />
 
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border/50 bg-background/30 backdrop-blur-md relative z-10">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-white/5 relative z-10 shrink-0 h-14">
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 ">
             <Sparkles className="w-5 h-5 text-primary animate-pulse-slow" />
             <span className="font-medium text-foreground tracking-tight">
               AI Cowork Agent
@@ -303,8 +303,8 @@ export function CoworkPanel({
       </div>
 
       {/* Input */}
-      <div className="p-4 border-t border-border/50 bg-background/50 backdrop-blur-md relative z-10">
-        <div className="flex gap-2 items-end bg-input/50 border border-input rounded-xl p-1.5 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/50 transition-all duration-200 shadow-inner">
+      <div className="p-4 border-t border-white/5 bg-white/5 backdrop-blur-md relative z-10 shrink-0">
+        <div className="flex gap-2 items-end bg-default-100/50 border-none rounded-2xl p-1.5 transition-all duration-200 focus-within:bg-default-100">
           <TextArea
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -371,10 +371,10 @@ function MessageBubble({
       <div
         className={`max-w-[85%] rounded-2xl px-5 py-3.5 shadow-sm text-sm leading-relaxed ${
           isUser
-            ? "bg-primary text-primary-foreground rounded-br-none"
+            ? "bg-primary text-primary-foreground rounded-br-sm"
             : isSystem
-              ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20"
-              : "bg-card border border-border text-foreground rounded-bl-none shadow-sm"
+              ? "bg-warning/10 text-warning-700 dark:text-warning-400 border border-warning/20"
+              : "bg-default-100/50 hover:bg-default-100 transition-colors text-foreground rounded-bl-sm"
         }`}
       >
         {message.isLoading && (
