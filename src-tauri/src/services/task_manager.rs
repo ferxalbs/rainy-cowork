@@ -6,16 +6,15 @@ use crate::models::{Task, TaskEvent, TaskStatus};
 use dashmap::DashMap;
 use std::sync::Arc;
 use tauri::ipc::Channel;
-use tokio::sync::Mutex;
 
 /// Task manager for orchestrating AI task execution
 pub struct TaskManager {
     tasks: DashMap<String, Task>,
-    ai_provider: Arc<Mutex<AIProviderManager>>,
+    ai_provider: Arc<AIProviderManager>,
 }
 
 impl TaskManager {
-    pub fn new(ai_provider: Arc<Mutex<AIProviderManager>>) -> Self {
+    pub fn new(ai_provider: Arc<AIProviderManager>) -> Self {
         Self {
             tasks: DashMap::new(),
             ai_provider,
@@ -60,11 +59,10 @@ impl TaskManager {
             })
             .map_err(|e| e.to_string())?;
 
-        // Execute the task using AI provider (acquire lock)
+        // Execute the task using AI provider
         let task_id_for_closure = task_id.to_string();
         let result = {
-            let mut provider = self.ai_provider.lock().await;
-            provider
+            self.ai_provider
                 .execute_prompt(
                     &task.provider,
                     &task.model,

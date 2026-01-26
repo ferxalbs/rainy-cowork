@@ -4,6 +4,10 @@
 use crate::ai::{gemini::GeminiProvider, keychain::KeychainManager};
 use crate::models::{AIProviderConfig, ProviderType};
 use rainy_sdk::{CoworkCapabilities, CoworkPlan, RainyClient};
+use std::sync::Arc;
+use tokio::sync::RwLock;
+use std::collections::HashMap;
+use std::time::{Duration, Instant};
 
 /// Error type for AI operations
 #[derive(Debug, thiserror::Error)]
@@ -25,44 +29,98 @@ pub struct CachedCapabilities {
     pub fetched_at: std::time::Instant,
 }
 
+/// Pooled RainyClient with connection reuse
+#[derive(Clone)]
+struct PooledClient {
+    client: Arc<RainyClient>,
+    created_at: Instant,
+}
+
 /// Manager for AI providers - uses rainy-sdk for paid plans, Gemini for free tier
 pub struct AIProviderManager {
     keychain: KeychainManager,
     gemini: GeminiProvider,
     /// Cached capabilities from last check
-    cached_caps: Option<CachedCapabilities>,
+    cached_caps: Arc<RwLock<Option<CachedCapabilities>>>,
+    /// Connection pool for RainyClient instances
+    client_pool: Arc<RwLock<HashMap<String, PooledClient>>>,
+    /// HTTP client with optimized settings
+    #[allow(dead_code)]
+    http_client: reqwest::Client,
 }
 
 impl AIProviderManager {
     pub fn new() -> Self {
+        // Create optimized HTTP client with timeouts and connection pooling
+        let http_client = reqwest::Client::builder()
+            .connect_timeout(Duration::from_secs(5))
+            .timeout(Duration::from_secs(30))
+            .pool_max_idle_per_host(10)
+            .pool_idle_timeout(Duration::from_secs(90))
+            .tcp_nodelay(true)
+            .http2_keep_alive_interval(Duration::from_secs(30))
+            .http2_keep_alive_timeout(Duration::from_secs(10))
+            .build()
+            .expect("Failed to create HTTP client");
+
         Self {
             keychain: KeychainManager::new(),
             gemini: GeminiProvider::new(),
-            cached_caps: None,
+            cached_caps: Arc::new(RwLock::new(None)),
+            client_pool: Arc::new(RwLock::new(HashMap::new())),
+            http_client,
         }
     }
 
-    /// Get Rainy SDK client for Cowork if API key is configured
-    async fn get_cowork_client(&self) -> Option<RainyClient> {
+    /// Get Rainy SDK client for Cowork if API key is configured (with connection pooling)
+    async fn get_cowork_client(&self) -> Option<Arc<RainyClient>> {
         let api_key = self.keychain.get_key("cowork_api").ok()??;
-        RainyClient::with_api_key(&api_key).ok()
+        self.get_or_create_client("cowork_api", &api_key).await
     }
 
-    /// Get cowork capabilities (with caching)
-    pub async fn get_capabilities(&mut self) -> CoworkCapabilities {
+    /// Get or create a pooled RainyClient instance
+    async fn get_or_create_client(&self, provider_key: &str, api_key: &str) -> Option<Arc<RainyClient>> {
+        let mut pool = self.client_pool.write().await;
+        
+        // Check if we have a valid cached client (less than 5 minutes old)
+        if let Some(pooled) = pool.get(provider_key) {
+            if pooled.created_at.elapsed() < Duration::from_secs(300) {
+                return Some(pooled.client.clone());
+            }
+        }
+
+        // Create new client
+        let client = RainyClient::with_api_key(api_key).ok()?;
+        let client = Arc::new(client);
+        
+        // Cache the client
+        pool.insert(provider_key.to_string(), PooledClient {
+            client: client.clone(),
+            created_at: Instant::now(),
+        });
+
+        Some(client)
+    }
+
+    /// Get cowork capabilities (with optimized caching)
+    pub async fn get_capabilities(&self) -> CoworkCapabilities {
         // Check cache (valid for 5 minutes)
-        if let Some(cached) = &self.cached_caps {
-            if cached.fetched_at.elapsed().as_secs() < 300 {
-                return cached.capabilities.clone();
+        {
+            let cached = self.cached_caps.read().await;
+            if let Some(cached) = cached.as_ref() {
+                if cached.fetched_at.elapsed().as_secs() < 300 {
+                    return cached.capabilities.clone();
+                }
             }
         }
 
         // Fetch from SDK
         if let Some(client) = self.get_cowork_client().await {
             if let Ok(caps) = client.get_cowork_capabilities().await {
-                self.cached_caps = Some(CachedCapabilities {
+                let mut cached = self.cached_caps.write().await;
+                *cached = Some(CachedCapabilities {
                     capabilities: caps.clone(),
-                    fetched_at: std::time::Instant::now(),
+                    fetched_at: Instant::now(),
                 });
                 return caps;
             }
@@ -72,7 +130,7 @@ impl AIProviderManager {
         CoworkCapabilities::free()
     }
 
-    /// Get cowork models directly from API (efficient)
+    /// Get cowork models directly from API (efficient with connection reuse)
     pub async fn get_cowork_models_from_api(
         &self,
     ) -> Result<rainy_sdk::cowork::CoworkModelsResponse, String> {
@@ -85,18 +143,18 @@ impl AIProviderManager {
 
     /// Check if user has a paid plan
     #[allow(dead_code)]
-    pub async fn has_paid_plan(&mut self) -> bool {
+    pub async fn has_paid_plan(&self) -> bool {
         self.get_capabilities().await.profile.plan.is_paid()
     }
 
     /// Get current plan
     #[allow(dead_code)]
-    pub async fn get_plan(&mut self) -> CoworkPlan {
+    pub async fn get_plan(&self) -> CoworkPlan {
         self.get_capabilities().await.profile.plan
     }
 
     /// List available providers based on plan
-    pub async fn list_providers(&mut self) -> Vec<AIProviderConfig> {
+    pub async fn list_providers(&self) -> Vec<AIProviderConfig> {
         let caps = self.get_capabilities().await;
         let mut providers = vec![];
 
@@ -151,7 +209,7 @@ impl AIProviderManager {
     }
 
     /// Get available models based on plan
-    pub async fn get_models(&mut self, provider: &str) -> Result<Vec<String>, String> {
+    pub async fn get_models(&self, provider: &str) -> Result<Vec<String>, String> {
         match provider {
             "rainy_api" => {
                 // Standard Rainy API supports all models (subject to key permission/credits)
@@ -228,7 +286,7 @@ impl AIProviderManager {
 
     /// Execute a prompt using the specified provider
     pub async fn execute_prompt<F>(
-        &mut self,
+        &self,
         provider: &ProviderType,
         model: &str,
         prompt: &str,
@@ -248,7 +306,8 @@ impl AIProviderManager {
                     .ok_or("No Rainy API key found")?;
 
                 on_progress(10, Some("Connecting to Rainy API...".to_string()));
-                let client = RainyClient::with_api_key(api_key).map_err(|e| e.to_string())?;
+                let client = self.get_or_create_client("rainy_api", &api_key).await
+                    .ok_or("Failed to create Rainy API client")?;
 
                 on_progress(30, Some("Sending request...".to_string()));
                 let result = client
@@ -292,7 +351,8 @@ impl AIProviderManager {
                     .ok_or("No Cowork API key found")?;
 
                 on_progress(10, Some("Connecting to Cowork API...".to_string()));
-                let client = RainyClient::with_api_key(api_key).map_err(|e| e.to_string())?;
+                let client = self.get_or_create_client("cowork_api", &api_key).await
+                    .ok_or("Failed to create Cowork API client")?;
 
                 on_progress(30, Some("Sending request...".to_string()));
                 let result = client
@@ -319,13 +379,28 @@ impl AIProviderManager {
     }
 
     /// Check if a feature is available based on plan
-    pub async fn can_use_feature(&mut self, feature: &str) -> bool {
+    pub async fn can_use_feature(&self, feature: &str) -> bool {
         self.get_capabilities().await.can_use_feature(feature)
     }
 
     /// Invalidate cached capabilities (call after API key changes)
-    pub fn invalidate_cache(&mut self) {
-        self.cached_caps = None;
+    pub async fn invalidate_cache(&self) {
+        let mut cached = self.cached_caps.write().await;
+        *cached = None;
+        
+        // Also clear client pool to force reconnection with new keys
+        let mut pool = self.client_pool.write().await;
+        pool.clear();
+    }
+
+    /// Batch multiple API calls for better performance
+    pub async fn batch_validate_keys(&self, providers: Vec<(String, String)>) -> Vec<(String, Result<bool, String>)> {
+        let futures = providers.into_iter().map(|(provider, key)| async move {
+            let result = self.validate_api_key(&provider, &key).await;
+            (provider, result)
+        });
+        
+        futures::future::join_all(futures).await
     }
 }
 

@@ -17,8 +17,8 @@ use tokio::sync::Mutex;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // Initialize AI provider manager as Arc<Mutex> for mutable access
-    let ai_provider = Arc::new(Mutex::new(AIProviderManager::new()));
+    // Initialize AI provider manager as Arc for thread-safe access
+    let ai_provider = Arc::new(AIProviderManager::new());
 
     // Initialize task manager with Arc clone (needs its own reference)
     let task_manager = TaskManager::new(ai_provider.clone());
@@ -66,7 +66,7 @@ pub fn run() {
         .manage(web_research)
         .manage(document_service)
         .manage(image_service)
-        .manage(ai_provider) // Arc<Mutex<AIProviderManager>>
+        .manage(ai_provider) // Arc<AIProviderManager>
         .manage(settings_manager) // Arc<Mutex<SettingsManager>>
         .setup(|app| {
             use tauri::Manager;

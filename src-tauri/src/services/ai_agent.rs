@@ -194,7 +194,7 @@ pub struct WorkspaceContext {
 
 /// AI-powered cowork agent for autonomous file operations
 pub struct CoworkAgent {
-    ai_provider: Arc<Mutex<AIProviderManager>>,
+    ai_provider: Arc<AIProviderManager>,
     file_ops: Arc<FileOperationEngine>,
     file_manager: Arc<FileManager>,
     settings: Arc<Mutex<SettingsManager>>,
@@ -204,7 +204,7 @@ pub struct CoworkAgent {
 
 impl CoworkAgent {
     pub fn new(
-        ai_provider: Arc<Mutex<AIProviderManager>>,
+        ai_provider: Arc<AIProviderManager>,
         file_ops: Arc<FileOperationEngine>,
         file_manager: Arc<FileManager>,
         settings: Arc<Mutex<SettingsManager>>,
@@ -275,9 +275,8 @@ impl CoworkAgent {
             settings.get_selected_model().to_string()
         };
 
-        let mut provider = self.ai_provider.lock().await;
         // Check capabilities (refresh if needed)
-        let caps = provider.get_capabilities().await;
+        let caps = self.ai_provider.get_capabilities().await;
 
         tracing::info!(
             "AI Agent Selection: Model='{}', PlanPaid={}, AvailableCoworkModels={:?}",
@@ -293,7 +292,7 @@ impl CoworkAgent {
         let trimmed_model = selected_model.trim();
         if caps.profile.plan.is_paid() {
             if caps.can_make_request() {
-                match provider
+                match self.ai_provider
                     .execute_prompt(&ProviderType::CoworkApi, trimmed_model, prompt, |_, _| {})
                     .await
                 {
@@ -314,11 +313,11 @@ impl CoworkAgent {
             }
         }
         // Is it a generic Rainy API model? (If key exists)
-        else if provider.has_api_key("rainy_api").await.unwrap_or(false) {
+        else if self.ai_provider.has_api_key("rainy_api").await.unwrap_or(false) {
             // Rainy API usually supports most models. We try it if the name looks valid or just attempt it.
             // For safety, we only route known OpenAI/Anthropic style IDs or if it matches "gpt" / "claude"
             if selected_model.contains("gpt") || selected_model.contains("claude") {
-                match provider
+                match self.ai_provider
                     .execute_prompt(&ProviderType::RainyApi, &selected_model, prompt, |_, _| {})
                     .await
                 {
@@ -340,9 +339,9 @@ impl CoworkAgent {
         }
         // Is it a Gemini BYOK model?
         else if selected_model.starts_with("gemini")
-            && provider.has_api_key("gemini").await.unwrap_or(false)
+            && self.ai_provider.has_api_key("gemini").await.unwrap_or(false)
         {
-            match provider
+            match self.ai_provider
                 .execute_prompt(&ProviderType::Gemini, &selected_model, prompt, |_, _| {})
                 .await
             {
@@ -368,7 +367,7 @@ impl CoworkAgent {
         // 1. Try Cowork default
         if caps.profile.plan.is_paid() && caps.can_make_request() {
             let preferred_model = caps.models.first().map(|s| s.as_str()).unwrap_or("gpt-4o");
-            if let Ok(response) = provider
+            if let Ok(response) = self.ai_provider
                 .execute_prompt(&ProviderType::CoworkApi, preferred_model, prompt, |_, _| {})
                 .await
             {
@@ -384,8 +383,8 @@ impl CoworkAgent {
         }
 
         // 2. Try Rainy API default
-        if provider.has_api_key("rainy_api").await.unwrap_or(false) {
-            if let Ok(response) = provider
+        if self.ai_provider.has_api_key("rainy_api").await.unwrap_or(false) {
+            if let Ok(response) = self.ai_provider
                 .execute_prompt(&ProviderType::RainyApi, "gpt-4o", prompt, |_, _| {})
                 .await
             {
@@ -402,7 +401,7 @@ impl CoworkAgent {
 
         // 3. Fallback to Gemini (Free/BYOK)
         let gemini_model = "gemini-3-flash-high";
-        let response = provider
+        let response = self.ai_provider
             .execute_prompt(&ProviderType::Gemini, gemini_model, prompt, |_, _| {})
             .await
             .map_err(|e| format!("All AI providers failed. Last error: {}", e))?;
@@ -825,13 +824,12 @@ Respond ONLY with valid JSON, no other text."#,
 
                 // Use AI to transform content
                 let new_content = {
-                    let mut provider = self.ai_provider.lock().await;
                     let prompt = format!(
                         "Modify this file content according to the instruction.\n\nINSTRUCTION: {}\n\nCURRENT CONTENT:\n{}\n\nRespond with ONLY the new file content, nothing else.",
                         instruction, current
                     );
 
-                    provider
+                    self.ai_provider
                         .execute_prompt(
                             &ProviderType::Gemini,
                             "gemini-2.5-flash",

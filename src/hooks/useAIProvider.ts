@@ -1,7 +1,7 @@
 // Rainy Cowork - useAIProvider Hook
 // React hook for AI provider management with Keychain integration
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import * as tauri from '../services/tauri';
 import type { AIProviderConfig } from '../services/tauri';
 
@@ -23,16 +23,32 @@ export function useAIProvider(): UseAIProviderResult {
     const [storedKeys, setStoredKeys] = useState<Set<string>>(new Set());
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    
+    // Debounce refresh calls to prevent excessive API calls
+    const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const lastRefreshTime = useRef<number>(0);
 
-    const refreshProviders = useCallback(async () => {
+    const refreshProviders = useCallback(async (force = false) => {
+        // Debounce rapid calls (unless forced)
+        const now = Date.now();
+        if (!force && now - lastRefreshTime.current < 1000) {
+            return;
+        }
+        lastRefreshTime.current = now;
+
+        // Clear any pending timeout
+        if (refreshTimeoutRef.current) {
+            clearTimeout(refreshTimeoutRef.current);
+        }
+
         setIsLoading(true);
         setError(null);
         try {
             const providerList = await tauri.listProviders();
             setProviders(providerList);
 
-            // Check which providers have stored keys
-            const keyChecks = await Promise.all(
+            // Batch key checks for better performance with error handling
+            const keyChecks = await Promise.allSettled(
                 providerList.map(async (p) => {
                     let providerId = 'gemini';
                     // Backend returns lowercase provider strings
@@ -47,7 +63,12 @@ export function useAIProvider(): UseAIProviderResult {
                 })
             );
 
-            setStoredKeys(new Set(keyChecks.filter(k => k.hasKey).map(k => k.provider)));
+            const successfulChecks = keyChecks
+                .filter((result): result is PromiseFulfilledResult<{ provider: string; hasKey: boolean }> => 
+                    result.status === 'fulfilled')
+                .map(result => result.value);
+
+            setStoredKeys(new Set(successfulChecks.filter(k => k.hasKey).map(k => k.provider)));
         } catch (err) {
             setError(err instanceof Error ? err.message : String(err));
         } finally {
@@ -82,11 +103,15 @@ export function useAIProvider(): UseAIProviderResult {
         try {
             await tauri.storeApiKey(provider, apiKey);
             setStoredKeys(prev => new Set([...prev, provider]));
+            // Force refresh after key change with debouncing
+            refreshTimeoutRef.current = setTimeout(() => {
+                refreshProviders(true);
+            }, 500);
         } catch (err) {
             setError(err instanceof Error ? err.message : String(err));
             throw err;
         }
-    }, []);
+    }, [refreshProviders]);
 
     const deleteApiKey = useCallback(async (provider: string) => {
         setError(null);
@@ -97,11 +122,15 @@ export function useAIProvider(): UseAIProviderResult {
                 newSet.delete(provider);
                 return newSet;
             });
+            // Force refresh after key deletion with debouncing
+            refreshTimeoutRef.current = setTimeout(() => {
+                refreshProviders(true);
+            }, 500);
         } catch (err) {
             setError(err instanceof Error ? err.message : String(err));
             throw err;
         }
-    }, []);
+    }, [refreshProviders]);
 
     const getModels = useCallback(async (provider: string): Promise<string[]> => {
         try {

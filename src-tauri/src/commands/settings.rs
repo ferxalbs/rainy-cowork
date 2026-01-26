@@ -60,7 +60,7 @@ pub async fn set_notifications(
 pub async fn get_available_models(
     ai_provider: State<'_, Arc<Mutex<AIProviderManager>>>,
 ) -> Result<Vec<ModelOption>, String> {
-    let mut provider = ai_provider.lock().await;
+    let provider = ai_provider.lock().await;
     let caps = provider.get_capabilities().await;
 
     Ok(SettingsManager::get_available_models(

@@ -46,7 +46,7 @@ interface UseCoworkBillingResult {
 }
 
 export function useCoworkBilling(): UseCoworkBillingResult {
-    const [plans, setPlans] = useState<CoworkPlan[]>([]);
+    const [plans] = useState<CoworkPlan[]>([]);
     const [subscription, setSubscription] = useState<CoworkSubscription | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -89,7 +89,7 @@ export function useCoworkBilling(): UseCoworkBillingResult {
     }, [refresh]);
 
     // Simplified checkout - just opens the pricing page as requested by user ("modal" / external link)
-    const checkout = useCallback(async (planId: string): Promise<string | null> => {
+    const checkout = useCallback(async (_planId: string): Promise<string | null> => {
        // Just open the pricing page directly
        await import('@tauri-apps/plugin-opener').then(opener => {
           opener.openUrl('https://enosislabs.com/pricing');
