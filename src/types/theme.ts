@@ -5,7 +5,12 @@ export type ThemeName =
   | 'cosmic-gold'
   | 'cosmic-night'
   | 'jujutsu-kaisen'
-  | 'anime-style';
+  | 'anime-style'
+  | 'cyberpunk-neon'
+  | 'ghibli-forest'
+  | 'eva-01'
+  | 'high-contrast'
+  | 'focus-minimal';
 
 export interface Theme {
   name: ThemeName;

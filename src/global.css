@@ -72,11 +72,11 @@
 
   /* Secondary - Subtle warm gray */
   --secondary: oklch(0.96 0.005 20);
-  --secondary-foreground: oklch(0.20 0.02 20);
+  --secondary-foreground: oklch(0.2 0.02 20);
 
   /* Muted - Soft rose gray */
   --muted: oklch(0.94 0.005 20);
-  --muted-foreground: oklch(0.40 0.02 20);
+  --muted-foreground: oklch(0.4 0.02 20);
 
   /* Accent - Vibrant Blue/Purple for visibility */
   --accent: oklch(0.55 0.22 255);
@@ -87,8 +87,8 @@
   --destructive-foreground: oklch(0.98 0 0);
 
   /* Borders & Input - Visible but subtle */
-  --border: oklch(0.90 0.01 20);
-  --input: oklch(0.90 0.01 20);
+  --border: oklch(0.9 0.01 20);
+  --input: oklch(0.9 0.01 20);
   --ring: oklch(0.55 0.22 255);
 
   /* Sidebar - Slightly off-white */
@@ -96,13 +96,12 @@
   --sidebar-foreground: oklch(0.15 0.02 20);
   --sidebar-primary: oklch(0.55 0.22 255);
   --sidebar-accent: oklch(0.94 0.01 20);
-  --sidebar-border: oklch(0.90 0.01 20);
+  --sidebar-border: oklch(0.9 0.01 20);
 
   /* Floating elements */
-  --floating-shadow: 0 8px 32px oklch(0.20 0.02 20 / 12%),
-    0 2px 8px oklch(0.20 0.02 20 / 8%);
-  --floating-shadow-lg: 0 12px 48px oklch(0.20 0.02 20 / 15%),
-    0 4px 16px oklch(0.20 0.02 20 / 10%);
+  /* Floating elements - FLATTENED */
+  --floating-shadow: none;
+  --floating-shadow-lg: none;
 }
 
 /* ============================================
@@ -121,7 +120,7 @@
   --popover-foreground: oklch(0.98 0 0);
 
   /* Primary - macOS Blue (Vibrant) */
-  --primary: oklch(0.65 0.20 255);
+  --primary: oklch(0.65 0.2 255);
   --primary-foreground: oklch(1 0 0);
 
   /* Secondary */
@@ -130,33 +129,32 @@
 
   /* Muted - Distinct from background */
   --muted: oklch(0.22 0.01 260);
-  --muted-foreground: oklch(0.70 0.01 260);
+  --muted-foreground: oklch(0.7 0.01 260);
 
   /* Accent - Vibrant Blue/Purple (Visible against dark) */
-  --accent: oklch(0.65 0.20 255);
+  --accent: oklch(0.65 0.2 255);
   --accent-foreground: oklch(1 0 0);
 
   /* Destructive */
-  --destructive: oklch(0.60 0.20 25);
+  --destructive: oklch(0.6 0.2 25);
   --destructive-foreground: oklch(1 0 0);
 
   /* Borders & Input */
-  --border: oklch(0.30 0.01 260);
-  --input: oklch(0.30 0.01 260);
-  --ring: oklch(0.65 0.20 255);
+  --border: oklch(0.3 0.01 260);
+  --input: oklch(0.3 0.01 260);
+  --ring: oklch(0.65 0.2 255);
 
   /* Sidebar - Translucent dark */
   --sidebar: oklch(0.14 0.01 260 / 95%);
   --sidebar-foreground: oklch(0.98 0 0);
-  --sidebar-primary: oklch(0.65 0.20 255);
+  --sidebar-primary: oklch(0.65 0.2 255);
   --sidebar-accent: oklch(0.22 0.01 260);
-  --sidebar-border: oklch(0.30 0.01 260);
+  --sidebar-border: oklch(0.3 0.01 260);
 
   /* Floating elements */
-  --floating-shadow: 0 8px 32px oklch(0 0 0 / 60%),
-    0 2px 8px oklch(0 0 0 / 40%);
-  --floating-shadow-lg: 0 12px 48px oklch(0 0 0 / 70%),
-    0 4px 16px oklch(0 0 0 / 50%);
+  /* Floating elements - FLATTENED */
+  --floating-shadow: none;
+  --floating-shadow-lg: none;
 }
 
 /* ============================================
@@ -178,6 +176,28 @@
     /* Allow text selection in content areas */
     -webkit-user-select: text;
     user-select: text;
+    position: relative;
+    min-height: 100vh;
+  }
+
+  /* Dynamic but Stable Background */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: 
+      /* Light Mode: Subtle Warm Glow */
+      radial-gradient(circle at 0% 0%, oklch(0.55 0.22 255 / 3%), transparent 50%),
+      radial-gradient(circle at 100% 100%, oklch(0.55 0.22 255 / 5%), transparent 50%);
+  }
+
+  .dark body::before {
+    background: 
+      /* Dark Mode: Deep Ambient Glow */
+      radial-gradient(circle at 0% 0%, oklch(0.65 0.20 255 / 8%), transparent 60%),
+      radial-gradient(circle at 100% 0%, oklch(0.22 0.01 260 / 15%), transparent 50%);
   }
 
   /* macOS-style scrollbars */
@@ -205,7 +225,6 @@
    WINDOW CHROME & DRAGGING
    ============================================ */
 @layer components {
-
   /* Draggable title bar region */
   .window-drag {
     -webkit-app-region: drag;
@@ -242,7 +261,6 @@
    ANIMATIONS
    ============================================ */
 @layer utilities {
-
   /* Smooth appear animation */
   .animate-appear {
     animation: appear 200ms cubic-bezier(0.16, 1, 0.3, 1);
@@ -299,7 +317,6 @@
    UTILITY OVERRIDES
    ============================================ */
 @layer utilities {
-
   /* Prevent text selection on interactive elements */
   .select-none {
     -webkit-user-select: none;

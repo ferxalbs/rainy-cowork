@@ -76,7 +76,7 @@ export function ThemeSelector() {
                   border-2
                   ${
                     isActive
-                      ? "border-primary shadow-lg scale-[1.02]"
+                      ? "border-primary scale-[1.02]"
                       : "border-border hover:border-primary/50 hover:scale-[1.01]"
                   }
                 `}

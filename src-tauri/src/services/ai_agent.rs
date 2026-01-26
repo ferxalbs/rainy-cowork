@@ -296,17 +296,21 @@ impl CoworkAgent {
             &caps.models,
         );
 
+        println!("📋 Available models count: {}", available_models.len());
+        println!("📋 Available models: {:?}", available_models.iter().map(|m| &m.id).collect::<Vec<_>>());
+
         // Find the selected model in available models to get its provider
         let model_info = available_models.iter().find(|m| m.id == selected_model);
         
         if let Some(model) = model_info {
-            println!("📋 Found model info: provider='{}', name='{}'", model.provider, model.name);
+            println!("📋 Found model info: provider='{}', name='{}', available={}", model.provider, model.name, model.is_available);
             
             // Route to correct provider based on model's provider field
             match model.provider.as_str() {
                 "Cowork Subscription" => {
                     // Verify model is in caps.models and we can make requests
                     if caps.models.contains(&selected_model) && caps.can_make_request() {
+                        println!("✅ Model '{}' is in caps.models and can make request", selected_model);
                         match self.ai_provider
                             .execute_prompt(&ProviderType::CoworkApi, &selected_model, prompt, |_, _| {})
                             .await
@@ -327,7 +331,12 @@ impl CoworkAgent {
                             }
                         }
                     } else {
-                        println!("⚠️ AI Agent: Cowork model '{}' not available in plan or no requests left", selected_model);
+                        if !caps.models.contains(&selected_model) {
+                            println!("⚠️ AI Agent: Model '{}' NOT in caps.models. Available: {:?}", selected_model, caps.models);
+                        }
+                        if !caps.can_make_request() {
+                            println!("⚠️ AI Agent: Cannot make request. Used: {}/{}", caps.profile.usage.used, caps.profile.usage.limit);
+                        }
                     }
                 }
                 "Rainy API" => {
@@ -386,18 +395,45 @@ impl CoworkAgent {
             }
         } else {
             println!("⚠️ AI Agent: Selected model '{}' not found in available models", selected_model);
+            println!("⚠️ Attempting to use as Gemini BYOK if it starts with 'gemini'");
+            
+            // If model starts with "gemini", try it as BYOK
+            if selected_model.starts_with("gemini") && self.ai_provider.has_api_key("gemini").await.unwrap_or(false) {
+                match self.ai_provider
+                    .execute_prompt(&ProviderType::Gemini, &selected_model, prompt, |_, _| {})
+                    .await
+                {
+                    Ok(response) => {
+                        println!("✅ AI Agent: Successfully used Gemini BYOK for model '{}'", selected_model);
+                        return Ok((
+                            response,
+                            ModelInfo {
+                                provider: "Google Gemini".to_string(),
+                                model: selected_model.to_string(),
+                                plan_tier: "BYOK".to_string(),
+                            },
+                        ));
+                    }
+                    Err(e) => {
+                        println!("❌ AI Agent: Gemini BYOK attempt failed: {}", e);
+                    }
+                }
+            }
         }
 
         // ============ FALLBACK LOGIC ============
         // If selected model failed or wasn't applicable, use smart defaults
+        println!("🔄 Entering fallback logic");
 
-        // 1. Try Cowork default
-        if caps.can_make_request() {
-            let preferred_model = caps.models.first().map(|s| s.as_str()).unwrap_or("gpt-4o");
+        // 1. Try Cowork default (first available model)
+        if caps.can_make_request() && !caps.models.is_empty() {
+            let preferred_model = caps.models.first().unwrap();
+            println!("🔄 Trying Cowork fallback with model: {}", preferred_model);
             if let Ok(response) = self.ai_provider
                 .execute_prompt(&ProviderType::CoworkApi, preferred_model, prompt, |_, _| {})
                 .await
             {
+                println!("✅ Cowork fallback successful");
                 return Ok((
                     response,
                     ModelInfo {
@@ -406,15 +442,22 @@ impl CoworkAgent {
                         plan_tier: caps.profile.plan.name.clone(),
                     },
                 ));
+            } else {
+                println!("❌ Cowork fallback failed");
             }
+        } else {
+            println!("⚠️ Cannot use Cowork fallback: can_make_request={}, models_count={}", 
+                caps.can_make_request(), caps.models.len());
         }
 
         // 2. Try Rainy API default
         if self.ai_provider.has_api_key("rainy_api").await.unwrap_or(false) {
+            println!("🔄 Trying Rainy API fallback");
             if let Ok(response) = self.ai_provider
                 .execute_prompt(&ProviderType::RainyApi, "gpt-4o", prompt, |_, _| {})
                 .await
             {
+                println!("✅ Rainy API fallback successful");
                 return Ok((
                     response,
                     ModelInfo {
@@ -423,24 +466,43 @@ impl CoworkAgent {
                         plan_tier: "Pay-As-You-Go".to_string(),
                     },
                 ));
+            } else {
+                println!("❌ Rainy API fallback failed");
             }
+        } else {
+            println!("⚠️ No Rainy API key configured");
         }
 
-        // 3. Fallback to Gemini (Free/BYOK)
-        let gemini_model = "gemini-3-flash-high";
-        let response = self.ai_provider
-            .execute_prompt(&ProviderType::Gemini, gemini_model, prompt, |_, _| {})
-            .await
-            .map_err(|e| format!("All AI providers failed. Last error: {}", e))?;
+        // 3. Try Gemini BYOK fallback (only if API key is configured)
+        if self.ai_provider.has_api_key("gemini").await.unwrap_or(false) {
+            let gemini_model = "gemini-3-flash-high";
+            println!("🔄 Trying Gemini BYOK fallback with model: {}", gemini_model);
+            match self.ai_provider
+                .execute_prompt(&ProviderType::Gemini, gemini_model, prompt, |_, _| {})
+                .await
+            {
+                Ok(response) => {
+                    println!("✅ Gemini BYOK fallback successful");
+                    return Ok((
+                        response,
+                        ModelInfo {
+                            provider: "Google Gemini (Fallback)".to_string(),
+                            model: gemini_model.to_string(),
+                            plan_tier: "Free / BYOK".to_string(),
+                        },
+                    ));
+                }
+                Err(e) => {
+                    println!("❌ AI Agent: Gemini fallback failed: {}", e);
+                }
+            }
+        } else {
+            println!("⚠️ No Gemini API key configured");
+        }
 
-        Ok((
-            response,
-            ModelInfo {
-                provider: "Google Gemini".to_string(),
-                model: gemini_model.to_string(),
-                plan_tier: "Free / BYOK".to_string(),
-            },
-        ))
+        // 4. No providers available
+        println!("❌ All providers failed or unavailable");
+        Err("No AI providers available. Please configure an API key in settings.".to_string())
     }
 
     /// Build the prompt for AI task planning

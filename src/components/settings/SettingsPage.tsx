@@ -336,7 +336,7 @@ export function SettingsPage({
             <Tabs.List className="mb-4 bg-muted/50 p-1 rounded-xl gap-1 backdrop-blur-xl border border-border/30">
               <Tabs.Tab
                 id="models"
-                className="px-3 py-1.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground data-[selected=true]:text-foreground data-[selected=true]:bg-background data-[selected=true]:shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ring-offset-background"
+                className="px-3 py-1.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 data-[selected=true]:text-foreground data-[selected=true]:bg-background transition-all focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ring-offset-background"
               >
                 <div className="flex items-center gap-2">
                   <Bot className="size-4" />
@@ -345,7 +345,7 @@ export function SettingsPage({
               </Tabs.Tab>
               <Tabs.Tab
                 id="keys"
-                className="px-3 py-1.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground data-[selected=true]:text-foreground data-[selected=true]:bg-background data-[selected=true]:shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ring-offset-background"
+                className="px-3 py-1.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 data-[selected=true]:text-foreground data-[selected=true]:bg-background transition-all focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ring-offset-background"
               >
                 <div className="flex items-center gap-2">
                   <Key className="size-4" />

@@ -278,6 +278,311 @@ export const themes: Record<string, Theme> = {
       },
     },
   },
+
+  'cyberpunk-neon': {
+    name: 'cyberpunk-neon',
+    displayName: 'Cyberpunk Neon',
+    description: 'High-tech low-life neon vibes',
+    icon: '🤖',
+    colors: {
+      light: {
+        background: 'oklch(0.96 0.01 240)',
+        foreground: 'oklch(0.15 0.05 290)',
+        card: 'oklch(1 0 0)',
+        cardForeground: 'oklch(0.15 0.05 290)',
+        popover: 'oklch(1 0 0)',
+        popoverForeground: 'oklch(0.15 0.05 290)',
+        primary: 'oklch(0.60 0.25 330)', // Neon Pink
+        primaryForeground: 'oklch(1 0 0)',
+        secondary: 'oklch(0.90 0.05 190)', // Cyan tint
+        secondaryForeground: 'oklch(0.20 0.10 240)',
+        muted: 'oklch(0.92 0.02 240)',
+        mutedForeground: 'oklch(0.45 0.05 240)',
+        accent: 'oklch(0.70 0.20 100)', // Neon Yellow
+        accentForeground: 'oklch(0.10 0.10 240)',
+        destructive: 'oklch(0.60 0.22 25)',
+        destructiveForeground: 'oklch(1 0 0)',
+        border: 'oklch(0.85 0.05 330)',
+        input: 'oklch(0.85 0.05 330)',
+        ring: 'oklch(0.60 0.25 330)',
+        sidebar: 'oklch(0.96 0.02 240)',
+        sidebarForeground: 'oklch(0.15 0.05 290)',
+        sidebarPrimary: 'oklch(0.60 0.25 330)',
+        sidebarAccent: 'oklch(0.90 0.05 190)',
+        sidebarBorder: 'oklch(0.85 0.05 330)',
+      },
+      dark: {
+        background: 'oklch(0.10 0.05 280)', // Deep Blue/Purple
+        foreground: 'oklch(0.90 0.05 190)', // Cyan text
+        card: 'oklch(0.14 0.05 280)',
+        cardForeground: 'oklch(0.95 0.05 330)', // Pinkish text
+        popover: 'oklch(0.14 0.05 280)',
+        popoverForeground: 'oklch(0.95 0.05 330)',
+        primary: 'oklch(0.65 0.28 330)', // Hot Pink
+        primaryForeground: 'oklch(1 0 0)',
+        secondary: 'oklch(0.20 0.10 240)',
+        secondaryForeground: 'oklch(0.90 0.05 190)',
+        muted: 'oklch(0.20 0.10 240)',
+        mutedForeground: 'oklch(0.60 0.10 240)',
+        accent: 'oklch(0.85 0.25 100)', // Bright Yellow
+        accentForeground: 'oklch(0.10 0.05 280)',
+        destructive: 'oklch(0.60 0.25 25)',
+        destructiveForeground: 'oklch(1 0 0)',
+        border: 'oklch(0.30 0.10 290)',
+        input: 'oklch(0.30 0.10 290)',
+        ring: 'oklch(0.65 0.28 330)',
+        sidebar: 'oklch(0.12 0.05 280)',
+        sidebarForeground: 'oklch(0.90 0.05 190)',
+        sidebarPrimary: 'oklch(0.65 0.28 330)',
+        sidebarAccent: 'oklch(0.20 0.10 240)',
+        sidebarBorder: 'oklch(0.30 0.10 290)',
+      },
+    },
+  },
+
+  'ghibli-forest': {
+    name: 'ghibli-forest',
+    displayName: 'Ghibli Forest',
+    description: 'Calm natural tones inspired by animation',
+    icon: '🍃',
+    colors: {
+      light: {
+        background: 'oklch(0.96 0.02 110)', // Soft Greenish Tint
+        foreground: 'oklch(0.20 0.05 140)', // Dark Green
+        card: 'oklch(0.98 0.01 120)',
+        cardForeground: 'oklch(0.20 0.05 140)',
+        popover: 'oklch(0.98 0.01 120)',
+        popoverForeground: 'oklch(0.20 0.05 140)',
+        primary: 'oklch(0.60 0.15 145)', // Forest Green
+        primaryForeground: 'oklch(0.98 0 0)',
+        secondary: 'oklch(0.92 0.05 110)', // Light Yellow/Green
+        secondaryForeground: 'oklch(0.25 0.05 140)',
+        muted: 'oklch(0.90 0.03 110)',
+        mutedForeground: 'oklch(0.50 0.05 140)',
+        accent: 'oklch(0.70 0.18 200)', // Sky Blue
+        accentForeground: 'oklch(0.98 0 0)',
+        destructive: 'oklch(0.60 0.15 25)',
+        destructiveForeground: 'oklch(0.98 0 0)',
+        border: 'oklch(0.85 0.05 120)',
+        input: 'oklch(0.85 0.05 120)',
+        ring: 'oklch(0.60 0.15 145)',
+        sidebar: 'oklch(0.97 0.01 120)',
+        sidebarForeground: 'oklch(0.20 0.05 140)',
+        sidebarPrimary: 'oklch(0.60 0.15 145)',
+        sidebarAccent: 'oklch(0.92 0.05 110)',
+        sidebarBorder: 'oklch(0.85 0.05 120)',
+      },
+      dark: {
+        background: 'oklch(0.15 0.05 145)', // Deep Forest Green
+        foreground: 'oklch(0.95 0.02 120)',
+        card: 'oklch(0.18 0.05 145)',
+        cardForeground: 'oklch(0.95 0.02 120)',
+        popover: 'oklch(0.18 0.05 145)',
+        popoverForeground: 'oklch(0.95 0.02 120)',
+        primary: 'oklch(0.65 0.18 145)', // Brighter Green
+        primaryForeground: 'oklch(0.10 0.05 145)',
+        secondary: 'oklch(0.25 0.05 145)',
+        secondaryForeground: 'oklch(0.95 0.02 120)',
+        muted: 'oklch(0.25 0.05 145)',
+        mutedForeground: 'oklch(0.70 0.05 145)',
+        accent: 'oklch(0.85 0.15 100)', // Firefly Yellow
+        accentForeground: 'oklch(0.15 0.05 145)',
+        destructive: 'oklch(0.60 0.20 25)',
+        destructiveForeground: 'oklch(1 0 0)',
+        border: 'oklch(0.30 0.05 145)',
+        input: 'oklch(0.30 0.05 145)',
+        ring: 'oklch(0.65 0.18 145)',
+        sidebar: 'oklch(0.16 0.05 145)',
+        sidebarForeground: 'oklch(0.95 0.02 120)',
+        sidebarPrimary: 'oklch(0.65 0.18 145)',
+        sidebarAccent: 'oklch(0.25 0.05 145)',
+        sidebarBorder: 'oklch(0.30 0.05 145)',
+      },
+    },
+  },
+
+  'eva-01': {
+    name: 'eva-01',
+    displayName: 'EVA-01',
+    description: 'Unit 01 Purple and Green color scheme',
+    icon: '👾',
+    colors: {
+      light: {
+        background: 'oklch(0.96 0.01 290)', // Pale Purple
+        foreground: 'oklch(0.20 0.10 290)', // Deep Purple
+        card: 'oklch(0.99 0.005 290)',
+        cardForeground: 'oklch(0.20 0.10 290)',
+        popover: 'oklch(0.99 0.005 290)',
+        popoverForeground: 'oklch(0.20 0.10 290)',
+        primary: 'oklch(0.55 0.25 290)', // Eva Purple
+        primaryForeground: 'oklch(0.98 0 0)',
+        secondary: 'oklch(0.90 0.05 145)', // Green tint
+        secondaryForeground: 'oklch(0.25 0.10 145)',
+        muted: 'oklch(0.92 0.02 290)',
+        mutedForeground: 'oklch(0.50 0.05 290)',
+        accent: 'oklch(0.65 0.22 145)', // Eva Green
+        accentForeground: 'oklch(0.10 0.05 290)',
+        destructive: 'oklch(0.60 0.25 30)', // Orange/Red
+        destructiveForeground: 'oklch(0.98 0 0)',
+        border: 'oklch(0.85 0.05 290)',
+        input: 'oklch(0.85 0.05 290)',
+        ring: 'oklch(0.55 0.25 290)',
+        sidebar: 'oklch(0.97 0.01 290)',
+        sidebarForeground: 'oklch(0.20 0.10 290)',
+        sidebarPrimary: 'oklch(0.55 0.25 290)',
+        sidebarAccent: 'oklch(0.90 0.05 145)',
+        sidebarBorder: 'oklch(0.85 0.05 290)',
+      },
+      dark: {
+        background: 'oklch(0.12 0.08 290)', // Deep Dark Purple
+        foreground: 'oklch(0.95 0.05 145)', // Pale Green text
+        card: 'oklch(0.16 0.08 290)',
+        cardForeground: 'oklch(0.95 0.05 145)',
+        popover: 'oklch(0.16 0.08 290)',
+        popoverForeground: 'oklch(0.95 0.05 145)',
+        primary: 'oklch(0.65 0.22 145)', // Neon Green
+        primaryForeground: 'oklch(0.10 0.05 290)',
+        secondary: 'oklch(0.25 0.10 290)', // Purple surface
+        secondaryForeground: 'oklch(0.95 0.05 145)',
+        muted: 'oklch(0.25 0.10 290)',
+        mutedForeground: 'oklch(0.65 0.05 145)',
+        accent: 'oklch(0.70 0.25 30)', // Orange
+        accentForeground: 'oklch(0.10 0.05 290)',
+        destructive: 'oklch(0.60 0.25 25)',
+        destructiveForeground: 'oklch(1 0 0)',
+        border: 'oklch(0.35 0.10 290)',
+        input: 'oklch(0.35 0.10 290)',
+        ring: 'oklch(0.65 0.22 145)',
+        sidebar: 'oklch(0.14 0.08 290)',
+        sidebarForeground: 'oklch(0.95 0.05 145)',
+        sidebarPrimary: 'oklch(0.65 0.22 145)',
+        sidebarAccent: 'oklch(0.25 0.10 290)',
+        sidebarBorder: 'oklch(0.35 0.10 290)',
+      },
+    },
+  },
+
+  'high-contrast': {
+    name: 'high-contrast',
+    displayName: 'High Contrast',
+    description: 'Maximum legibility with strict black and white',
+    icon: '👁️',
+    colors: {
+      light: {
+        background: 'oklch(1 0 0)', // Pure White
+        foreground: 'oklch(0 0 0)', // Pure Black
+        card: 'oklch(1 0 0)',
+        cardForeground: 'oklch(0 0 0)',
+        popover: 'oklch(1 0 0)',
+        popoverForeground: 'oklch(0 0 0)',
+        primary: 'oklch(0 0 0)',
+        primaryForeground: 'oklch(1 0 0)',
+        secondary: 'oklch(0.95 0 0)',
+        secondaryForeground: 'oklch(0 0 0)',
+        muted: 'oklch(0.90 0 0)',
+        mutedForeground: 'oklch(0.30 0 0)',
+        accent: 'oklch(0 0 0)', // Black accent
+        accentForeground: 'oklch(1 0 0)',
+        destructive: 'oklch(0.40 0.20 25)',
+        destructiveForeground: 'oklch(1 0 0)',
+        border: 'oklch(0 0 0)', // Black border
+        input: 'oklch(0 0 0)',
+        ring: 'oklch(0 0 0)',
+        sidebar: 'oklch(1 0 0)',
+        sidebarForeground: 'oklch(0 0 0)',
+        sidebarPrimary: 'oklch(0 0 0)',
+        sidebarAccent: 'oklch(0.90 0 0)',
+        sidebarBorder: 'oklch(0 0 0)',
+      },
+      dark: {
+        background: 'oklch(0 0 0)', // Pure Black
+        foreground: 'oklch(1 0 0)', // Pure White
+        card: 'oklch(0.05 0 0)',
+        cardForeground: 'oklch(1 0 0)',
+        popover: 'oklch(0.05 0 0)',
+        popoverForeground: 'oklch(1 0 0)',
+        primary: 'oklch(1 0 0)',
+        primaryForeground: 'oklch(0 0 0)',
+        secondary: 'oklch(0.15 0 0)',
+        secondaryForeground: 'oklch(1 0 0)',
+        muted: 'oklch(0.15 0 0)',
+        mutedForeground: 'oklch(0.70 0 0)',
+        accent: 'oklch(1 0 0)',
+        accentForeground: 'oklch(0 0 0)',
+        destructive: 'oklch(0.60 0.20 25)',
+        destructiveForeground: 'oklch(1 0 0)',
+        border: 'oklch(1 0 0)', // White border
+        input: 'oklch(1 0 0)',
+        ring: 'oklch(1 0 0)',
+        sidebar: 'oklch(0 0 0)',
+        sidebarForeground: 'oklch(1 0 0)',
+        sidebarPrimary: 'oklch(1 0 0)',
+        sidebarAccent: 'oklch(0.15 0 0)',
+        sidebarBorder: 'oklch(1 0 0)',
+      },
+    },
+  },
+
+  'focus-minimal': {
+    name: 'focus-minimal',
+    displayName: 'Focus Minimal',
+    description: 'Low-saturation tones for deep work',
+    icon: '☕',
+    colors: {
+      light: {
+        background: 'oklch(0.96 0.005 85)', // Warm Sepia-ish Gray
+        foreground: 'oklch(0.30 0.02 85)',
+        card: 'oklch(0.98 0.005 85)',
+        cardForeground: 'oklch(0.30 0.02 85)',
+        popover: 'oklch(0.98 0.005 85)',
+        popoverForeground: 'oklch(0.30 0.02 85)',
+        primary: 'oklch(0.50 0.02 85)',
+        primaryForeground: 'oklch(0.98 0 0)',
+        secondary: 'oklch(0.94 0.005 85)',
+        secondaryForeground: 'oklch(0.30 0.02 85)',
+        muted: 'oklch(0.92 0.005 85)',
+        mutedForeground: 'oklch(0.60 0.02 85)',
+        accent: 'oklch(0.50 0.02 85)',
+        accentForeground: 'oklch(0.98 0 0)',
+        destructive: 'oklch(0.60 0.05 25)', // Desaturated Red
+        destructiveForeground: 'oklch(0.95 0 0)',
+        border: 'oklch(0.90 0.01 85)',
+        input: 'oklch(0.90 0.01 85)',
+        ring: 'oklch(0.50 0.02 85)',
+        sidebar: 'oklch(0.97 0.005 85)',
+        sidebarForeground: 'oklch(0.30 0.02 85)',
+        sidebarPrimary: 'oklch(0.50 0.02 85)',
+        sidebarAccent: 'oklch(0.94 0.005 85)',
+        sidebarBorder: 'oklch(0.90 0.01 85)',
+      },
+      dark: {
+        background: 'oklch(0.15 0 0)', // Neutral Dark Gray
+        foreground: 'oklch(0.80 0 0)',
+        card: 'oklch(0.18 0 0)',
+        cardForeground: 'oklch(0.80 0 0)',
+        popover: 'oklch(0.18 0 0)',
+        popoverForeground: 'oklch(0.80 0 0)',
+        primary: 'oklch(0.70 0 0)', // Light Gray
+        primaryForeground: 'oklch(0.15 0 0)',
+        secondary: 'oklch(0.22 0 0)',
+        secondaryForeground: 'oklch(0.80 0 0)',
+        muted: 'oklch(0.22 0 0)',
+        mutedForeground: 'oklch(0.50 0 0)',
+        accent: 'oklch(0.70 0 0)',
+        accentForeground: 'oklch(0.15 0 0)',
+        destructive: 'oklch(0.60 0.05 25)',
+        destructiveForeground: 'oklch(0.95 0 0)',
+        border: 'oklch(0.25 0 0)',
+        input: 'oklch(0.25 0 0)',
+        ring: 'oklch(0.70 0 0)',
+        sidebar: 'oklch(0.16 0 0)',
+        sidebarForeground: 'oklch(0.80 0 0)',
+        sidebarPrimary: 'oklch(0.70 0 0)',
+        sidebarAccent: 'oklch(0.22 0 0)',
+        sidebarBorder: 'oklch(0.25 0 0)',
+      },
+    },
+  },
 };
 
 export const defaultTheme: Theme = themes['cosmic-gold'];
