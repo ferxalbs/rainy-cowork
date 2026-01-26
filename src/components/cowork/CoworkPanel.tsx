@@ -18,6 +18,7 @@ import {
 import { useCoworkAgent, AgentMessage } from "../../hooks/useCoworkAgent";
 import { useCoworkStatus } from "../../hooks/useCoworkStatus";
 import { useAIProvider } from "../../hooks/useAIProvider";
+import { MarkdownRenderer } from "../shared/MarkdownRenderer";
 
 interface CoworkPanelProps {
   workspacePath: string;
@@ -378,7 +379,7 @@ function MessageBubble({
         }`}
       >
         {message.isLoading && (
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2.5 mb-2">
             <Spinner size="sm" color="current" className="opacity-60" />
             <span className="text-xs font-medium opacity-70 tracking-wide">
               THINKING...
@@ -386,7 +387,12 @@ function MessageBubble({
           </div>
         )}
 
-        <div className="whitespace-pre-wrap text-sm">{message.content}</div>
+        <MarkdownRenderer
+          content={message.content}
+          className={
+            isUser ? "prose-invert text-primary-foreground" : "text-foreground"
+          }
+        />
 
         {/* Plan Actions */}
         {message.plan &&

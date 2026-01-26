@@ -2,6 +2,7 @@
 /* Tailwind CSS v4 + HeroUI v3 */
 
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 @import "@heroui/styles";
 @import "tw-animate-css";
 
