@@ -222,23 +222,29 @@ function SidebarItem({
   return (
     <Button
       variant={isActive ? "secondary" : "ghost"}
-      className={`w-full justify-start gap-2 h-9 px-3 text-sm font-normal group ${
-        isActive ? "font-medium" : "text-foreground/80 hover:text-foreground"
+      className={`w-full justify-start gap-3 h-10 px-3 text-sm font-normal group transition-all duration-200 ${
+        isActive
+          ? "bg-primary/10 text-primary font-medium"
+          : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
       }`}
       onPress={onClick}
     >
-      <span
-        className={`size-4 shrink-0 transition-colors ${isActive ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"}`}
+      <div
+        className={`flex items-center justify-center size-5 shrink-0 transition-colors duration-200 ${
+          isActive
+            ? "text-primary"
+            : "text-muted-foreground group-hover:text-foreground"
+        }`}
       >
         {icon}
-      </span>
-      <span className="truncate flex-1 text-left">{label}</span>
+      </div>
+      <span className="truncate flex-1 text-left leading-none">{label}</span>
       {badge !== undefined && (
         <span
-          className={`text-xs px-1.5 py-0.5 rounded-full ${
+          className={`text-[10px] font-medium px-2 py-0.5 rounded-full ml-auto ${
             badgeColor === "blue"
-              ? "bg-blue-500/20 text-blue-500"
-              : "bg-default-200 text-default-500"
+              ? "bg-blue-500/10 text-blue-500"
+              : "bg-default-100 text-default-500 group-hover:bg-default-200"
           }`}
         >
           {badge}
