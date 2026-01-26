@@ -270,16 +270,19 @@ impl CoworkAgent {
         &self,
         prompt: &str,
     ) -> Result<(String, ModelInfo), String> {
+        println!("🤖 AI Agent: execute_with_best_provider called");
+
         let selected_model = {
             let settings = self.settings.lock().await;
             settings.get_selected_model().to_string()
         };
+        println!("🎯 Selected model from settings: '{}'", selected_model);
 
         // Check capabilities (refresh if needed)
         let caps = self.ai_provider.get_capabilities().await;
 
-        tracing::info!(
-            "AI Agent Selection: Model='{}', PlanPaid={}, AvailableCoworkModels={:?}, CanMakeRequest={}, PlanName='{}'",
+        println!(
+            "📊 AI Agent Selection: Model='{}', PlanPaid={}, AvailableCoworkModels={:?}, CanMakeRequest={}, PlanName='{}'",
             selected_model,
             caps.profile.plan.is_paid(),
             caps.models,
@@ -293,14 +296,14 @@ impl CoworkAgent {
         // This avoids double-checking and potential string mismatch issues.
         let trimmed_model = selected_model.trim();
         
-        // Check if we can use Cowork features (paid plan with available requests)
-        if caps.profile.plan.is_paid() && caps.can_make_request() {
+        // Check if we can use Cowork features (any plan with available requests)
+        if caps.can_make_request() {
             match self.ai_provider
                 .execute_prompt(&ProviderType::CoworkApi, trimmed_model, prompt, |_, _| {})
                 .await
             {
                 Ok(response) => {
-                    tracing::info!("Successfully used Cowork API for model: {}", trimmed_model);
+                    println!("✅ AI Agent: Successfully used Cowork API for model '{}'", trimmed_model);
                     return Ok((
                         response,
                         ModelInfo {
@@ -311,7 +314,7 @@ impl CoworkAgent {
                     ));
                 }
                 Err(e) => {
-                    tracing::warn!("Selected Cowork model failed, falling back: {}", e);
+                    println!("❌ AI Agent: Selected Cowork model failed: {}", e);
                 }
             }
         }
@@ -336,7 +339,7 @@ impl CoworkAgent {
                         ));
                     }
                     Err(e) => {
-                        tracing::warn!("Selected Rainy API model failed, falling back: {}", e);
+                        println!("❌ AI Agent: Selected Rainy API model failed: {}", e);
                     }
                 }
             }
@@ -360,7 +363,7 @@ impl CoworkAgent {
                     ));
                 }
                 Err(e) => {
-                    tracing::warn!("Selected Gemini model failed, falling back: {}", e);
+                    println!("❌ AI Agent: Selected Gemini model failed: {}", e);
                 }
             }
         }
@@ -369,7 +372,7 @@ impl CoworkAgent {
         // If selected model failed or wasn't applicable, use smart defaults
 
         // 1. Try Cowork default
-        if caps.profile.plan.is_paid() && caps.can_make_request() {
+        if caps.can_make_request() {
             let preferred_model = caps.models.first().map(|s| s.as_str()).unwrap_or("gpt-4o");
             if let Ok(response) = self.ai_provider
                 .execute_prompt(&ProviderType::CoworkApi, preferred_model, prompt, |_, _| {})

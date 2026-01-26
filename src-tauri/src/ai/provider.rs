@@ -120,37 +120,79 @@ impl AIProviderManager {
 
     /// Get cowork capabilities (with optimized caching)
     pub async fn get_capabilities(&self) -> CoworkCapabilities {
+        println!("🔍 AIProviderManager::get_capabilities() called");
+
         // Check cache (valid for 5 minutes)
         {
             let cached = self.cached_caps.read().await;
             if let Some(cached) = cached.as_ref() {
                 if cached.fetched_at.elapsed().as_secs() < 300 {
+                    println!("📋 Using cached capabilities: plan={}, models={}, can_make_request={}",
+                        cached.capabilities.profile.plan.name,
+                        cached.capabilities.models.len(),
+                        cached.capabilities.can_make_request());
                     return cached.capabilities.clone();
                 }
             }
         }
 
+        // Check for API keys
+        let has_cowork_key = self.keychain.get_key("cowork_api").ok().flatten().is_some();
+        let has_rainy_key = self.keychain.get_key("rainy_api").ok().flatten().is_some();
+        println!("🔑 API Keys available: cowork_api={}, rainy_api={}", has_cowork_key, has_rainy_key);
+
         // Fetch from SDK
         if let Some(client) = self.get_cowork_client().await {
-            if let Ok(caps) = client.get_cowork_capabilities().await {
-                let mut cached = self.cached_caps.write().await;
-                *cached = Some(CachedCapabilities {
-                    capabilities: caps.clone(),
-                    fetched_at: Instant::now(),
-                });
-                tracing::info!("Cowork capabilities loaded successfully: plan={}, paid={}", 
-                    caps.profile.plan.name, caps.profile.plan.is_paid());
-                return caps;
-            } else {
-                tracing::warn!("Failed to fetch cowork capabilities with available key");
+            println!("🌐 Cowork client created, fetching capabilities...");
+            match client.get_cowork_capabilities().await {
+                Ok(mut caps) => {
+                    println!("✅ Raw capabilities from API: plan={}, paid={}, models={}, limit={}/{}",
+                        caps.profile.plan.name, caps.profile.plan.is_paid(),
+                        caps.models.len(), caps.profile.usage.used, caps.profile.usage.limit);
+
+                    // Fix: Ensure free plan has correct limits and models until server deployment propagates
+                    if caps.profile.plan.id == "free" {
+                        if caps.profile.usage.limit == 0 {
+                            caps.profile.usage.limit = 30;
+                            println!("🔧 Applied free plan limit fix: 0 → 30");
+                        }
+                        // Ensure free users get basic Cowork models
+                        if caps.models.is_empty() {
+                            caps.models = vec![
+                                "gemini-2.5-flash-lite".to_string(),
+                                "gemini-flash-lite-latest".to_string(),
+                                "llama-3.1-8b-instant".to_string(),
+                            ];
+                            println!("🔧 Applied free plan models fix: added {} models", caps.models.len());
+                        }
+                    }
+
+                    let final_can_make_request = caps.can_make_request();
+                    println!("🎯 Final capabilities: plan={}, models={}, can_make_request={}",
+                        caps.profile.plan.name, caps.models.len(), final_can_make_request);
+
+                    let mut cached = self.cached_caps.write().await;
+                    *cached = Some(CachedCapabilities {
+                        capabilities: caps.clone(),
+                        fetched_at: Instant::now(),
+                    });
+
+                    return caps;
+                }
+                Err(e) => {
+                    println!("❌ Failed to fetch cowork capabilities: {}", e);
+                }
             }
         } else {
-            tracing::warn!("No cowork API key available for capabilities check");
+            println!("❌ No cowork client available (no API keys)");
         }
 
         // Fallback to free plan
-        tracing::info!("Using free plan fallback");
-        CoworkCapabilities::free()
+        println!("🔄 Using free plan fallback");
+        let fallback = CoworkCapabilities::free();
+        println!("📋 Fallback capabilities: models={}, can_make_request={}",
+            fallback.models.len(), fallback.can_make_request());
+        fallback
     }
 
     /// Get cowork models directly from API (efficient with connection reuse)
@@ -246,11 +288,7 @@ impl AIProviderManager {
             }
             "cowork_api" => {
                 let caps = self.get_capabilities().await;
-                if caps.profile.plan.is_paid() {
-                    Ok(caps.models)
-                } else {
-                    Err("Upgrade to a paid plan to access Cowork models".to_string())
-                }
+                Ok(caps.models)
             }
             "gemini" => Ok(self.gemini.available_models()),
             _ => Err(AIError::ProviderNotAvailable(provider.to_string()).to_string()),
@@ -342,30 +380,31 @@ impl AIProviderManager {
                 Ok(result)
             }
             ProviderType::CoworkApi => {
-                // Cowork Subscription (Credits)
-                // Needs checks for capabilities/plan
+                println!("🚀 execute_prompt: Starting Cowork API execution for model '{}'", model);
+
+                // Cowork API (supports free tier)
                 let caps = self.get_capabilities().await;
-                if !caps.profile.plan.is_paid() {
-                    return Err("Upgrade to a paid plan to use Cowork API.".to_string());
-                }
+                println!("📊 Capabilities check: plan={}, models_count={}, can_make_request={}",
+                    caps.profile.plan.name, caps.models.len(), caps.can_make_request());
 
                 if !caps.can_use_model(model) {
+                    println!("❌ Model '{}' not available. Available models: {:?}", model, caps.models);
                     return Err(format!(
                         "Model {} not available on {} plan",
                         model, caps.profile.plan.name
                     ));
                 }
+                println!("✅ Model '{}' is available", model);
 
                 if !caps.can_make_request() {
+                    println!("❌ Cannot make request: used={}/{}, upgrade_msg={:?}",
+                        caps.profile.usage.used, caps.profile.usage.limit, caps.upgrade_message);
                     if let Some(msg) = &caps.upgrade_message {
                         return Err(msg.clone());
                     }
                     return Err("Usage limit reached. Upgrade for more access.".to_string());
                 }
-
-                // We need the key specifically for Cowork (might be different from rainy_api key)
-                // But get_capabilities uses "rainy_api" key in get_rainy_client().
-                // We should separate keys storage.
+                println!("✅ Can make request: used={}/{}", caps.profile.usage.used, caps.profile.usage.limit);
 
                 // Try cowork_api key first, fallback to rainy_api key (same SDK supports both)
                 let api_key = self
@@ -374,21 +413,25 @@ impl AIProviderManager {
                     .ok()
                     .or_else(|| self.keychain.get_key("rainy_api").ok())
                     .ok_or_else(|| "No Cowork API key found".to_string())?;
-                
-                tracing::info!("Executing with Cowork API using key: cowork_api={}, rainy_api={}", 
-                    self.keychain.get_key("cowork_api").is_ok_and(|k| k.is_some()),
-                    self.keychain.get_key("rainy_api").is_ok_and(|k| k.is_some()));
+
+                println!("🔑 Using API key for Cowork execution");
 
                 on_progress(10, Some("Connecting to Cowork API...".to_string()));
                 let client = self.get_or_create_client("cowork_api", api_key.as_ref().unwrap()).await
                     .ok_or("Failed to create Cowork API client")?;
+                println!("🔗 Cowork API client created successfully");
 
                 on_progress(30, Some("Sending request...".to_string()));
+                println!("📤 Sending chat request: model='{}', prompt_length={}", model, prompt.len());
                 let result = client
                     .simple_chat(model, prompt)
                     .await
-                    .map_err(|e| e.to_string())?;
+                    .map_err(|e| {
+                        println!("❌ Chat request failed: {}", e);
+                        e.to_string()
+                    })?;
 
+                println!("✅ Chat request successful, response_length={}", result.len());
                 on_progress(100, Some("Complete".to_string()));
                 Ok(result)
             }
