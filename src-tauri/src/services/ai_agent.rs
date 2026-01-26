@@ -330,7 +330,7 @@ impl CoworkAgent {
                             response,
                             ModelInfo {
                                 provider: "Rainy API".to_string(),
-                                model: selected_model,
+                                model: selected_model.to_string(),
                                 plan_tier: "Pay-As-You-Go".to_string(),
                             },
                         ));
@@ -354,7 +354,7 @@ impl CoworkAgent {
                         response,
                         ModelInfo {
                             provider: "Google Gemini".to_string(),
-                            model: selected_model,
+                            model: selected_model.to_string(),
                             plan_tier: "BYOK".to_string(),
                         },
                     ));
@@ -834,12 +834,7 @@ Respond ONLY with valid JSON, no other text."#,
                     );
 
                     self.ai_provider
-                        .execute_prompt(
-                            &ProviderType::Gemini,
-                            "gemini-2.5-flash",
-                            &prompt,
-                            |_, _| {},
-                        )
+                        .execute_prompt(&ProviderType::Gemini, "gemini-2.5-flash", &prompt, |_, _| {})
                         .await
                         .map_err(|e| e.to_string())?
                 };

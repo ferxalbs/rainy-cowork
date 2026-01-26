@@ -58,10 +58,9 @@ pub async fn set_notifications(
 /// Get available models based on user's plan
 #[tauri::command]
 pub async fn get_available_models(
-    ai_provider: State<'_, Arc<Mutex<AIProviderManager>>>,
+    ai_provider: State<'_, Arc<AIProviderManager>>,
 ) -> Result<Vec<ModelOption>, String> {
-    let provider = ai_provider.lock().await;
-    let caps = provider.get_capabilities().await;
+    let caps = ai_provider.get_capabilities().await;
 
     Ok(SettingsManager::get_available_models(
         caps.profile.plan.is_paid(),

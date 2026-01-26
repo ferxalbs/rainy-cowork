@@ -127,15 +127,19 @@ export function CoworkPanel({
 
   // Determine model display logic based on actual provider
   const isCoworkModel = currentModelInfo?.provider === "Rainy API" || currentModelInfo?.provider === "Cowork Subscription";
+  const isCoworkApiModel = currentModelInfo?.provider === "Cowork Subscription"; // Specifically Cowork API
   const isByokModel = currentModelInfo?.provider === "Google Gemini";
   const isFallback = !isModelAvailable && !statusLoading;
 
-  // Display model name - show actual if fallback
-  const modelDisplay = isFallback
+  // Display model name - always show fallback for Cowork API models
+  const modelDisplay = isCoworkApiModel
     ? "Gemini Flash (Fallback)"
-    : currentModelInfo?.name || currentModel || "Loading...";
+    : isFallback
+      ? "Gemini Flash (Fallback)"
+      : currentModelInfo?.name || currentModel || "Loading...";
 
-  const isCoworkBadge = isCoworkModel && isModelAvailable;
+  const isCoworkBadge = isCoworkModel && isModelAvailable && !isCoworkApiModel; // Don't show badge for Cowork API
+  const isCoworkApiBadge = isCoworkApiModel; // Always show for Cowork API
   const isByokBadge = isByokModel && isModelAvailable;
 
   return (
@@ -151,22 +155,26 @@ export function CoworkPanel({
           {/* Model Indicator */}
           <div
             className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs border cursor-pointer hover:bg-white/5 transition-colors ${
-              isFallback
-                ? "bg-orange-500/10 border-orange-500/30 text-orange-300"
-                : isCoworkBadge
-                  ? "bg-purple-500/10 border-purple-500/30 text-purple-300"
-                  : isByokBadge
-                    ? "bg-blue-500/10 border-blue-500/30 text-blue-300"
-                    : "bg-gray-500/10 border-gray-500/30 text-gray-300"
+              isCoworkApiBadge
+                ? "bg-green-500/10 border-green-500/30 text-green-300"
+                : isFallback
+                  ? "bg-orange-500/10 border-orange-500/30 text-orange-300"
+                  : isCoworkBadge
+                    ? "bg-purple-500/10 border-purple-500/30 text-purple-300"
+                    : isByokBadge
+                      ? "bg-blue-500/10 border-blue-500/30 text-blue-300"
+                      : "bg-gray-500/10 border-gray-500/30 text-gray-300"
             }`}
             onClick={onOpenSettings}
             title={
-              isFallback
-                ? "Subscription required. Using free model fallback."
-                : "Click to change model in settings"
+              isCoworkApiBadge
+                ? "Using Cowork API with free tier access"
+                : isFallback
+                  ? "Subscription required. Using free model fallback."
+                  : "Click to change model in settings"
             }
           >
-            {isFallback ? (
+            {isCoworkApiBadge || isFallback ? (
               <AlertCircle className="w-3 h-3" />
             ) : (
               <BrainCircuit className="w-3 h-3" />
@@ -175,7 +183,7 @@ export function CoworkPanel({
               {modelDisplay}
             </span>
             <span className="opacity-60 text-[10px] uppercase tracking-wider">
-              {isFallback ? "FREE" : isCoworkBadge ? "COWORK" : isByokBadge ? "BYOK" : "UNKNOWN"}
+              {isCoworkApiBadge ? "FREE" : isFallback ? "FREE" : isCoworkBadge ? "COWORK" : isByokBadge ? "BYOK" : "UNKNOWN"}
             </span>
           </div>
         </div>

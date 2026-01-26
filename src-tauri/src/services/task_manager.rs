@@ -61,18 +61,16 @@ impl TaskManager {
 
         // Execute the task using AI provider
         let task_id_for_closure = task_id.to_string();
-        let result = {
-            self.ai_provider
-                .execute_prompt(
-                    &task.provider,
-                    &task.model,
-                    &task.description,
-                    move |progress, _message| {
-                        tracing::debug!("Task {} progress: {}%", task_id_for_closure, progress);
-                    },
-                )
-                .await
-        };
+        let result = self.ai_provider
+            .execute_prompt(
+                &task.provider,
+                &task.model,
+                &task.description,
+                move |progress, _message| {
+                    tracing::debug!("Task {} progress: {}%", task_id_for_closure, progress);
+                },
+            )
+            .await;
 
         // Update task status based on result
         match result {
