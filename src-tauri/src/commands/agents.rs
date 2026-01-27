@@ -113,6 +113,20 @@ pub async fn register_agent(
             );
             Arc::new(analyst)
         }
+        "critic" => {
+            let critic = crate::agents::critic::CriticAgent::new(
+                config.clone(),
+                registry.0.clone(),
+            );
+            Arc::new(critic)
+        }
+        "governor" => {
+            let governor = crate::agents::governor::GovernorAgent::new(
+                config.clone(),
+                registry.0.clone(),
+            );
+            Arc::new(governor)
+        }
         _ => {
             return Err(format!("Unknown agent type: {}", agent_type));
         }

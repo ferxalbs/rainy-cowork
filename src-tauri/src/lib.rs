@@ -12,7 +12,7 @@ use agents::AgentRegistry;
 use ai::AIProviderManager;
 use services::{
     CoworkAgent, DocumentService, FileManager, FileOperationEngine, FolderManager, ImageService,
-    SettingsManager, WebResearchService, WorkspaceManager,
+    MemoryManager, SettingsManager, WebResearchService, WorkspaceManager,
 };
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -108,6 +108,17 @@ pub fn run() {
                     tracing::error!("Failed to init file operation engine: {}", e);
                 }
             });
+
+            // Initialize memory manager with app data dir
+            let app_data_dir = app
+                .path()
+                .app_data_dir()
+                .expect("Failed to get app data dir");
+            let memory_db_path = app_data_dir.join("memory_db");
+            let memory_manager = Arc::new(MemoryManager::new(100, memory_db_path));
+
+            // Manage memory manager state
+            app.manage(commands::memory::MemoryManagerState(memory_manager));
 
             Ok(())
         })
@@ -208,6 +219,17 @@ pub fn run() {
             commands::get_agent_messages,
             commands::get_agent_statistics,
             commands::get_agent_capabilities,
+            // Memory commands (NEW - Memory System)
+            commands::store_memory,
+            commands::search_memory,
+            commands::get_recent_memory,
+            commands::get_all_short_term_memory,
+            commands::clear_short_term_memory,
+            commands::get_memory_stats,
+            commands::get_memory_by_id,
+            commands::delete_memory,
+            commands::get_short_term_memory_size,
+            commands::is_short_term_memory_empty,
             // Settings commands
             commands::get_user_settings,
             commands::get_selected_model,
