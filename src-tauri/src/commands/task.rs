@@ -92,3 +92,32 @@ pub async fn get_task(
 pub async fn list_tasks(task_manager: State<'_, TaskManager>) -> Result<Vec<Task>, String> {
     Ok(task_manager.list_tasks().await)
 }
+
+/// Save task queue state to disk
+#[tauri::command]
+pub async fn save_task_queue_state(
+    path: String,
+    task_manager: State<'_, crate::services::TaskManager>,
+) -> Result<(), String> {
+    task_manager.save_state(&std::path::PathBuf::from(path)).await
+        .map_err(|e| e.to_string())
+}
+
+/// Load task queue state from disk
+#[tauri::command]
+pub async fn load_task_queue_state(
+    path: String,
+    task_manager: State<'_, crate::services::TaskManager>,
+) -> Result<(), String> {
+    task_manager.load_state(&std::path::PathBuf::from(path)).await
+        .map_err(|e| e.to_string())
+}
+
+/// Start background task processing
+#[tauri::command]
+pub async fn start_background_task_processing(
+    task_manager: State<'_, crate::services::TaskManager>,
+) -> Result<(), String> {
+    task_manager.start_background_processing().await;
+    Ok(())
+}

@@ -116,6 +116,9 @@ pub fn run() {
             commands::get_task,
             commands::list_tasks,
             commands::set_task_manager_workspace,
+            commands::save_task_queue_state,
+            commands::load_task_queue_state,
+            commands::start_background_task_processing,
             // AI commands
             commands::list_providers,
             commands::validate_api_key,

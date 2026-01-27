@@ -4,6 +4,7 @@ use std::fs;
 use std::path::PathBuf;
 use uuid::Uuid;
 use dirs;
+use chrono::{DateTime, Utc};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Workspace {
@@ -267,15 +268,15 @@ impl WorkspaceManager {
         use std::path::Path;
 
         // Check for path-specific overrides
-        for override in &workspace.permission_overrides {
-            let override_path = Path::new(&override.path);
+        for perm_override in &workspace.permission_overrides {
+            let override_path = Path::new(&perm_override.path);
             let target_path = Path::new(path);
 
             // Check if the target path is within the override path
             if let Ok(canonical_override) = override_path.canonicalize() {
                 if let Ok(canonical_target) = target_path.canonicalize() {
                     if canonical_target.starts_with(&canonical_override) {
-                        return override.permissions.clone();
+                        return perm_override.permissions.clone();
                     }
                 }
             }
@@ -421,10 +422,12 @@ impl WorkspaceManager {
                 let entry = entry?;
                 let path = entry.path();
 
-                if path.extension().map_or(None, |ext| ext == "json" || ext == "toml").is_some() {
+                if path.extension().map_or(None, |ext| Some(ext == "json" || ext == "toml")).is_some() {
                     let content = fs::read_to_string(&path)?;
-                    if let Ok(template) = serde_json::from_str::<WorkspaceTemplate>(&content)
-                        .or_else(|_| toml::from_str(&content).map_err(|e| e.into())) {
+                    // Try JSON first, then TOML
+                    if let Ok(template) = serde_json::from_str::<WorkspaceTemplate>(&content) {
+                        templates.push(template);
+                    } else if let Ok(template) = toml::from_str::<WorkspaceTemplate>(&content) {
                         templates.push(template);
                     }
                 }
