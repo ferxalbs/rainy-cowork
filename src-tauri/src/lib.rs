@@ -8,10 +8,11 @@ mod commands;
 mod models;
 mod services;
 
+use agents::AgentRegistry;
 use ai::AIProviderManager;
 use services::{
     CoworkAgent, DocumentService, FileManager, FileOperationEngine, FolderManager, ImageService,
-    SettingsManager, TaskManager, WebResearchService, WorkspaceManager,
+    SettingsManager, WebResearchService, WorkspaceManager,
 };
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -22,7 +23,7 @@ pub fn run() {
     let ai_provider = Arc::new(AIProviderManager::new());
 
     // Initialize task manager with Arc clone (needs its own reference)
-    let task_manager = TaskManager::new(ai_provider.clone());
+    let task_manager = services::task_manager::TaskManager::new(ai_provider.clone());
 
     // Initialize file manager
     let file_manager = Arc::new(FileManager::new());
@@ -53,6 +54,9 @@ pub fn run() {
     // Initialize workspace manager
     let workspace_manager = Arc::new(WorkspaceManager::new().expect("Failed to create workspace manager"));
 
+    // Initialize agent registry for multi-agent system
+    let agent_registry = Arc::new(AgentRegistry::new(ai_provider.clone()));
+
     // Initialize folder manager (requires app handle for data dir)
     // We'll initialize it in setup since we need the app handle
 
@@ -73,6 +77,7 @@ pub fn run() {
         .manage(workspace_manager) // Arc<WorkspaceManager>
         .manage(ai_provider) // Arc<AIProviderManager>
         .manage(settings_manager) // Arc<Mutex<SettingsManager>>
+        .manage(commands::agents::AgentRegistryState(agent_registry)) // Arc<AgentRegistry>
         .setup(|app| {
             use tauri::Manager;
 
@@ -189,6 +194,20 @@ pub fn run() {
             commands::get_agent_plan,
             commands::cancel_agent_plan,
             commands::agent_analyze_workspace,
+            // Multi-agent system commands (NEW - Agent Registry)
+            commands::register_agent,
+            commands::unregister_agent,
+            commands::list_agents,
+            commands::get_agent_info,
+            commands::get_agent_status,
+            commands::create_multi_agent_task,
+            commands::execute_multi_agent_task,
+            commands::cancel_agent_task,
+            commands::get_task_status,
+            commands::send_agent_message,
+            commands::get_agent_messages,
+            commands::get_agent_statistics,
+            commands::get_agent_capabilities,
             // Settings commands
             commands::get_user_settings,
             commands::get_selected_model,

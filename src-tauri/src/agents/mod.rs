@@ -43,18 +43,34 @@
 // ```
 
 pub mod agent_trait;
+pub mod analyst;
 pub mod base_agent;
+pub mod creator;
+pub mod designer;
+pub mod developer;
+pub mod director_agent;
+pub mod executor;
+#[cfg(test)]
+mod director_agent_tests;
 pub mod message_bus;
 pub mod registry;
+pub mod researcher;
 pub mod status_monitoring;
 pub mod task_management;
 pub mod types;
 
 // Re-export commonly used types for convenience
 pub use agent_trait::{Agent, AgentConfig, AgentError};
+pub use analyst::AnalystAgent;
 pub use base_agent::BaseAgent;
+pub use creator::CreatorAgent;
+pub use designer::DesignerAgent;
+pub use developer::DeveloperAgent;
+pub use director_agent::{DirectorAgent, SubTask, TaskAssignment, AssignmentStatus};
+pub use executor::ExecutorAgent;
 pub use message_bus::MessageBus;
 pub use registry::{AgentRegistry, RegistryStatistics};
+pub use researcher::ResearcherAgent;
 pub use status_monitoring::StatusMonitor;
 pub use task_management::TaskManager;
 pub use types::{
