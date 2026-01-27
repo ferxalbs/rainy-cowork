@@ -158,6 +158,14 @@ impl Agent for GovernorAgent {
         }
     }
 
+    async fn update_status(&self, status: AgentStatus) {
+        self.base.update_status(status).await;
+    }
+
+    async fn set_current_task(&self, task_id: Option<String>) {
+        self.base.set_current_task(task_id).await;
+    }
+
     async fn process_task(&self, task: Task) -> Result<TaskResult, AgentError> {
         self.base.update_status(AgentStatus::Busy).await;
         self.base.set_current_task(Some(task.id.clone())).await;

@@ -247,21 +247,23 @@ impl Agent for AnalystAgent {
                 "comprehensive"
             };
 
+            let default_data = "No data provided".to_string();
             let data = task.context.relevant_files
                 .first()
-                .unwrap_or(&"No data provided".to_string());
+                .unwrap_or(&default_data);
 
             self.analyze_data(
                 data,
                 analysis_type,
             ).await?
         } else if task.description.contains("visualize") ||
-                   task.description.contains("chart") ||
-                   task.description.contains("graph") {
+                    task.description.contains("chart") ||
+                    task.description.contains("graph") {
             // Visualization
+            let default_data = "No data provided".to_string();
             let data = task.context.relevant_files
                 .first()
-                .unwrap_or(&"No data provided".to_string());
+                .unwrap_or(&default_data);
 
             let visualization_goals = if task.description.contains("trend") {
                 "show trends over time"
@@ -280,9 +282,10 @@ impl Agent for AnalystAgent {
         } else if task.description.contains("insight") ||
                    task.description.contains("recommendation") {
             // Insights generation
+            let default_data = "No data provided".to_string();
             let data = task.context.relevant_files
                 .first()
-                .unwrap_or(&"No data provided".to_string());
+                .unwrap_or(&default_data);
 
             let insight_type = if task.description.contains("business") {
                 "business"
@@ -299,9 +302,10 @@ impl Agent for AnalystAgent {
         } else if task.description.contains("pattern") ||
                    task.description.contains("trend") {
             // Pattern recognition
+            let default_data = "No data provided".to_string();
             let data = task.context.relevant_files
                 .first()
-                .unwrap_or(&"No data provided".to_string());
+                .unwrap_or(&default_data);
 
             let pattern_type = if task.description.contains("seasonal") {
                 "seasonal"

@@ -97,6 +97,14 @@ impl Agent for CriticAgent {
         }
     }
 
+    async fn update_status(&self, status: AgentStatus) {
+        self.base.update_status(status).await;
+    }
+
+    async fn set_current_task(&self, task_id: Option<String>) {
+        self.base.set_current_task(task_id).await;
+    }
+
     async fn process_task(&self, task: Task) -> Result<TaskResult, AgentError> {
         self.base.update_status(AgentStatus::Busy).await;
         self.base.set_current_task(Some(task.id.clone())).await;
@@ -186,13 +194,18 @@ mod tests {
     #[test]
     fn test_can_handle() {
         // This test would require a full setup with registry
-        // For now, we just verify the logic structure
+        // For now, we just verify logic structure
         let task = Task {
             id: "test-1".to_string(),
             description: "Evaluate this result".to_string(),
-            agent_type: AgentType::Critic,
-            priority: 1,
-            created_at: chrono::Utc::now(),
+            priority: TaskPriority::Medium,
+            dependencies: vec![],
+            context: crate::agents::TaskContext {
+                workspace_id: "default".to_string(),
+                user_instruction: "".to_string(),
+                relevant_files: vec![],
+                memory_context: vec![],
+            },
         };
 
         assert!(task.description.contains("evaluate"));

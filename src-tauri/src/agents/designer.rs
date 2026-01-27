@@ -232,9 +232,10 @@ impl Agent for DesignerAgent {
         let result = if task.description.contains("mockup") ||
                        task.description.contains("wireframe") {
             // UI mockup generation
+            let default_component = "component".to_string();
             let component_type = task.context.relevant_files
                 .first()
-                .unwrap_or(&"component".to_string());
+                .unwrap_or(&default_component);
 
             self.generate_ui_mockup(
                 component_type,
@@ -254,9 +255,10 @@ impl Agent for DesignerAgent {
                 "diagram"
             };
 
+            let default_content = "No content provided".to_string();
             let content = task.context.relevant_files
                 .first()
-                .unwrap_or(&"No content provided".to_string());
+                .unwrap_or(&default_content);
 
             self.create_diagram(
                 diagram_type,
@@ -284,9 +286,10 @@ impl Agent for DesignerAgent {
         } else if task.description.contains("suggest") ||
                    task.description.contains("design") {
             // Design suggestions
+            let default_context = "No context provided".to_string();
             let context = task.context.relevant_files
                 .first()
-                .unwrap_or(&"No context provided".to_string());
+                .unwrap_or(&default_context);
 
             self.provide_design_suggestions(
                 context,

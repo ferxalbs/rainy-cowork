@@ -13,6 +13,7 @@ use ai::AIProviderManager;
 use services::{
     CoworkAgent, DocumentService, FileManager, FileOperationEngine, FolderManager, ImageService,
     MemoryManager, SettingsManager, WebResearchService, WorkspaceManager,
+    ReflectionEngine,
 };
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -57,6 +58,9 @@ pub fn run() {
     // Initialize agent registry for multi-agent system
     let agent_registry = Arc::new(AgentRegistry::new(ai_provider.clone()));
 
+    // Initialize reflection engine for self-improvement
+    let reflection_engine = Arc::new(ReflectionEngine::new(ai_provider.clone()));
+
     // Initialize folder manager (requires app handle for data dir)
     // We'll initialize it in setup since we need the app handle
 
@@ -78,6 +82,7 @@ pub fn run() {
         .manage(ai_provider) // Arc<AIProviderManager>
         .manage(settings_manager) // Arc<Mutex<SettingsManager>>
         .manage(commands::agents::AgentRegistryState(agent_registry)) // Arc<AgentRegistry>
+        .manage(commands::reflection::ReflectionEngineState(reflection_engine)) // Arc<ReflectionEngine>
         .setup(|app| {
             use tauri::Manager;
 
@@ -252,6 +257,17 @@ pub fn run() {
             commands::save_workspace_template,
             commands::delete_workspace_template,
             commands::get_workspace_analytics,
+            // Reflection & Governance commands (NEW - Reflection System)
+            commands::analyze_task_result,
+            commands::get_error_patterns,
+            commands::get_strategies,
+            commands::optimize_system,
+            commands::clear_error_patterns,
+            commands::clear_strategies,
+            commands::add_security_policy,
+            commands::list_security_policies,
+            commands::remove_security_policy,
+            commands::evaluate_task_quality,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

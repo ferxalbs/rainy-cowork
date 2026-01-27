@@ -225,9 +225,10 @@ impl Agent for CreatorAgent {
 
         let result = if task.description.contains("document") {
             // Document generation
+            let default_title = "Untitled".to_string();
             let title = task.context.relevant_files
                 .first()
-                .unwrap_or(&"Untitled".to_string());
+                .unwrap_or(&default_title);
             let content_type = if task.description.contains("report") {
                 "report"
             } else if task.description.contains("documentation") {
@@ -254,9 +255,10 @@ impl Agent for CreatorAgent {
                 "content"
             };
 
+            let default_topic = "General topic".to_string();
             let topic = task.context.relevant_files
                 .first()
-                .unwrap_or(&"General topic".to_string());
+                .unwrap_or(&default_topic);
 
             self.create_content(
                 content_type,
@@ -273,9 +275,10 @@ impl Agent for CreatorAgent {
                 "general"
             };
 
+            let default_data = "No data provided".to_string();
             let data = task.context.relevant_files
                 .first()
-                .unwrap_or(&"No data provided".to_string());
+                .unwrap_or(&default_data);
 
             let findings = task.context.memory_context
                 .first()
@@ -289,9 +292,10 @@ impl Agent for CreatorAgent {
             ).await?
         } else if task.description.contains("template") {
             // Template-based generation
+            let default_template = "No template provided".to_string();
             let template = task.context.relevant_files
                 .first()
-                .unwrap_or(&"No template provided".to_string());
+                .unwrap_or(&default_template);
 
             self.generate_from_template(
                 template,

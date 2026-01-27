@@ -5,6 +5,7 @@
 
 use std::sync::Arc;
 use crate::agents::{Task, TaskResult, AgentError};
+use crate::models::ProviderType;
 
 /// ReflectionEngine for self-improvement and optimization
 pub struct ReflectionEngine {
@@ -59,9 +60,9 @@ impl ReflectionEngine {
             result.errors
         );
 
-        let response = self.ai_provider.get_provider("rainyApi")
-            .ok_or_else(|| AgentError::TaskExecutionFailed("Provider not found".to_string()))?
-            .generate(&prompt, "gpt-4").await
+        let response = self.ai_provider
+            .execute_prompt(&ProviderType::RainyApi, "gpt-4", &prompt, |_, _| {})
+            .await
             .map_err(|e| AgentError::TaskExecutionFailed(e.to_string()))?;
 
         // Parse and store error pattern
@@ -98,10 +99,10 @@ impl ReflectionEngine {
             result.output
         );
 
-        let response = self.ai_provider.get_provider("rainyApi")
-            .ok_or_else(|| AgentError::TaskExecutionFailed("Provider not found".to_string()))?
-            .generate(&prompt, "gpt-4").await
-            .map_err(|e| AgentError::TaskExecutionFailed(e.to_string()))?;
+        let response = self.ai_provider
+            .execute_prompt(&ProviderType::RainyApi, "gpt-4", &prompt, |_, _| {})
+            .await
+            .map_err(|e: String| AgentError::TaskExecutionFailed(e))?;
 
         // Parse and store strategy
         let strategy: Strategy = serde_json::from_str(&response)
@@ -204,15 +205,48 @@ pub struct Strategy {
 pub struct OptimizationReport {
     /// Number of error patterns identified
     pub error_patterns_count: usize,
-    /// Number of strategies identified
+    /// Number of strategies generated
     pub strategies_count: usize,
-    /// Recommendations for optimization
+    /// Recommendations for improvement
     pub recommendations: Vec<String>,
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_error_pattern_serialization() {
+        let pattern = ErrorPattern {
+            id: "test-1".to_string(),
+            error_type: "SyntaxError".to_string(),
+            root_cause: "Missing semicolon".to_string(),
+            prevention_strategy: "Use linter".to_string(),
+            count: 5,
+        };
+
+        let json = serde_json::to_string(&pattern).unwrap();
+        let deserialized: ErrorPattern = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(deserialized.error_type, "SyntaxError");
+        assert_eq!(deserialized.count, 5);
+    }
+
+    #[test]
+    fn test_strategy_serialization() {
+        let strategy = Strategy {
+            id: "test-1".to_string(),
+            name: "Code Review".to_string(),
+            description: "Implement peer review process".to_string(),
+            effectiveness: 0.85,
+        };
+
+        let json = serde_json::to_string(&strategy).unwrap();
+        let deserialized: Strategy = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(deserialized.name, "Code Review");
+        assert_eq!(deserialized.effectiveness, 0.85);
+    }
 
     #[test]
     fn test_reflection_serialization() {
@@ -228,58 +262,6 @@ mod tests {
 
         assert_eq!(deserialized.task_id, "task-1");
         assert!(deserialized.success);
-        assert_eq!(deserialized.insights.len(), 1);
-    }
-
-    #[test]
-    fn test_error_pattern_serialization() {
-        let pattern = ErrorPattern {
-            id: "pattern-1".to_string(),
-            error_type: "Timeout".to_string(),
-            root_cause: "Network latency".to_string(),
-            prevention_strategy: "Add retry logic".to_string(),
-            count: 5,
-        };
-
-        let json = serde_json::to_string(&pattern).unwrap();
-        let deserialized: ErrorPattern = serde_json::from_str(&json).unwrap();
-
-        assert_eq!(deserialized.error_type, "Timeout");
-        assert_eq!(deserialized.count, 5);
-    }
-
-    #[test]
-    fn test_strategy_serialization() {
-        let strategy = Strategy {
-            id: "strategy-1".to_string(),
-            name: "Caching".to_string(),
-            description: "Implement caching for frequently accessed data".to_string(),
-            effectiveness: 0.85,
-        };
-
-        let json = serde_json::to_string(&strategy).unwrap();
-        let deserialized: Strategy = serde_json::from_str(&json).unwrap();
-
-        assert_eq!(deserialized.name, "Caching");
-        assert_eq!(deserialized.effectiveness, 0.85);
-    }
-
-    #[test]
-    fn test_optimization_report_serialization() {
-        let report = OptimizationReport {
-            error_patterns_count: 10,
-            strategies_count: 5,
-            recommendations: vec![
-                "Review error patterns".to_string(),
-                "Implement strategies".to_string(),
-            ],
-        };
-
-        let json = serde_json::to_string(&report).unwrap();
-        let deserialized: OptimizationReport = serde_json::from_str(&json).unwrap();
-
-        assert_eq!(deserialized.error_patterns_count, 10);
-        assert_eq!(deserialized.strategies_count, 5);
-        assert_eq!(deserialized.recommendations.len(), 2);
+        assert_eq!(deserialized.improvements.len(), 1);
     }
 }

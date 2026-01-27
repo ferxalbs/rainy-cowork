@@ -242,9 +242,10 @@ impl Agent for ExecutorAgent {
                 "delete"
             };
 
+            let default_source = "unknown".to_string();
             let source = task.context.relevant_files
                 .first()
-                .unwrap_or(&"unknown".to_string());
+                .unwrap_or(&default_source);
             let destination = task.context.relevant_files.get(1);
 
             self.execute_file_operation(operation, source, destination.map(|s| s.as_str())).await?
