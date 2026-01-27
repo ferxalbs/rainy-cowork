@@ -10,7 +10,7 @@ mod services;
 use ai::AIProviderManager;
 use services::{
     CoworkAgent, DocumentService, FileManager, FileOperationEngine, FolderManager, ImageService,
-    SettingsManager, TaskManager, WebResearchService,
+    SettingsManager, TaskManager, WebResearchService, WorkspaceManager,
 };
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -49,6 +49,9 @@ pub fn run() {
     // Initialize image service
     let image_service = ImageService::new();
 
+    // Initialize workspace manager
+    let workspace_manager = Arc::new(WorkspaceManager::new().expect("Failed to create workspace manager"));
+
     // Initialize folder manager (requires app handle for data dir)
     // We'll initialize it in setup since we need the app handle
 
@@ -66,6 +69,7 @@ pub fn run() {
         .manage(web_research)
         .manage(document_service)
         .manage(image_service)
+        .manage(workspace_manager) // Arc<WorkspaceManager>
         .manage(ai_provider) // Arc<AIProviderManager>
         .manage(settings_manager) // Arc<Mutex<SettingsManager>>
         .setup(|app| {
@@ -160,6 +164,20 @@ pub fn run() {
             commands::analyze_workspace,
             commands::undo_file_operation,
             commands::list_file_operations,
+            // Versioning commands
+            commands::create_file_version,
+            commands::get_file_versions,
+            commands::restore_file_version,
+            // Transaction commands
+            commands::begin_file_transaction,
+            commands::commit_file_transaction,
+            commands::rollback_file_transaction,
+            commands::get_file_transaction,
+            // Enhanced undo/redo commands
+            commands::undo_file_operation_enhanced,
+            commands::redo_file_operation,
+            commands::list_enhanced_file_operations,
+            commands::set_file_ops_workspace_root,
             // Agent commands (NEW - AI Agent)
             commands::plan_task,
             commands::execute_agent_task,
@@ -173,6 +191,12 @@ pub fn run() {
             commands::set_theme,
             commands::set_notifications,
             commands::get_available_models,
+            // Workspace commands
+            commands::create_workspace,
+            commands::load_workspace,
+            commands::save_workspace,
+            commands::list_workspaces,
+            commands::delete_workspace,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -6,7 +6,7 @@ use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 // rayon is available for future parallel processing optimizations
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 use tokio::fs;
@@ -197,6 +197,73 @@ pub enum SuggestionType {
     CleanTempFiles,
 }
 
+// ============ Versioning and Transaction Types ============
+
+/// File version snapshot
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileVersion {
+    pub id: String,
+    pub file_path: String,
+    pub version_number: u32,
+    pub timestamp: DateTime<Utc>,
+    pub description: String,
+    pub content_hash: String,
+    pub size: u64,
+    pub version_path: String, // Path where version is stored
+}
+
+/// Version metadata for a file
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileVersionInfo {
+    pub file_path: String,
+    pub current_version: u32,
+    pub total_versions: u32,
+    pub versions: Vec<FileVersion>,
+}
+
+/// Transaction state
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum TransactionState {
+    Active,
+    Committed,
+    RolledBack,
+    Failed,
+}
+
+/// Transaction context for batch operations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Transaction {
+    pub id: String,
+    pub description: String,
+    pub state: TransactionState,
+    pub start_time: DateTime<Utc>,
+    pub end_time: Option<DateTime<Utc>>,
+    pub operations: Vec<FileOpChange>,
+    pub snapshots: Vec<FileVersion>, // Pre-transaction snapshots
+}
+
+/// Enhanced operation record with versioning support
+#[derive(Debug, Clone)]
+pub struct EnhancedOperationRecord {
+    pub id: String,
+    pub description: String,
+    pub timestamp: DateTime<Utc>,
+    pub changes: Vec<FileOpChange>,
+    pub transaction_id: Option<String>,
+    pub versions_created: Vec<FileVersion>,
+}
+
+/// Undo/Redo stack entry
+#[derive(Debug, Clone)]
+pub struct HistoryEntry {
+    pub operation: EnhancedOperationRecord,
+    pub can_redo: bool,
+}
+
 // ============ Operation History ============
 
 /// Recorded operation for undo support
@@ -214,20 +281,39 @@ pub struct OperationRecord {
 pub struct FileOperationEngine {
     /// Operation history for undo support
     history: DashMap<String, OperationRecord>,
+    /// Enhanced operation history with versioning
+    enhanced_history: DashMap<String, EnhancedOperationRecord>,
+    /// Undo/Redo stacks
+    undo_stack: DashMap<String, VecDeque<HistoryEntry>>,
+    redo_stack: DashMap<String, VecDeque<HistoryEntry>>,
+    /// Active transactions
+    transactions: DashMap<String, Transaction>,
+    /// File versions storage
+    versions_dir: PathBuf,
     /// Trash directory for safe deletes
     trash_dir: PathBuf,
+    /// Workspace context for versioning
+    workspace_root: Option<PathBuf>,
 }
 
 impl FileOperationEngine {
     pub fn new() -> Self {
-        let trash_dir = dirs::data_local_dir()
+        let base_dir = dirs::data_local_dir()
             .unwrap_or_else(|| PathBuf::from("/tmp"))
-            .join("rainy-cowork")
-            .join("trash");
+            .join("rainy-cowork");
+
+        let trash_dir = base_dir.join("trash");
+        let versions_dir = base_dir.join("versions");
 
         Self {
             history: DashMap::new(),
+            enhanced_history: DashMap::new(),
+            undo_stack: DashMap::new(),
+            redo_stack: DashMap::new(),
+            transactions: DashMap::new(),
+            versions_dir,
             trash_dir,
+            workspace_root: None,
         }
     }
 
@@ -236,7 +322,15 @@ impl FileOperationEngine {
         if !self.trash_dir.exists() {
             fs::create_dir_all(&self.trash_dir).await?;
         }
+        if !self.versions_dir.exists() {
+            fs::create_dir_all(&self.versions_dir).await?;
+        }
         Ok(())
+    }
+
+    /// Set workspace root for versioning context
+    pub fn set_workspace_root(&mut self, root: PathBuf) {
+        self.workspace_root = Some(root);
     }
 
     // ============ Core Operations ============
@@ -822,17 +916,508 @@ impl FileOperationEngine {
         })
     }
 
+    // ============ Versioning System ============
+
+    /// Create a version snapshot of a file
+    pub async fn create_version_snapshot(
+        &self,
+        file_path: &str,
+        description: &str,
+    ) -> FileOpResult<FileVersion> {
+        let path = Path::new(file_path);
+        if !path.exists() {
+            return Err(FileOpError::NotFound(file_path.to_string()));
+        }
+
+        // Calculate content hash
+        let content = fs::read(path).await?;
+        let content_hash = format!("{:x}", md5::compute(&content));
+
+        // Get file metadata
+        let metadata = fs::metadata(path).await?;
+        let size = metadata.len();
+
+        // Get current version number
+        let version_info = self.get_file_version_info(file_path).await?;
+        let version_number = version_info.current_version + 1;
+
+        // Create version storage path
+        let file_name = path
+            .file_name()
+            .map(|s| s.to_string_lossy().to_string())
+            .unwrap_or_else(|| Uuid::new_v4().to_string());
+
+        let version_file_name = format!(
+            "{}_v{:03}_{}.backup",
+            file_name,
+            version_number,
+            Utc::now().format("%Y%m%d_%H%M%S")
+        );
+
+        let version_path = self.versions_dir.join(&version_file_name);
+
+        // Copy file to versions directory
+        fs::copy(path, &version_path).await?;
+
+        let version = FileVersion {
+            id: Uuid::new_v4().to_string(),
+            file_path: file_path.to_string(),
+            version_number,
+            timestamp: Utc::now(),
+            description: description.to_string(),
+            content_hash,
+            size,
+            version_path: version_path.to_string_lossy().to_string(),
+        };
+
+        Ok(version)
+    }
+
+    /// Get version information for a file
+    pub async fn get_file_version_info(&self, file_path: &str) -> FileOpResult<FileVersionInfo> {
+        let mut versions = Vec::new();
+        let mut max_version = 0;
+
+        // Scan versions directory for this file's versions
+        if self.versions_dir.exists() {
+            let mut entries = fs::read_dir(&self.versions_dir).await?;
+            while let Some(entry) = entries.next_entry().await? {
+                let path = entry.path();
+                if path.is_file() {
+                    let file_name = path
+                        .file_name()
+                        .map(|s| s.to_string_lossy().to_string())
+                        .unwrap_or_default();
+
+                    // Parse version file name to extract original file path and version
+                    if let Some(version_info) = self.parse_version_file_name(&file_name, file_path) {
+                        let version_number = version_info.version_number;
+                        versions.push(version_info.clone());
+                        max_version = max_version.max(version_number);
+                    }
+                }
+            }
+        }
+
+        // Sort versions by version number
+        versions.sort_by(|a, b| a.version_number.cmp(&b.version_number));
+
+        Ok(FileVersionInfo {
+            file_path: file_path.to_string(),
+            current_version: max_version,
+            total_versions: versions.len() as u32,
+            versions,
+        })
+    }
+
+    /// Restore a file from a specific version
+    pub async fn restore_version(
+        &self,
+        file_path: &str,
+        version_id: &str,
+    ) -> FileOpResult<FileOpChange> {
+        let version_info = self.get_file_version_info(file_path).await?;
+        let version = version_info
+            .versions
+            .iter()
+            .find(|v| v.id == version_id)
+            .ok_or_else(|| FileOpError::NotFound(format!("Version not found: {}", version_id)))?;
+
+        // Create backup of current version before restore
+        let _backup_version = self
+            .create_version_snapshot(file_path, "Auto-backup before restore")
+            .await?;
+
+        // Restore from version
+        fs::copy(&version.version_path, file_path).await?;
+
+        Ok(FileOpChange {
+            id: Uuid::new_v4().to_string(),
+            operation: FileOpType::Create, // Restore is like creating the old version
+            source_path: version.version_path.clone(),
+            dest_path: Some(file_path.to_string()),
+            timestamp: Utc::now(),
+            reversible: true,
+        })
+    }
+
+    /// Parse version file name to extract version info
+    fn parse_version_file_name(&self, file_name: &str, target_file_path: &str) -> Option<FileVersion> {
+        // Expected format: "original_name_v001_20231201_120000.backup"
+        let parts: Vec<&str> = file_name.split('_').collect();
+        if parts.len() < 3 || parts.last() != Some(&"backup") {
+            return None;
+        }
+
+        // Extract version number
+        let version_part = parts.get(parts.len() - 3)?;
+        if !version_part.starts_with('v') {
+            return None;
+        }
+
+        let version_str = &version_part[1..];
+        let version_number: u32 = version_str.parse().ok()?;
+
+        // Reconstruct original file name (everything before _v001)
+        let original_name_parts = &parts[..parts.len() - 3];
+        let original_name = original_name_parts.join("_");
+
+        // Check if this version belongs to our target file
+        let target_name = Path::new(target_file_path)
+            .file_name()
+            .map(|s| s.to_string_lossy().to_string())
+            .unwrap_or_default();
+
+        if original_name != target_name {
+            return None;
+        }
+
+        // For now, we'll create a basic FileVersion - in a real implementation,
+        // we'd store metadata separately or parse more info from the file
+        Some(FileVersion {
+            id: Uuid::new_v4().to_string(),
+            file_path: target_file_path.to_string(),
+            version_number,
+            timestamp: Utc::now(), // Would be parsed from filename in real impl
+            description: format!("Version {}", version_number),
+            content_hash: String::new(), // Would be calculated or stored
+            size: 0, // Would be retrieved from file metadata
+            version_path: self.versions_dir.join(file_name).to_string_lossy().to_string(),
+        })
+    }
+
+    // ============ Transaction Support ============
+
+    /// Start a new transaction
+    pub async fn begin_transaction(&self, description: &str) -> FileOpResult<String> {
+        let transaction_id = Uuid::new_v4().to_string();
+
+        let transaction = Transaction {
+            id: transaction_id.clone(),
+            description: description.to_string(),
+            state: TransactionState::Active,
+            start_time: Utc::now(),
+            end_time: None,
+            operations: Vec::new(),
+            snapshots: Vec::new(),
+        };
+
+        self.transactions.insert(transaction_id.clone(), transaction);
+        Ok(transaction_id)
+    }
+
+    /// Add an operation to an active transaction
+    pub async fn add_to_transaction(
+        &self,
+        transaction_id: &str,
+        operation: FileOpChange,
+    ) -> FileOpResult<()> {
+        let mut transaction = self
+            .transactions
+            .get_mut(transaction_id)
+            .ok_or_else(|| FileOpError::NotFound(format!("Transaction not found: {}", transaction_id)))?;
+
+        if transaction.state != TransactionState::Active {
+            return Err(FileOpError::Conflict(format!(
+                "Transaction {} is not active",
+                transaction_id
+            )));
+        }
+
+        transaction.operations.push(operation);
+        Ok(())
+    }
+
+    /// Commit a transaction
+    pub async fn commit_transaction(&self, transaction_id: &str) -> FileOpResult<Vec<FileOpChange>> {
+        let mut transaction = self
+            .transactions
+            .get_mut(transaction_id)
+            .ok_or_else(|| FileOpError::NotFound(format!("Transaction not found: {}", transaction_id)))?;
+
+        if transaction.state != TransactionState::Active {
+            return Err(FileOpError::Conflict(format!(
+                "Transaction {} is not active",
+                transaction_id
+            )));
+        }
+
+        // Record the transaction in enhanced history
+        let record = EnhancedOperationRecord {
+            id: Uuid::new_v4().to_string(),
+            description: transaction.description.clone(),
+            timestamp: Utc::now(),
+            changes: transaction.operations.clone(),
+            transaction_id: Some(transaction_id.to_string()),
+            versions_created: transaction.snapshots.clone(),
+        };
+
+        self.enhanced_history.insert(record.id.clone(), record);
+
+        // Update transaction state
+        transaction.state = TransactionState::Committed;
+        transaction.end_time = Some(Utc::now());
+
+        Ok(transaction.operations.clone())
+    }
+
+    /// Rollback a transaction
+    pub async fn rollback_transaction(&self, transaction_id: &str) -> FileOpResult<Vec<FileOpChange>> {
+        let mut transaction = self
+            .transactions
+            .get_mut(transaction_id)
+            .ok_or_else(|| FileOpError::NotFound(format!("Transaction not found: {}", transaction_id)))?;
+
+        if transaction.state != TransactionState::Active {
+            return Err(FileOpError::Conflict(format!(
+                "Transaction {} cannot be rolled back",
+                transaction_id
+            )));
+        }
+
+        let mut rollback_changes = Vec::new();
+
+        // Reverse operations in reverse order
+        for change in transaction.operations.iter().rev() {
+            if !change.reversible {
+                continue;
+            }
+
+            match change.operation {
+                FileOpType::Move | FileOpType::Rename => {
+                    if let Some(dest) = &change.dest_path {
+                        fs::rename(dest, &change.source_path).await?;
+                        rollback_changes.push(FileOpChange {
+                            id: Uuid::new_v4().to_string(),
+                            operation: FileOpType::Move,
+                            source_path: dest.clone(),
+                            dest_path: Some(change.source_path.clone()),
+                            timestamp: Utc::now(),
+                            reversible: false,
+                        });
+                    }
+                }
+                FileOpType::Delete => {
+                    if let Some(trash_path) = &change.dest_path {
+                        fs::rename(trash_path, &change.source_path).await?;
+                        rollback_changes.push(FileOpChange {
+                            id: Uuid::new_v4().to_string(),
+                            operation: FileOpType::Create,
+                            source_path: change.source_path.clone(),
+                            dest_path: None,
+                            timestamp: Utc::now(),
+                            reversible: false,
+                        });
+                    }
+                }
+                FileOpType::Create => {
+                    fs::remove_file(&change.source_path).await?;
+                    rollback_changes.push(FileOpChange {
+                        id: Uuid::new_v4().to_string(),
+                        operation: FileOpType::Delete,
+                        source_path: change.source_path.clone(),
+                        dest_path: Some(self.trash_dir.join(Uuid::new_v4().to_string()).to_string_lossy().to_string()),
+                        timestamp: Utc::now(),
+                        reversible: false,
+                    });
+                }
+                _ => {}
+            }
+        }
+
+        // Update transaction state
+        transaction.state = TransactionState::RolledBack;
+        transaction.end_time = Some(Utc::now());
+
+        Ok(rollback_changes)
+    }
+
+    /// Get transaction status
+    pub fn get_transaction(&self, transaction_id: &str) -> Option<Transaction> {
+        self.transactions.get(transaction_id).map(|t| t.clone())
+    }
+
+    // ============ Enhanced Undo/Redo Support ============
+
+    /// Enhanced undo with full operation history
+    pub async fn undo_enhanced(&self, operation_id: &str) -> FileOpResult<Vec<FileOpChange>> {
+        let record = self
+            .enhanced_history
+            .remove(operation_id)
+            .map(|(_, r)| r)
+            .ok_or_else(|| {
+                FileOpError::NotFound(format!("Operation not found: {}", operation_id))
+            })?;
+
+        let mut undo_changes = Vec::new();
+
+        // Reverse each change
+        for change in record.changes.clone().into_iter().rev() {
+            if !change.reversible {
+                continue;
+            }
+
+            match change.operation {
+                FileOpType::Move | FileOpType::Rename => {
+                    if let Some(dest) = &change.dest_path {
+                        fs::rename(dest, &change.source_path).await?;
+                        undo_changes.push(FileOpChange {
+                            id: Uuid::new_v4().to_string(),
+                            operation: FileOpType::Move,
+                            source_path: dest.clone(),
+                            dest_path: Some(change.source_path.clone()),
+                            timestamp: Utc::now(),
+                            reversible: false,
+                        });
+                    }
+                }
+                FileOpType::Delete => {
+                    if let Some(trash_path) = &change.dest_path {
+                        fs::rename(trash_path, &change.source_path).await?;
+                        undo_changes.push(FileOpChange {
+                            id: Uuid::new_v4().to_string(),
+                            operation: FileOpType::Create,
+                            source_path: change.source_path.clone(),
+                            dest_path: None,
+                            timestamp: Utc::now(),
+                            reversible: false,
+                        });
+                    }
+                }
+                FileOpType::Create => {
+                    fs::remove_file(&change.source_path).await?;
+                    undo_changes.push(FileOpChange {
+                        id: Uuid::new_v4().to_string(),
+                        operation: FileOpType::Delete,
+                        source_path: change.source_path.clone(),
+                        dest_path: Some(self.trash_dir.join(Uuid::new_v4().to_string()).to_string_lossy().to_string()),
+                        timestamp: Utc::now(),
+                        reversible: false,
+                    });
+                }
+                _ => {}
+            }
+        }
+
+        // Add to redo stack
+        let history_entry = HistoryEntry {
+            operation: record,
+            can_redo: true,
+        };
+
+        // For simplicity, we'll use a global redo stack
+        let mut redo_stack = self.redo_stack.entry("global".to_string()).or_insert_with(VecDeque::new);
+        redo_stack.push_back(history_entry);
+
+        Ok(undo_changes)
+    }
+
+    /// Redo a previously undone operation
+    pub async fn redo_operation(&self) -> FileOpResult<Vec<FileOpChange>> {
+        let mut redo_stack = self.redo_stack.get_mut("global").ok_or_else(|| {
+            FileOpError::NotFound("No operations to redo".to_string())
+        })?;
+
+        let history_entry = redo_stack.pop_back().ok_or_else(|| {
+            FileOpError::NotFound("No operations to redo".to_string())
+        })?;
+
+        if !history_entry.can_redo {
+            return Err(FileOpError::Conflict("Operation cannot be redone".to_string()));
+        }
+
+        let mut redo_changes = Vec::new();
+
+        // Reapply each change
+        for change in &history_entry.operation.changes {
+            match change.operation {
+                FileOpType::Move | FileOpType::Rename => {
+                    if let Some(dest) = &change.dest_path {
+                        fs::rename(&change.source_path, dest).await?;
+                        redo_changes.push(FileOpChange {
+                            id: Uuid::new_v4().to_string(),
+                            operation: change.operation.clone(),
+                            source_path: change.source_path.clone(),
+                            dest_path: change.dest_path.clone(),
+                            timestamp: Utc::now(),
+                            reversible: true,
+                        });
+                    }
+                }
+                FileOpType::Delete => {
+                    if let Some(trash_path) = &change.dest_path {
+                        fs::rename(&change.source_path, trash_path).await?;
+                        redo_changes.push(FileOpChange {
+                            id: Uuid::new_v4().to_string(),
+                            operation: change.operation.clone(),
+                            source_path: change.source_path.clone(),
+                            dest_path: change.dest_path.clone(),
+                            timestamp: Utc::now(),
+                            reversible: true,
+                        });
+                    }
+                }
+                FileOpType::Create => {
+                    if let Some(dest) = &change.dest_path {
+                        fs::rename(&change.source_path, dest).await?;
+                        redo_changes.push(FileOpChange {
+                            id: Uuid::new_v4().to_string(),
+                            operation: change.operation.clone(),
+                            source_path: change.source_path.clone(),
+                            dest_path: change.dest_path.clone(),
+                            timestamp: Utc::now(),
+                            reversible: true,
+                        });
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        // Re-add to enhanced history
+        self.enhanced_history.insert(
+            history_entry.operation.id.clone(),
+            history_entry.operation.clone(),
+        );
+
+        Ok(redo_changes)
+    }
+
+    /// Get enhanced operation history
+    pub fn list_enhanced_operations(&self) -> Vec<(String, String, DateTime<Utc>, Option<String>)> {
+        self.enhanced_history
+            .iter()
+            .map(|r| (
+                r.id.clone(),
+                r.description.clone(),
+                r.timestamp,
+                r.transaction_id.clone(),
+            ))
+            .collect()
+    }
+
     // ============ Undo Support ============
 
     /// Record an operation for undo support
     fn record_operation(&self, description: &str, changes: Vec<FileOpChange>) {
         let record = OperationRecord {
             id: Uuid::new_v4().to_string(),
-            changes,
+            changes: changes.clone(),
             timestamp: Utc::now(),
             description: description.to_string(),
         };
         self.history.insert(record.id.clone(), record);
+
+        // Also record in enhanced history
+        let enhanced_record = EnhancedOperationRecord {
+            id: Uuid::new_v4().to_string(),
+            description: description.to_string(),
+            timestamp: Utc::now(),
+            changes,
+            transaction_id: None,
+            versions_created: Vec::new(),
+        };
+        self.enhanced_history.insert(enhanced_record.id.clone(), enhanced_record);
     }
 
     /// Undo the last operation
@@ -930,5 +1515,42 @@ mod tests {
 
         // Pattern should produce names like "photo_001.jpg"
         assert!(pattern.template.contains("{counter}"));
+    }
+
+    #[test]
+    fn test_transaction_states() {
+        // Test transaction state transitions
+        assert_eq!(TransactionState::Active as u8, 0);
+        assert_eq!(TransactionState::Committed as u8, 1);
+        assert_eq!(TransactionState::RolledBack as u8, 2);
+        assert_eq!(TransactionState::Failed as u8, 3);
+    }
+
+    #[test]
+    fn test_file_version_creation() {
+        let version = FileVersion {
+            id: "test-id".to_string(),
+            file_path: "/test/file.txt".to_string(),
+            version_number: 1,
+            timestamp: Utc::now(),
+            description: "Test version".to_string(),
+            content_hash: "abc123".to_string(),
+            size: 1024,
+            version_path: "/versions/file_v001.backup".to_string(),
+        };
+
+        assert_eq!(version.version_number, 1);
+        assert_eq!(version.file_path, "/test/file.txt");
+        assert_eq!(version.description, "Test version");
+    }
+
+    #[test]
+    fn test_file_operation_types() {
+        assert_eq!(FileOpType::Move as u8, 0);
+        assert_eq!(FileOpType::Copy as u8, 1);
+        assert_eq!(FileOpType::Rename as u8, 2);
+        assert_eq!(FileOpType::Delete as u8, 3);
+        assert_eq!(FileOpType::Create as u8, 4);
+        assert_eq!(FileOpType::CreateFolder as u8, 5);
     }
 }

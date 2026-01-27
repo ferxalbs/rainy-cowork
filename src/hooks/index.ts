@@ -8,3 +8,4 @@ export { useFolderManager } from './useFolderManager';
 export { useCoworkKeys } from './useCoworkKeys';
 export { useCoworkBilling } from './useCoworkBilling';
 export { useTheme } from './useTheme';
+export { useWorkspace } from './useWorkspace';

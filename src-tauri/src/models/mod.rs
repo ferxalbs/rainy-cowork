@@ -39,6 +39,16 @@ pub struct TaskStep {
     pub completed_at: Option<DateTime<Utc>>,
 }
 
+/// Task priority levels
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "lowercase")]
+pub enum TaskPriority {
+    Low = 1,
+    Normal = 2,
+    High = 3,
+    Critical = 4,
+}
+
 /// Core task structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -48,6 +58,8 @@ pub struct Task {
     pub description: String,
     pub status: TaskStatus,
     pub progress: u8, // 0-100
+    pub priority: TaskPriority,
+    pub dependencies: Vec<String>, // Task IDs this task depends on
     pub provider: ProviderType,
     pub model: String,
     pub workspace_path: Option<String>,
@@ -60,6 +72,16 @@ pub struct Task {
 
 impl Task {
     pub fn new(description: String, provider: ProviderType, model: String) -> Self {
+        Self::with_priority(description, provider, model, TaskPriority::Normal, Vec::new())
+    }
+
+    pub fn with_priority(
+        description: String,
+        provider: ProviderType,
+        model: String,
+        priority: TaskPriority,
+        dependencies: Vec<String>,
+    ) -> Self {
         let id = Uuid::new_v4().to_string();
         let title = if description.len() > 50 {
             format!("{}...", &description[..47])
@@ -73,6 +95,8 @@ impl Task {
             description,
             status: TaskStatus::Queued,
             progress: 0,
+            priority,
+            dependencies,
             provider,
             model,
             workspace_path: None,

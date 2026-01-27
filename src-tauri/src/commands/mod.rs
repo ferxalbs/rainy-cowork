@@ -10,6 +10,7 @@ pub mod image;
 pub mod settings;
 pub mod task;
 pub mod web;
+pub mod workspace;
 
 pub use ai::*;
 pub use document::*;
@@ -20,3 +21,4 @@ pub use image::*;
 pub use settings::*;
 pub use task::*;
 pub use web::*;
+pub use workspace::*;

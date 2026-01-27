@@ -517,3 +517,63 @@ export async function getAvailableModels(): Promise<ModelOption[]> {
     return invoke<ModelOption[]>('get_available_models');
 }
 
+// ============ Workspace Types ============
+
+export interface AdvancedWorkspace {
+    id: string;
+    name: string;
+    allowedPaths: string[];
+    permissions: {
+        canRead: boolean;
+        canWrite: boolean;
+        canExecute: boolean;
+        canDelete: boolean;
+        canCreateAgents: boolean;
+    };
+    agents: Array<{
+        id: string;
+        name: string;
+        agentType: string;
+        config: Record<string, any>;
+    }>;
+    memory: {
+        maxSize: number;
+        currentSize: number;
+        retentionPolicy: string;
+    };
+    settings: {
+        theme: string;
+        language: string;
+        autoSave: boolean;
+        notificationsEnabled: boolean;
+    };
+}
+
+// ============ Workspace Commands ============
+
+export async function createWorkspace(
+    name: string,
+    allowedPaths: string[]
+): Promise<AdvancedWorkspace> {
+    return invoke<AdvancedWorkspace>('create_workspace', { name, allowedPaths });
+}
+
+export async function loadWorkspace(id: string): Promise<AdvancedWorkspace> {
+    return invoke<AdvancedWorkspace>('load_workspace', { id });
+}
+
+export async function saveWorkspace(
+    workspace: AdvancedWorkspace,
+    format: 'json' | 'toml' = 'json'
+): Promise<void> {
+    return invoke<void>('save_workspace', { workspace, format });
+}
+
+export async function listWorkspaces(): Promise<string[]> {
+    return invoke<string[]>('list_workspaces');
+}
+
+export async function deleteWorkspace(id: string): Promise<void> {
+    return invoke<void>('delete_workspace', { id });
+}
+
