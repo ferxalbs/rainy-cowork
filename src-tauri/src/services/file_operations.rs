@@ -254,6 +254,8 @@ pub struct EnhancedOperationRecord {
     pub timestamp: DateTime<Utc>,
     pub changes: Vec<FileOpChange>,
     pub transaction_id: Option<String>,
+    /// Reserved for future versioning feature
+    #[allow(dead_code)]
     pub versions_created: Vec<FileVersion>,
 }
 
@@ -283,7 +285,8 @@ pub struct FileOperationEngine {
     history: DashMap<String, OperationRecord>,
     /// Enhanced operation history with versioning
     enhanced_history: DashMap<String, EnhancedOperationRecord>,
-    /// Undo/Redo stacks
+    /// Undo/Redo stacks - Reserved for future undo feature
+    #[allow(dead_code)]
     undo_stack: DashMap<String, VecDeque<HistoryEntry>>,
     redo_stack: DashMap<String, VecDeque<HistoryEntry>>,
     /// Active transactions
@@ -292,7 +295,8 @@ pub struct FileOperationEngine {
     versions_dir: PathBuf,
     /// Trash directory for safe deletes
     trash_dir: PathBuf,
-    /// Workspace context for versioning
+    /// Workspace context for versioning - Reserved for future feature
+    #[allow(dead_code)]
     workspace_root: Option<PathBuf>,
 }
 
@@ -329,6 +333,8 @@ impl FileOperationEngine {
     }
 
     /// Set workspace root for versioning context
+    /// Reserved for future versioning feature
+    #[allow(dead_code)]
     pub fn set_workspace_root(&mut self, root: PathBuf) {
         self.workspace_root = Some(root);
     }
@@ -990,7 +996,8 @@ impl FileOperationEngine {
                         .unwrap_or_default();
 
                     // Parse version file name to extract original file path and version
-                    if let Some(version_info) = self.parse_version_file_name(&file_name, file_path) {
+                    if let Some(version_info) = self.parse_version_file_name(&file_name, file_path)
+                    {
                         let version_number = version_info.version_number;
                         versions.push(version_info.clone());
                         max_version = max_version.max(version_number);
@@ -1042,7 +1049,11 @@ impl FileOperationEngine {
     }
 
     /// Parse version file name to extract version info
-    fn parse_version_file_name(&self, file_name: &str, target_file_path: &str) -> Option<FileVersion> {
+    fn parse_version_file_name(
+        &self,
+        file_name: &str,
+        target_file_path: &str,
+    ) -> Option<FileVersion> {
         // Expected format: "original_name_v001_20231201_120000.backup"
         let parts: Vec<&str> = file_name.split('_').collect();
         if parts.len() < 3 || parts.last() != Some(&"backup") {
@@ -1081,8 +1092,12 @@ impl FileOperationEngine {
             timestamp: Utc::now(), // Would be parsed from filename in real impl
             description: format!("Version {}", version_number),
             content_hash: String::new(), // Would be calculated or stored
-            size: 0, // Would be retrieved from file metadata
-            version_path: self.versions_dir.join(file_name).to_string_lossy().to_string(),
+            size: 0,                     // Would be retrieved from file metadata
+            version_path: self
+                .versions_dir
+                .join(file_name)
+                .to_string_lossy()
+                .to_string(),
         })
     }
 
@@ -1102,20 +1117,22 @@ impl FileOperationEngine {
             snapshots: Vec::new(),
         };
 
-        self.transactions.insert(transaction_id.clone(), transaction);
+        self.transactions
+            .insert(transaction_id.clone(), transaction);
         Ok(transaction_id)
     }
 
     /// Add an operation to an active transaction
+    /// Reserved for future transaction feature
+    #[allow(dead_code)]
     pub async fn add_to_transaction(
         &self,
         transaction_id: &str,
         operation: FileOpChange,
     ) -> FileOpResult<()> {
-        let mut transaction = self
-            .transactions
-            .get_mut(transaction_id)
-            .ok_or_else(|| FileOpError::NotFound(format!("Transaction not found: {}", transaction_id)))?;
+        let mut transaction = self.transactions.get_mut(transaction_id).ok_or_else(|| {
+            FileOpError::NotFound(format!("Transaction not found: {}", transaction_id))
+        })?;
 
         if transaction.state != TransactionState::Active {
             return Err(FileOpError::Conflict(format!(
@@ -1129,11 +1146,13 @@ impl FileOperationEngine {
     }
 
     /// Commit a transaction
-    pub async fn commit_transaction(&self, transaction_id: &str) -> FileOpResult<Vec<FileOpChange>> {
-        let mut transaction = self
-            .transactions
-            .get_mut(transaction_id)
-            .ok_or_else(|| FileOpError::NotFound(format!("Transaction not found: {}", transaction_id)))?;
+    pub async fn commit_transaction(
+        &self,
+        transaction_id: &str,
+    ) -> FileOpResult<Vec<FileOpChange>> {
+        let mut transaction = self.transactions.get_mut(transaction_id).ok_or_else(|| {
+            FileOpError::NotFound(format!("Transaction not found: {}", transaction_id))
+        })?;
 
         if transaction.state != TransactionState::Active {
             return Err(FileOpError::Conflict(format!(
@@ -1162,11 +1181,13 @@ impl FileOperationEngine {
     }
 
     /// Rollback a transaction
-    pub async fn rollback_transaction(&self, transaction_id: &str) -> FileOpResult<Vec<FileOpChange>> {
-        let mut transaction = self
-            .transactions
-            .get_mut(transaction_id)
-            .ok_or_else(|| FileOpError::NotFound(format!("Transaction not found: {}", transaction_id)))?;
+    pub async fn rollback_transaction(
+        &self,
+        transaction_id: &str,
+    ) -> FileOpResult<Vec<FileOpChange>> {
+        let mut transaction = self.transactions.get_mut(transaction_id).ok_or_else(|| {
+            FileOpError::NotFound(format!("Transaction not found: {}", transaction_id))
+        })?;
 
         if transaction.state != TransactionState::Active {
             return Err(FileOpError::Conflict(format!(
@@ -1216,7 +1237,12 @@ impl FileOperationEngine {
                         id: Uuid::new_v4().to_string(),
                         operation: FileOpType::Delete,
                         source_path: change.source_path.clone(),
-                        dest_path: Some(self.trash_dir.join(Uuid::new_v4().to_string()).to_string_lossy().to_string()),
+                        dest_path: Some(
+                            self.trash_dir
+                                .join(Uuid::new_v4().to_string())
+                                .to_string_lossy()
+                                .to_string(),
+                        ),
                         timestamp: Utc::now(),
                         reversible: false,
                     });
@@ -1290,7 +1316,12 @@ impl FileOperationEngine {
                         id: Uuid::new_v4().to_string(),
                         operation: FileOpType::Delete,
                         source_path: change.source_path.clone(),
-                        dest_path: Some(self.trash_dir.join(Uuid::new_v4().to_string()).to_string_lossy().to_string()),
+                        dest_path: Some(
+                            self.trash_dir
+                                .join(Uuid::new_v4().to_string())
+                                .to_string_lossy()
+                                .to_string(),
+                        ),
                         timestamp: Utc::now(),
                         reversible: false,
                     });
@@ -1306,7 +1337,10 @@ impl FileOperationEngine {
         };
 
         // For simplicity, we'll use a global redo stack
-        let mut redo_stack = self.redo_stack.entry("global".to_string()).or_insert_with(VecDeque::new);
+        let mut redo_stack = self
+            .redo_stack
+            .entry("global".to_string())
+            .or_insert_with(VecDeque::new);
         redo_stack.push_back(history_entry);
 
         Ok(undo_changes)
@@ -1314,16 +1348,19 @@ impl FileOperationEngine {
 
     /// Redo a previously undone operation
     pub async fn redo_operation(&self) -> FileOpResult<Vec<FileOpChange>> {
-        let mut redo_stack = self.redo_stack.get_mut("global").ok_or_else(|| {
-            FileOpError::NotFound("No operations to redo".to_string())
-        })?;
+        let mut redo_stack = self
+            .redo_stack
+            .get_mut("global")
+            .ok_or_else(|| FileOpError::NotFound("No operations to redo".to_string()))?;
 
-        let history_entry = redo_stack.pop_back().ok_or_else(|| {
-            FileOpError::NotFound("No operations to redo".to_string())
-        })?;
+        let history_entry = redo_stack
+            .pop_back()
+            .ok_or_else(|| FileOpError::NotFound("No operations to redo".to_string()))?;
 
         if !history_entry.can_redo {
-            return Err(FileOpError::Conflict("Operation cannot be redone".to_string()));
+            return Err(FileOpError::Conflict(
+                "Operation cannot be redone".to_string(),
+            ));
         }
 
         let mut redo_changes = Vec::new();
@@ -1387,12 +1424,14 @@ impl FileOperationEngine {
     pub fn list_enhanced_operations(&self) -> Vec<(String, String, DateTime<Utc>, Option<String>)> {
         self.enhanced_history
             .iter()
-            .map(|r| (
-                r.id.clone(),
-                r.description.clone(),
-                r.timestamp,
-                r.transaction_id.clone(),
-            ))
+            .map(|r| {
+                (
+                    r.id.clone(),
+                    r.description.clone(),
+                    r.timestamp,
+                    r.transaction_id.clone(),
+                )
+            })
             .collect()
     }
 
@@ -1417,7 +1456,8 @@ impl FileOperationEngine {
             transaction_id: None,
             versions_created: Vec::new(),
         };
-        self.enhanced_history.insert(enhanced_record.id.clone(), enhanced_record);
+        self.enhanced_history
+            .insert(enhanced_record.id.clone(), enhanced_record);
     }
 
     /// Undo the last operation

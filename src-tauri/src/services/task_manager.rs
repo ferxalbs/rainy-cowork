@@ -4,16 +4,14 @@
 use crate::ai::AIProviderManager;
 use crate::models::{Task, TaskEvent, TaskPriority, TaskStatus};
 use dashmap::DashMap;
-use serde::{Deserialize, Serialize};
 use std::collections::BinaryHeap;
 use std::collections::HashMap;
 use std::collections::HashSet;
-use std::collections::VecDeque;
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
-use tokio::sync::Mutex;
 use tauri::ipc::Channel;
+use tokio::sync::Mutex;
 
 /// Priority queue item for tasks
 #[derive(Debug, Clone)]
@@ -26,7 +24,9 @@ struct PriorityTask {
 impl Ord for PriorityTask {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         // Higher priority first, then earlier creation time
-        other.priority.cmp(&self.priority)
+        other
+            .priority
+            .cmp(&self.priority)
             .then_with(|| self.created_at.cmp(&other.created_at))
     }
 }
@@ -46,6 +46,8 @@ impl PartialEq for PriorityTask {
 }
 
 /// Serializable queue state for persistence
+/// Reserved for future state persistence feature
+#[allow(dead_code)]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 struct QueueState {
     pending: Vec<Task>,
@@ -56,27 +58,22 @@ struct QueueState {
     reverse_dependencies: HashMap<String, HashSet<String>>,
 }
 
+#[allow(dead_code)]
 impl QueueState {
     async fn from_queue(queue: &TaskQueue) -> Self {
-        let pending = queue.pending.lock().await
+        let pending = queue
+            .pending
+            .lock()
+            .await
             .iter()
             .map(|pt| pt.task.clone())
             .collect();
 
-        let running = queue.running
-            .iter()
-            .map(|r| r.value().clone())
-            .collect();
+        let running = queue.running.iter().map(|r| r.value().clone()).collect();
 
-        let completed = queue.completed
-            .iter()
-            .map(|r| r.value().clone())
-            .collect();
+        let completed = queue.completed.iter().map(|r| r.value().clone()).collect();
 
-        let failed = queue.failed
-            .iter()
-            .map(|r| r.value().clone())
-            .collect();
+        let failed = queue.failed.iter().map(|r| r.value().clone()).collect();
 
         let dependency_graph = queue.dependency_graph.lock().await.clone();
         let reverse_dependencies = queue.reverse_dependencies.lock().await.clone();
@@ -157,7 +154,10 @@ impl TaskQueue {
         // Add to dependency graph
         dep_graph.insert(task.id.clone(), HashSet::new());
         for dep_id in &task.dependencies {
-            rev_deps.entry(dep_id.clone()).or_insert_with(HashSet::new).insert(task.id.clone());
+            rev_deps
+                .entry(dep_id.clone())
+                .or_insert_with(HashSet::new)
+                .insert(task.id.clone());
         }
 
         // Add to priority queue
@@ -172,7 +172,7 @@ impl TaskQueue {
     /// Get the next task to execute (considering dependencies)
     pub async fn dequeue(&self) -> Option<Task> {
         let mut pending = self.pending.lock().await;
-        let rev_deps = self.reverse_dependencies.lock().await;
+        let _rev_deps = self.reverse_dependencies.lock().await;
         let mut unsatisfied_tasks = Vec::new();
 
         while let Some(priority_task) = pending.pop() {
@@ -209,7 +209,7 @@ impl TaskQueue {
 
             // Notify dependent tasks that this dependency is satisfied
             let rev_deps = self.reverse_dependencies.lock().await;
-            if let Some(dependents) = rev_deps.get(task_id) {
+            if let Some(_dependents) = rev_deps.get(task_id) {
                 // Dependents can now potentially be dequeued
                 // This is handled by the dequeue method checking dependencies
             }
@@ -283,18 +283,21 @@ impl TaskQueue {
     }
 
     /// Save queue state to disk
+    /// Reserved for future state persistence feature
+    #[allow(dead_code)]
     pub async fn save_to_disk(&self, path: &Path) -> Result<(), String> {
         let state = QueueState::from_queue(self).await;
         let json = serde_json::to_string_pretty(&state)
             .map_err(|e| format!("Failed to serialize queue state: {}", e))?;
 
-        fs::write(path, json)
-            .map_err(|e| format!("Failed to write queue state to disk: {}", e))?;
+        fs::write(path, json).map_err(|e| format!("Failed to write queue state to disk: {}", e))?;
 
         Ok(())
     }
 
     /// Load queue state from disk
+    /// Reserved for future state persistence feature
+    #[allow(dead_code)]
     pub async fn load_from_disk(&self, path: &Path) -> Result<(), String> {
         if !path.exists() {
             return Ok(()); // No saved state, start fresh
@@ -315,7 +318,11 @@ impl TaskQueue {
 pub struct TaskManager {
     queue: Arc<TaskQueue>,
     ai_provider: Arc<AIProviderManager>,
+    /// Reserved for background processing feature
+    #[allow(dead_code)]
     max_concurrent_tasks: usize,
+    /// Reserved for background processing feature
+    #[allow(dead_code)]
     running_handles: Arc<Mutex<Vec<tokio::task::JoinHandle<()>>>>,
 }
 
@@ -345,10 +352,7 @@ impl TaskManager {
     }
 
     /// Execute the next available task from the queue
-    pub async fn execute_next_task(
-        &self,
-        on_event: Channel<TaskEvent>,
-    ) -> Result<(), String> {
+    pub async fn execute_next_task(&self, on_event: Channel<TaskEvent>) -> Result<(), String> {
         // Get next task from queue
         let task = match self.queue.dequeue().await {
             Some(task) => task,
@@ -366,7 +370,8 @@ impl TaskManager {
 
         // Execute the task using AI provider
         let task_id_for_closure = task_id.clone();
-        let result = self.ai_provider
+        let result = self
+            .ai_provider
             .execute_prompt(
                 &task.provider,
                 &task.model,
@@ -405,7 +410,7 @@ impl TaskManager {
     /// Execute a specific task (for manual execution)
     pub async fn execute_task(
         &self,
-        task_id: &str,
+        _task_id: &str,
         on_event: Channel<TaskEvent>,
     ) -> Result<(), String> {
         // For now, delegate to execute_next_task if the task is pending
@@ -474,6 +479,8 @@ impl TaskManager {
     }
 
     /// Start background task processing
+    /// Reserved for future background processing feature
+    #[allow(dead_code)]
     pub async fn start_background_processing(&self) {
         let queue = Arc::clone(&self.queue);
         let ai_provider = Arc::clone(&self.ai_provider);
@@ -503,7 +510,11 @@ impl TaskManager {
                                     &task.model,
                                     &task.description,
                                     move |progress, _message| {
-                                        tracing::debug!("Task {} progress: {}%", task_id_clone, progress);
+                                        tracing::debug!(
+                                            "Task {} progress: {}%",
+                                            task_id_clone,
+                                            progress
+                                        );
                                     },
                                 )
                                 .await;
@@ -533,21 +544,29 @@ impl TaskManager {
     }
 
     /// Get the number of currently running tasks
+    /// Reserved for future background processing feature
+    #[allow(dead_code)]
     pub async fn running_task_count(&self) -> usize {
         self.queue.running.len()
     }
 
     /// Get the number of pending tasks
+    /// Reserved for future background processing feature
+    #[allow(dead_code)]
     pub async fn pending_task_count(&self) -> usize {
         self.queue.pending.lock().await.len()
     }
 
     /// Save task manager state to disk
+    /// Reserved for future state persistence feature
+    #[allow(dead_code)]
     pub async fn save_state(&self, path: &Path) -> Result<(), String> {
         self.queue.save_to_disk(path).await
     }
 
     /// Load task manager state from disk
+    /// Reserved for future state persistence feature
+    #[allow(dead_code)]
     pub async fn load_state(&self, path: &Path) -> Result<(), String> {
         self.queue.load_from_disk(path).await
     }

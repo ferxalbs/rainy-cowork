@@ -207,6 +207,8 @@ impl SettingsManager {
         }
     }
 
+    /// Reserved for future Rainy API model info display
+    #[allow(dead_code)]
     fn get_model_info(model_id: &str) -> (String, String) {
         match model_id {
             "gpt-4o" => (
