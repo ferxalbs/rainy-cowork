@@ -224,6 +224,37 @@ impl CoworkAgent {
         instruction: &str,
         workspace_path: &str,
     ) -> Result<TaskPlan, String> {
+        // Create and set workspace context for file operations
+        // This is an ad-hoc workspace based on the user's selected folder
+        let adhoc_workspace = crate::services::workspace::Workspace {
+            id: uuid::Uuid::new_v4(),
+            name: format!("Cowork - {}", workspace_path),
+            allowed_paths: vec![workspace_path.to_string()],
+            permissions: crate::services::workspace::WorkspacePermissions {
+                can_read: true,
+                can_write: true,
+                can_execute: false,
+                can_delete: true,  // Allow delete for organize/cleanup operations
+                can_create_agents: false,
+            },
+            permission_overrides: Vec::new(),
+            agents: Vec::new(),
+            memory: crate::services::workspace::WorkspaceMemory {
+                max_size: 1024 * 1024 * 100, // 100MB
+                current_size: 0,
+                retention_policy: "fifo".to_string(),
+            },
+            settings: crate::services::workspace::WorkspaceSettings {
+                theme: "default".to_string(),
+                language: "en".to_string(),
+                auto_save: true,
+                notifications_enabled: true,
+            },
+        };
+
+        // Set the workspace context on file operations engine
+        self.file_ops.set_workspace(adhoc_workspace).await;
+
         // Get workspace context
         let analysis = self
             .file_ops
