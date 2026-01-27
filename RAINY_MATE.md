@@ -340,7 +340,7 @@ pub trait AIProvider: Send + Sync {
 | **OpenAI**    | GPT-4, GPT-4o, o1     | General, reasoning | 🟢 Planned |
 | **Anthropic** | Claude 3.5/4, Opus    | Complex tasks      | 🟢 Planned |
 | **Google**    | Gemini 2.0, Flash     | Fast responses     | 🟢 Planned |
-| **xAI**       | Grok-4.1                | Real-time data     | 🟡 Future  |
+| **xAI**       | Grok-4.1              | Real-time data     | 🟡 Future  |
 | **Local**     | Ollama, LM Studio     | Privacy mode       | 🟢 Planned |
 | **Custom**    | Any OpenAI-compatible | Enterprise         | 🟢 Planned |
 
@@ -496,7 +496,7 @@ export const rainyMateTheme = {
 | **Dev**          | GitHub, GitLab, VS Code         | 🟢 Planned |
 | **Productivity** | Asana, Todoist, Linear          | 🟡 Future  |
 | **Browser**      | Chrome Extension                | 🟢 Planned |
-| **MCP**          | Model Context Protocol.         |    Planned |
+| **MCP**          | Model Context Protocol.         | Planned    |
 
 #### 5.2 Connector SDK
 
