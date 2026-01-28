@@ -12,3 +12,4 @@ export { useCoworkBilling } from './useCoworkBilling';
 export { useTheme } from './useTheme';
 export { useWorkspace } from './useWorkspace';
 export { useFileVersioning } from './useFileVersioning';
+export { useIntelligentRouter } from './useIntelligentRouter';

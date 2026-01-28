@@ -1056,3 +1056,101 @@ export async function getProviderCount(): Promise<number> {
     return invoke<number>('get_provider_count');
 }
 
+// ============ PHASE 3: Intelligent Router Commands ============
+
+export interface RouterConfigDto {
+    load_balancing_strategy: string;
+    fallback_strategy: string;
+    cost_optimization_enabled: boolean;
+    capability_matching_enabled: boolean;
+    max_retries: number;
+}
+
+export interface RouterStatsDto {
+    total_providers: number;
+    healthy_providers: number;
+    circuit_breakers_open: number;
+}
+
+export interface RoutedChatRequest {
+    messages: Array<{ role: string; content: string; name?: string }>;
+    model?: string;
+    temperature?: number;
+    max_tokens?: number;
+    top_p?: number;
+    frequency_penalty?: number;
+    presence_penalty?: number;
+    stop?: string[];
+    preferred_provider?: string;
+}
+
+export interface RoutedEmbeddingRequest {
+    input: string;
+    model?: string;
+    preferred_provider?: string;
+}
+
+export type StreamingEvent =
+    | { event: 'started'; data: { model: string; providerId: string } }
+    | { event: 'chunk'; data: { content: string; isFinal: boolean } }
+    | { event: 'finished'; data: { finishReason: string; totalChunks: number } }
+    | { event: 'error'; data: { message: string } };
+
+export async function getRouterConfig(): Promise<RouterConfigDto> {
+    return invoke<RouterConfigDto>('get_router_config');
+}
+
+export async function updateRouterConfig(config: Partial<{
+    load_balancing_strategy: string;
+    fallback_strategy: string;
+    cost_optimization_enabled: boolean;
+    capability_matching_enabled: boolean;
+    max_retries: number;
+}>): Promise<RouterConfigDto> {
+    return invoke<RouterConfigDto>('update_router_config', config);
+}
+
+export async function getRouterStats(): Promise<RouterStatsDto> {
+    return invoke<RouterStatsDto>('get_router_stats');
+}
+
+export async function completeWithRouting(
+    request: RoutedChatRequest
+): Promise<ChatCompletionResponse> {
+    return invoke<ChatCompletionResponse>('complete_with_routing', { request });
+}
+
+export async function streamWithRouting(
+    request: RoutedChatRequest,
+    onEvent: (event: StreamingEvent) => void
+): Promise<void> {
+    const channel = new Channel<StreamingEvent>();
+    channel.onmessage = onEvent;
+
+    return invoke<void>('stream_with_routing', {
+        request,
+        onEvent: channel,
+    });
+}
+
+export async function embedWithRouting(
+    request: RoutedEmbeddingRequest
+): Promise<EmbeddingResponse> {
+    return invoke<EmbeddingResponse>('embed_with_routing', { request });
+}
+
+export async function addProviderToRouter(providerId: string): Promise<void> {
+    return invoke<void>('add_provider_to_router', { providerId });
+}
+
+export async function removeProviderFromRouter(providerId: string): Promise<void> {
+    return invoke<void>('remove_provider_from_router', { providerId });
+}
+
+export async function getRouterProviders(): Promise<string[]> {
+    return invoke<string[]>('get_router_providers');
+}
+
+export async function routerHasProviders(): Promise<boolean> {
+    return invoke<boolean>('router_has_providers');
+}

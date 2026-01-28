@@ -9,14 +9,13 @@ mod models;
 mod services;
 
 use agents::AgentRegistry;
-use ai::{AIProviderManager, ProviderRegistry};
+use ai::{AIProviderManager, IntelligentRouter, ProviderRegistry};
 use services::{
     CoworkAgent, DocumentService, FileManager, FileOperationEngine, FolderManager, ImageService,
-    MemoryManager, SettingsManager, WebResearchService, WorkspaceManager,
-    ReflectionEngine,
+    MemoryManager, ReflectionEngine, SettingsManager, WebResearchService, WorkspaceManager,
 };
 use std::sync::Arc;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, RwLock};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -56,13 +55,17 @@ pub fn run() {
     let image_service = ImageService::new();
 
     // Initialize workspace manager
-    let workspace_manager = Arc::new(WorkspaceManager::new().expect("Failed to create workspace manager"));
+    let workspace_manager =
+        Arc::new(WorkspaceManager::new().expect("Failed to create workspace manager"));
 
     // Initialize agent registry for multi-agent system
     let agent_registry = Arc::new(AgentRegistry::new(ai_provider.clone()));
 
     // Initialize reflection engine for self-improvement
     let reflection_engine = Arc::new(ReflectionEngine::new(ai_provider.clone()));
+
+    // Initialize intelligent router for PHASE 3
+    let intelligent_router = Arc::new(RwLock::new(IntelligentRouter::default()));
 
     // Initialize folder manager (requires app handle for data dir)
     // We'll initialize it in setup since we need the app handle
@@ -83,10 +86,15 @@ pub fn run() {
         .manage(image_service)
         .manage(workspace_manager) // Arc<WorkspaceManager>
         .manage(ai_provider) // Arc<AIProviderManager>
-        .manage(commands::ai_providers::ProviderRegistryState(provider_registry)) // Arc<ProviderRegistry>
+        .manage(commands::ai_providers::ProviderRegistryState(
+            provider_registry,
+        )) // Arc<ProviderRegistry>
         .manage(settings_manager) // Arc<Mutex<SettingsManager>>
         .manage(commands::agents::AgentRegistryState(agent_registry)) // Arc<AgentRegistry>
-        .manage(commands::reflection::ReflectionEngineState(reflection_engine)) // Arc<ReflectionEngine>
+        .manage(commands::reflection::ReflectionEngineState(
+            reflection_engine,
+        )) // Arc<ReflectionEngine>
+        .manage(commands::router::IntelligentRouterState(intelligent_router)) // Arc<RwLock<IntelligentRouter>>
         .setup(|app| {
             use tauri::Manager;
 
@@ -288,6 +296,17 @@ pub fn run() {
             commands::list_security_policies,
             commands::remove_security_policy,
             commands::evaluate_task_quality,
+            // Router commands (PHASE 3 - Intelligent Routing)
+            commands::get_router_config,
+            commands::update_router_config,
+            commands::get_router_stats,
+            commands::complete_with_routing,
+            commands::stream_with_routing,
+            commands::embed_with_routing,
+            commands::add_provider_to_router,
+            commands::remove_provider_from_router,
+            commands::get_router_providers,
+            commands::router_has_providers,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

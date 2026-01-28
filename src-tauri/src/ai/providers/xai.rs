@@ -79,10 +79,24 @@ impl AIProvider for XAIProvider {
     /// Get available models
     async fn available_models(&self) -> ProviderResult<Vec<String>> {
         Ok(vec![
+            // Grok 4.1 Family (2M context)
+            "grok-4-1-fast-reasoning".to_string(),
+            "grok-4-1-fast-non-reasoning".to_string(),
+            // Grok 4 Family (256K context)
+            "grok-4-fast-reasoning".to_string(),
+            "grok-4-fast-non-reasoning".to_string(),
+            "grok-4".to_string(),
+            // Grok 3 Family (200K context)
             "grok-3".to_string(),
             "grok-3-fast".to_string(),
+            "grok-3-mini".to_string(),
+            "grok-3-mini-reasoning".to_string(),
+            // Grok Code Family (256K context)
+            "grok-code-fast-1".to_string(),
+            // Grok 2 Family (128K context)
             "grok-2".to_string(),
-            "grok-2-fast".to_string(),
+            "grok-2-vision".to_string(),
+            "grok-2-image-1212".to_string(),
         ])
     }
 
@@ -94,14 +108,28 @@ impl AIProvider for XAIProvider {
             streaming: true,
             function_calling: true,
             vision: true,
-            web_search: false,
-            max_context_tokens: 131_072,
-            max_output_tokens: 4096,
+            web_search: true,
+            max_context_tokens: 2_000_000, // grok-4-1 family has 2M context
+            max_output_tokens: 16384,
             models: vec![
+                // Grok 4.1 Family (2M context)
+                "grok-4-1-fast-reasoning".to_string(),
+                "grok-4-1-fast-non-reasoning".to_string(),
+                // Grok 4 Family (256K context)
+                "grok-4-fast-reasoning".to_string(),
+                "grok-4-fast-non-reasoning".to_string(),
+                "grok-4".to_string(),
+                // Grok 3 Family (200K context)
                 "grok-3".to_string(),
                 "grok-3-fast".to_string(),
+                "grok-3-mini".to_string(),
+                "grok-3-mini-reasoning".to_string(),
+                // Grok Code Family (256K context)
+                "grok-code-fast-1".to_string(),
+                // Grok 2 Family (128K context)
                 "grok-2".to_string(),
-                "grok-2-fast".to_string(),
+                "grok-2-vision".to_string(),
+                "grok-2-image-1212".to_string(),
             ],
         })
     }
@@ -221,11 +249,11 @@ impl XAIProvider {
                     // Parse SSE data
                     if let Ok(chunk) = serde_json::from_str::<XAIStreamingChunk>(data) {
                         if let Some(delta) = chunk.choices.first().and_then(|c| c.delta.content.clone()) {
-                            callback(StreamingChunk {
+                            let _ = callback(StreamingChunk {
                                 content: delta,
                                 is_final: false,
                                 finish_reason: chunk.choices.first().and_then(|c| c.finish_reason.clone()),
-                            }).map_err(|e| AIError::Internal(format!("Streaming callback error: {}", e)))?;
+                            });
                         }
                     }
                 }
@@ -383,7 +411,7 @@ pub struct XAIDelta {
 }
 
 /// xAI Provider Factory
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct XAIProviderFactory;
 
 #[async_trait]
@@ -469,8 +497,6 @@ mod tests {
 
     #[test]
     fn test_xai_factory_validate_config() {
-        let factory = XAIProviderFactory;
-
         // Valid config
         let valid_config = ProviderConfig {
             id: ProviderId::new("xai-valid"),
@@ -484,7 +510,7 @@ mod tests {
             rate_limit: None,
             timeout: 300,
         };
-        assert!(factory.validate_config(&valid_config).is_ok());
+        assert!(XAIProviderFactory::validate_config(&valid_config).is_ok());
 
         // Invalid config (no API key)
         let invalid_config = ProviderConfig {
@@ -499,6 +525,6 @@ mod tests {
             rate_limit: None,
             timeout: 300,
         };
-        assert!(factory.validate_config(&invalid_config).is_err());
+        assert!(XAIProviderFactory::validate_config(&invalid_config).is_err());
     }
 }

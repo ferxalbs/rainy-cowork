@@ -5,6 +5,64 @@ All notable changes to Rainy Cowork will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.3] - 2026-01-28 - PHASE 3: Intelligent Router Integration
+
+### Added - PHASE 3: Intelligent Router Commands
+
+**Rust Backend (`src-tauri/src/`)**
+
+- `commands/router.rs` - IntelligentRouter Tauri commands (10 commands):
+  - `get_router_config` - Retrieve router configuration (load balancing, fallback, circuit breaker settings)
+  - `update_router_config` - Update router configuration dynamically
+  - `get_router_stats` - Get router statistics (provider count, healthy providers, open circuits)
+  - `complete_with_routing` - Chat completion with intelligent provider selection
+  - `stream_with_routing` - Streaming chat with Tauri v2 channels for real-time events
+  - `embed_with_routing` - Embeddings with intelligent provider selection
+  - `add_provider_to_router` - Add a provider to the intelligent router
+  - `remove_provider_from_router` - Remove a provider from the router
+  - `get_router_providers` - List all providers in the router
+  - `router_has_providers` - Check if router has any providers
+
+- `commands/mod.rs` - Added router module export and re-exports
+
+- `lib.rs` - Updated to:
+  - Initialize IntelligentRouter state with `Arc<RwLock<IntelligentRouter>>`
+  - Register IntelligentRouterState for Tauri state management
+  - Register all 10 router commands
+
+**Frontend (`src/`)**
+
+- `services/tauri.ts` - Added TypeScript types and functions:
+  - `RouterConfigDto` - Router configuration interface
+  - `RouterStatsDto` - Router statistics interface
+  - `RoutedChatRequest` - Chat request with routing options
+  - `RoutedEmbeddingRequest` - Embedding request with routing options
+  - `StreamingEvent` - Discriminated union for streaming events (started/chunk/finished/error)
+  - 10 typed functions for router command invocation
+
+- `hooks/useIntelligentRouter.ts` - New React hook for intelligent routing:
+  - Configuration management (get/update)
+  - Provider management (add/remove/list)
+  - Routed completions (complete/stream/embed)
+  - Streaming state management with content accumulation
+  - Error handling and loading states
+
+- `hooks/index.ts` - Exported useIntelligentRouter hook
+
+### Technical
+
+- IntelligentRouter now integrated at application level
+- Streaming uses Tauri v2 Channel API for efficient real-time events
+- Router state is protected by `RwLock` for thread-safe access
+- All router components (LoadBalancer, CostOptimizer, FallbackChain, CircuitBreaker) are now accessible
+
+### Notes
+
+- Streaming implementation uses Tauri channels for ordered event delivery
+- Router configuration can be updated at runtime without restart
+- Provider health and circuit breaker states are tracked per-provider
+- Cost optimization considers token pricing and budget limits
+
 ## [0.5.2] - 2026-01-28 - PHASE 3: xAI Provider Implementation
 
 ### Added - PHASE 3: xAI (Grok) Provider Implementation
@@ -31,6 +89,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Proper validation for xAI provider type
 
 ### Notes
+
 - xAI API uses OpenAI-compatible endpoints at https://api.x.ai/v1
 - Grok-3 is the default model with 131K context window
 - Streaming support via Server-Sent Events (SSE)
@@ -73,6 +132,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Proper validation for each provider type
 
 ### Notes
+
 - Google Gemini provider already exists at `ai/gemini.rs` with full Gemini 3 support
 - Gemini 3 models include: gemini-3-flash-minimal, gemini-3-flash-high, gemini-2.5-flash-lite
 - Existing Gemini implementation supports thinking levels and multimodal capabilities
@@ -180,24 +240,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.4.2] - 2026-01-27 - PHASE 2: Intelligence Layer Complete
 
 ### Multi-Agent System
+
 - DirectorAgent for task decomposition and orchestration
 - 6 Specialized Agents (Researcher, Executor, Creator, Designer, Developer, Analyst)
 - CriticAgent for quality evaluation and improvement suggestions
 - GovernorAgent for security policy enforcement and compliance
 
 ### Memory System
+
 - ShortTermMemory with RingBuffer (100 entries)
 - LongTermMemory with LanceDB integration (structure ready)
 - MemoryManager coordinating both memory types
 - 9 Tauri commands for memory management
 
 ### Reflection & Self-Improvement
+
 - ReflectionEngine for error pattern recognition
 - Strategy optimization and learning
 - Post-task analysis loop
 - 9 Tauri commands for reflection and governance
 
 ### Architecture
+
 - Agent trait with 7 methods
 - BaseAgent with common functionality
 - AgentRegistry for agent lifecycle management
@@ -207,9 +271,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Comprehensive unit tests for all components
 
 ### Breaking Changes
+
 - None
 
 ### Migration Notes
+
 - All PHASE 1 features remain compatible
 - Multi-agent system is opt-in via Tauri commands
 - Memory system integrates with existing workspace context
