@@ -189,9 +189,9 @@ impl AgentRegistry {
         let agent_id = self.task_manager.assign_task(task.clone()).await?;
 
         // Get agent
-        let agent = self
-            .get_agent(&agent_id)
-            .ok_or_else(|| AgentError::TaskExecutionFailed(format!("Agent {} not found", agent_id)))?;
+        let agent = self.get_agent(&agent_id).ok_or_else(|| {
+            AgentError::TaskExecutionFailed(format!("Agent {} not found", agent_id))
+        })?;
 
         // Execute task asynchronously
         let agent_clone = agent.clone();
@@ -220,9 +220,7 @@ impl AgentRegistry {
                 Err(e) => {
                     // Handle error
                     agent_clone
-                        .update_status(crate::agents::types::AgentStatus::Error(
-                            e.to_string(),
-                        ))
+                        .update_status(crate::agents::types::AgentStatus::Error(e.to_string()))
                         .await;
                     eprintln!("Task {} failed: {}", task_id, e);
                 }
@@ -392,7 +390,6 @@ impl Clone for AgentRegistry {
 mod tests {
     use super::*;
     use crate::agents::base_agent::BaseAgent;
-    use crate::agents::types::{AgentType, TaskContext, TaskPriority};
 
     #[tokio::test]
     async fn test_registry_creation() {
@@ -418,7 +415,11 @@ mod tests {
         };
 
         let message_bus = registry.message_bus();
-        let agent = Arc::new(BaseAgent::new(config.clone(), registry.ai_provider(), message_bus));
+        let agent = Arc::new(BaseAgent::new(
+            config.clone(),
+            registry.ai_provider(),
+            message_bus,
+        ));
 
         let result = registry.register_agent(agent, config).await;
         assert!(result.is_ok());
@@ -446,7 +447,11 @@ mod tests {
             registry.ai_provider(),
             message_bus.clone(),
         ));
-        let agent2 = Arc::new(BaseAgent::new(config.clone(), registry.ai_provider(), message_bus));
+        let agent2 = Arc::new(BaseAgent::new(
+            config.clone(),
+            registry.ai_provider(),
+            message_bus,
+        ));
 
         let result1 = registry.register_agent(agent1, config.clone()).await;
         assert!(result1.is_ok());
@@ -469,7 +474,11 @@ mod tests {
         };
 
         let message_bus = registry.message_bus();
-        let agent = Arc::new(BaseAgent::new(config.clone(), registry.ai_provider(), message_bus));
+        let agent = Arc::new(BaseAgent::new(
+            config.clone(),
+            registry.ai_provider(),
+            message_bus,
+        ));
 
         registry.register_agent(agent, config).await.unwrap();
 
@@ -507,7 +516,11 @@ mod tests {
             registry.ai_provider(),
             message_bus.clone(),
         ));
-        let agent2 = Arc::new(BaseAgent::new(config2.clone(), registry.ai_provider(), message_bus));
+        let agent2 = Arc::new(BaseAgent::new(
+            config2.clone(),
+            registry.ai_provider(),
+            message_bus,
+        ));
 
         registry.register_agent(agent1, config1).await.unwrap();
         registry.register_agent(agent2, config2).await.unwrap();
@@ -530,7 +543,11 @@ mod tests {
         };
 
         let message_bus = registry.message_bus();
-        let agent = Arc::new(BaseAgent::new(config.clone(), registry.ai_provider(), message_bus));
+        let agent = Arc::new(BaseAgent::new(
+            config.clone(),
+            registry.ai_provider(),
+            message_bus,
+        ));
 
         registry.register_agent(agent, config).await.unwrap();
 
@@ -555,7 +572,11 @@ mod tests {
         };
 
         let message_bus = registry.message_bus();
-        let agent = Arc::new(BaseAgent::new(config.clone(), registry.ai_provider(), message_bus));
+        let agent = Arc::new(BaseAgent::new(
+            config.clone(),
+            registry.ai_provider(),
+            message_bus,
+        ));
 
         registry.register_agent(agent, config).await.unwrap();
 
@@ -577,7 +598,11 @@ mod tests {
         };
 
         let message_bus = registry.message_bus();
-        let agent = Arc::new(BaseAgent::new(config.clone(), registry.ai_provider(), message_bus));
+        let agent = Arc::new(BaseAgent::new(
+            config.clone(),
+            registry.ai_provider(),
+            message_bus,
+        ));
 
         registry.register_agent(agent, config).await.unwrap();
 
@@ -599,7 +624,11 @@ mod tests {
         };
 
         let message_bus = registry.message_bus();
-        let agent = Arc::new(BaseAgent::new(config.clone(), registry.ai_provider(), message_bus));
+        let agent = Arc::new(BaseAgent::new(
+            config.clone(),
+            registry.ai_provider(),
+            message_bus,
+        ));
 
         registry.register_agent(agent, config).await.unwrap();
 
@@ -648,7 +677,11 @@ mod tests {
         };
 
         let message_bus = registry.message_bus();
-        let agent = Arc::new(BaseAgent::new(config.clone(), registry.ai_provider(), message_bus));
+        let agent = Arc::new(BaseAgent::new(
+            config.clone(),
+            registry.ai_provider(),
+            message_bus,
+        ));
 
         registry.register_agent(agent, config).await.unwrap();
 

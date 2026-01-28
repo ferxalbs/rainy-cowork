@@ -6,7 +6,9 @@ pub mod streaming;
 pub mod usage_analytics;
 pub mod web_search;
 
-pub use embeddings::{EmbeddingService, EmbeddingBatchRequest, EmbeddingBatchResponse};
-pub use streaming::{StreamingService, StreamingRequest, StreamingResponse};
-pub use usage_analytics::{UsageAnalytics, ProviderUsage, TotalUsage, UsageStatistics, UsageReport};
-pub use web_search::{WebSearchService, SearchResults, SearchResult};
+// PHASE 3 features - use via full path when needed:
+// - embeddings::{EmbeddingService, EmbeddingBatchRequest, EmbeddingBatchResponse}
+// - streaming::{StreamingService, StreamingRequest, StreamingResponse}
+// - usage_analytics::{UsageAnalytics, ProviderUsage, TotalUsage, UsageStatistics, UsageReport}
+// - web_search::{WebSearchService, SearchResults, SearchResult}
+

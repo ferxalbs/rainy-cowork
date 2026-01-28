@@ -3,8 +3,8 @@
 //! This module provides Tauri commands that expose the memory system to the frontend.
 //! All commands are thread-safe and use the MemoryManager for operations.
 
-use crate::services::memory::MemoryManager;
 use crate::agents::MemoryEntry;
+use crate::services::memory::MemoryManager;
 use tauri::State;
 
 /// State wrapper for MemoryManager
@@ -51,8 +51,7 @@ pub async fn store_memory(
         tags,
     };
 
-    manager.0.store(entry).await
-        .map_err(|e| e.to_string())?;
+    manager.0.store(entry).await.map_err(|e| e.to_string())?;
 
     Ok("Stored successfully".to_string())
 }
@@ -88,7 +87,10 @@ pub async fn search_memory(
     limit: Option<usize>,
 ) -> Result<Vec<MemoryEntry>, String> {
     let limit = limit.unwrap_or(10);
-    manager.0.search(&query, limit).await
+    manager
+        .0
+        .search(&query, limit)
+        .await
         .map_err(|e| e.to_string())
 }
 
@@ -170,9 +172,7 @@ pub async fn get_all_short_term_memory(
 /// await invoke('clear_short_term_memory');
 /// ```
 #[tauri::command]
-pub async fn clear_short_term_memory(
-    manager: State<'_, MemoryManagerState>,
-) -> Result<(), String> {
+pub async fn clear_short_term_memory(manager: State<'_, MemoryManagerState>) -> Result<(), String> {
     manager.0.clear_short_term().await;
     Ok(())
 }
@@ -201,8 +201,7 @@ pub async fn clear_short_term_memory(
 pub async fn get_memory_stats(
     manager: State<'_, MemoryManagerState>,
 ) -> Result<crate::services::memory::long_term::MemoryStats, String> {
-    manager.0.get_stats().await
-        .map_err(|e| e.to_string())
+    manager.0.get_stats().await.map_err(|e| e.to_string())
 }
 
 /// Get entry by ID
@@ -232,8 +231,7 @@ pub async fn get_memory_by_id(
     manager: State<'_, MemoryManagerState>,
     id: String,
 ) -> Result<Option<MemoryEntry>, String> {
-    manager.0.get_by_id(&id).await
-        .map_err(|e| e.to_string())
+    manager.0.get_by_id(&id).await.map_err(|e| e.to_string())
 }
 
 /// Delete entry from long-term memory
@@ -263,8 +261,7 @@ pub async fn delete_memory(
     manager: State<'_, MemoryManagerState>,
     id: String,
 ) -> Result<(), String> {
-    manager.0.delete(&id).await
-        .map_err(|e| e.to_string())
+    manager.0.delete(&id).await.map_err(|e| e.to_string())
 }
 
 /// Get short-term memory size
@@ -323,14 +320,14 @@ pub async fn is_short_term_memory_empty(
 mod tests {
     use super::*;
     use crate::services::memory::MemoryManager;
-    use std::path::PathBuf;
     use tempfile::TempDir;
 
     fn create_test_manager() -> MemoryManagerState {
         let temp_dir = TempDir::new().unwrap();
-        MemoryManagerState(std::sync::Arc::new(
-            MemoryManager::new(10, temp_dir.path().to_path_buf())
-        ))
+        MemoryManagerState(std::sync::Arc::new(MemoryManager::new(
+            10,
+            temp_dir.path().to_path_buf(),
+        )))
     }
 
     // Helper function to simulate Tauri State
@@ -346,7 +343,8 @@ mod tests {
             as_state(&manager),
             "Test entry".to_string(),
             vec!["test".to_string()],
-        ).await;
+        )
+        .await;
 
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "Stored successfully");
@@ -357,17 +355,11 @@ mod tests {
         let manager = create_test_manager();
 
         // Store an entry first
-        store_memory(
-            as_state(&manager),
-            "Test entry".to_string(),
-            vec![],
-        ).await.unwrap();
+        store_memory(as_state(&manager), "Test entry".to_string(), vec![])
+            .await
+            .unwrap();
 
-        let result = search_memory(
-            as_state(&manager),
-            "test".to_string(),
-            Some(10),
-        ).await;
+        let result = search_memory(as_state(&manager), "test".to_string(), Some(10)).await;
 
         assert!(result.is_ok());
         let results = result.unwrap();
@@ -380,17 +372,12 @@ mod tests {
 
         // Store some entries
         for i in 0..3 {
-            store_memory(
-                as_state(&manager),
-                format!("Entry {}", i),
-                vec![],
-            ).await.unwrap();
+            store_memory(as_state(&manager), format!("Entry {}", i), vec![])
+                .await
+                .unwrap();
         }
 
-        let result = get_recent_memory(
-            as_state(&manager),
-            Some(2),
-        ).await;
+        let result = get_recent_memory(as_state(&manager), Some(2)).await;
 
         assert!(result.is_ok());
         let recent = result.unwrap();
@@ -402,18 +389,18 @@ mod tests {
         let manager = create_test_manager();
 
         // Store an entry
-        store_memory(
-            as_state(&manager),
-            "Test entry".to_string(),
-            vec![],
-        ).await.unwrap();
+        store_memory(as_state(&manager), "Test entry".to_string(), vec![])
+            .await
+            .unwrap();
 
         // Clear memory
         let result = clear_short_term_memory(as_state(&manager)).await;
         assert!(result.is_ok());
 
         // Verify it's empty
-        let size = get_short_term_memory_size(as_state(&manager)).await.unwrap();
+        let size = get_short_term_memory_size(as_state(&manager))
+            .await
+            .unwrap();
         assert_eq!(size, 0);
     }
 
@@ -431,17 +418,19 @@ mod tests {
     async fn test_get_short_term_memory_size_command() {
         let manager = create_test_manager();
 
-        let size = get_short_term_memory_size(as_state(&manager)).await.unwrap();
+        let size = get_short_term_memory_size(as_state(&manager))
+            .await
+            .unwrap();
         assert_eq!(size, 0);
 
         // Store an entry
-        store_memory(
-            as_state(&manager),
-            "Test entry".to_string(),
-            vec![],
-        ).await.unwrap();
+        store_memory(as_state(&manager), "Test entry".to_string(), vec![])
+            .await
+            .unwrap();
 
-        let size = get_short_term_memory_size(as_state(&manager)).await.unwrap();
+        let size = get_short_term_memory_size(as_state(&manager))
+            .await
+            .unwrap();
         assert_eq!(size, 1);
     }
 
@@ -449,17 +438,19 @@ mod tests {
     async fn test_is_short_term_memory_empty_command() {
         let manager = create_test_manager();
 
-        let is_empty = is_short_term_memory_empty(as_state(&manager)).await.unwrap();
+        let is_empty = is_short_term_memory_empty(as_state(&manager))
+            .await
+            .unwrap();
         assert!(is_empty);
 
         // Store an entry
-        store_memory(
-            as_state(&manager),
-            "Test entry".to_string(),
-            vec![],
-        ).await.unwrap();
+        store_memory(as_state(&manager), "Test entry".to_string(), vec![])
+            .await
+            .unwrap();
 
-        let is_empty = is_short_term_memory_empty(as_state(&manager)).await.unwrap();
+        let is_empty = is_short_term_memory_empty(as_state(&manager))
+            .await
+            .unwrap();
         assert!(!is_empty);
     }
 }

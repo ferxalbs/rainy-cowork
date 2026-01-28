@@ -1,17 +1,19 @@
 // AI Providers Module
 // Individual provider implementations
 
-pub mod rainy_sdk;
-pub mod openai;
 pub mod anthropic;
+pub mod openai;
+pub mod rainy_sdk;
 pub mod xai;
 
-// Re-exports
-pub use rainy_sdk::{RainySDKProvider, RainySDKProviderFactory};
-pub use openai::{OpenAIProvider, OpenAIProviderFactory};
-pub use anthropic::{AnthropicProvider, AnthropicProviderFactory};
-pub use xai::{XAIProvider, XAIProviderFactory};
+// Only re-export factories (which are used for registration)
+pub use anthropic::AnthropicProviderFactory;
+pub use openai::OpenAIProviderFactory;
+pub use rainy_sdk::RainySDKProviderFactory;
+pub use xai::XAIProviderFactory;
 
-// Future providers (to be implemented):
-// pub mod ollama;
-// pub mod custom;
+// Provider types available via full path when needed:
+// - rainy_sdk::RainySDKProvider
+// - openai::OpenAIProvider
+// - anthropic::AnthropicProvider
+// - xai::XAIProvider

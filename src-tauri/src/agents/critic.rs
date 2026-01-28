@@ -3,13 +3,12 @@
 //! The CriticAgent evaluates task results for quality, accuracy, and coherence,
 //! providing actionable improvement suggestions to enhance overall system performance.
 
-use std::sync::Arc;
 use async_trait::async_trait;
+use std::sync::Arc;
 
 use crate::agents::{
-    Agent, AgentConfig, AgentError, AgentInfo, AgentMessage,
-    AgentStatus, AgentType, Task, TaskResult, TaskPriority,
-    BaseAgent, AgentRegistry,
+    Agent, AgentConfig, AgentError, AgentInfo, AgentMessage, AgentRegistry, AgentStatus, AgentType,
+    BaseAgent, Task, TaskResult,
 };
 
 /// CriticAgent evaluates task results and provides quality assessments
@@ -20,10 +19,7 @@ pub struct CriticAgent {
 
 impl CriticAgent {
     /// Create a new CriticAgent instance
-    pub fn new(
-        config: AgentConfig,
-        registry: Arc<AgentRegistry>,
-    ) -> Self {
+    pub fn new(config: AgentConfig, registry: Arc<AgentRegistry>) -> Self {
         let ai_provider = registry.ai_provider();
         let message_bus = registry.message_bus();
         let base = BaseAgent::new(config, ai_provider, message_bus);
@@ -43,24 +39,24 @@ impl CriticAgent {
             - accuracy (assessment)\n\
             - coherence (assessment)\n\
             - suggestions (array of improvement suggestions)",
-            result.success,
-            result.output,
-            result.errors
+            result.success, result.output, result.errors
         );
 
         let response = self.base.query_ai(&prompt).await?;
 
         // Parse AI response
-        let evaluation: QualityEvaluation = serde_json::from_str(&response)
-            .map_err(|e| AgentError::TaskExecutionFailed(
-                format!("Failed to parse evaluation: {}", e)
-            ))?;
+        let evaluation: QualityEvaluation = serde_json::from_str(&response).map_err(|e| {
+            AgentError::TaskExecutionFailed(format!("Failed to parse evaluation: {}", e))
+        })?;
 
         Ok(evaluation)
     }
 
     /// Provide improvement suggestions for a task result
-    pub async fn suggest_improvements(&self, result: &TaskResult) -> Result<Vec<String>, AgentError> {
+    pub async fn suggest_improvements(
+        &self,
+        result: &TaskResult,
+    ) -> Result<Vec<String>, AgentError> {
         let evaluation = self.evaluate_result(result).await?;
         Ok(evaluation.suggestions)
     }
@@ -110,12 +106,14 @@ impl Agent for CriticAgent {
         self.base.set_current_task(Some(task.id.clone())).await;
 
         // Evaluate result from task context
-        let evaluation = self.evaluate_result(&TaskResult {
-            success: true,
-            output: task.description.clone(),
-            errors: vec![],
-            metadata: serde_json::json!({}),
-        }).await?;
+        let evaluation = self
+            .evaluate_result(&TaskResult {
+                success: true,
+                output: task.description.clone(),
+                errors: vec![],
+                metadata: serde_json::json!({}),
+            })
+            .await?;
 
         self.base.update_status(AgentStatus::Idle).await;
         self.base.set_current_task(None).await;
@@ -152,10 +150,10 @@ impl Agent for CriticAgent {
     }
 
     fn can_handle(&self, task: &Task) -> bool {
-        task.description.contains("evaluate") ||
-        task.description.contains("review") ||
-        task.description.contains("critique") ||
-        task.description.contains("assess")
+        task.description.contains("evaluate")
+            || task.description.contains("review")
+            || task.description.contains("critique")
+            || task.description.contains("assess")
     }
 
     async fn initialize(&mut self, config: AgentConfig) -> Result<(), AgentError> {
@@ -170,6 +168,7 @@ impl Agent for CriticAgent {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::agents::TaskPriority;
 
     #[test]
     fn test_quality_evaluation_serialization() {

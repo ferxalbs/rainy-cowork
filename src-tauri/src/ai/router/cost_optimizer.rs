@@ -2,7 +2,7 @@
 // Selects providers based on cost efficiency
 
 use crate::ai::provider_trait::ProviderWithStats;
-use crate::ai::provider_types::{ProviderId, ProviderType};
+use crate::ai::provider_types::ProviderId;
 use std::collections::HashMap;
 
 /// Cost per 1K tokens for different providers
@@ -27,7 +27,7 @@ impl ProviderCost {
 impl Default for ProviderCost {
     fn default() -> Self {
         Self {
-            input_cost_per_1k: 0.001, // $0.001 per 1K input tokens
+            input_cost_per_1k: 0.001,  // $0.001 per 1K input tokens
             output_cost_per_1k: 0.002, // $0.002 per 1K output tokens
         }
     }
@@ -98,7 +98,11 @@ impl CostOptimizer {
     }
 
     /// Select the most cost-effective provider
-    pub fn select_provider(&self, estimated_input_tokens: u32, estimated_output_tokens: u32) -> Option<std::sync::Arc<ProviderWithStats>> {
+    pub fn select_provider(
+        &self,
+        estimated_input_tokens: u32,
+        estimated_output_tokens: u32,
+    ) -> Option<std::sync::Arc<ProviderWithStats>> {
         if self.providers.is_empty() {
             return None;
         }
@@ -109,7 +113,8 @@ impl CostOptimizer {
 
         for provider in &self.providers {
             if let Some(cost) = self.config.provider_costs.get(provider.provider().id()) {
-                let provider_cost = cost.calculate_cost(estimated_input_tokens, estimated_output_tokens);
+                let provider_cost =
+                    cost.calculate_cost(estimated_input_tokens, estimated_output_tokens);
 
                 // Check budget limit
                 if let Some(budget) = self.config.budget_limit {

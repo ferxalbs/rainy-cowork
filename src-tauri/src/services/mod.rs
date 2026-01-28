@@ -20,9 +20,12 @@ pub use file_manager::FileManager;
 pub use file_operations::FileOperationEngine;
 pub use folder_manager::FolderManager;
 pub use image::ImageService;
-pub use memory::{MemoryManager, MemoryError, MemoryStats};
-pub use reflection::{ReflectionEngine, Reflection, ErrorPattern, Strategy, OptimizationReport};
+pub use memory::MemoryManager;
+pub use reflection::ReflectionEngine;
 pub use settings::SettingsManager;
 pub use task_manager::TaskManager;
 pub use web_research::WebResearchService;
-pub use workspace::{ConfigFormat, PermissionOverride, Workspace, WorkspaceManager, WorkspaceAnalytics, WorkspacePermissions, WorkspaceTemplate};
+pub use workspace::{
+    ConfigFormat, PermissionOverride, Workspace, WorkspaceAnalytics, WorkspaceManager,
+    WorkspacePermissions, WorkspaceTemplate,
+};

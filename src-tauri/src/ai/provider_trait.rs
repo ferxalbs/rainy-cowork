@@ -7,7 +7,7 @@ use crate::ai::provider_types::{
     ProviderId, ProviderType, ProviderCapabilities, ProviderHealth,
     ChatCompletionRequest, ChatCompletionResponse,
     EmbeddingRequest, EmbeddingResponse,
-    StreamingChunk, StreamingCallback,
+    StreamingCallback,
     ProviderResult,
 };
 

@@ -1,19 +1,17 @@
 // Intelligent Router
 // Orchestrates load balancing, cost optimization, capability matching, and fallback
 
-use std::sync::Arc;
 use crate::ai::provider_trait::ProviderWithStats;
 use crate::ai::provider_types::{
-    ProviderId, ChatCompletionRequest, ChatCompletionResponse,
-    EmbeddingRequest, EmbeddingResponse,
-    StreamingChunk, StreamingCallback,
-    ProviderResult, AIError,
+    AIError, ChatCompletionRequest, ChatCompletionResponse, EmbeddingRequest, EmbeddingResponse,
+    ProviderId, ProviderResult, StreamingCallback,
 };
-use crate::ai::router::{
-    LoadBalancer, CostOptimizer, CapabilityMatcher, FallbackChain, CircuitBreaker,
-};
-use crate::ai::router::load_balancer::LoadBalancingStrategy;
 use crate::ai::router::fallback_chain::FallbackStrategy;
+use crate::ai::router::load_balancer::LoadBalancingStrategy;
+use crate::ai::router::{
+    CapabilityMatcher, CircuitBreaker, CostOptimizer, FallbackChain, LoadBalancer,
+};
+use std::sync::Arc;
 
 /// Router configuration
 #[derive(Debug, Clone)]
@@ -87,10 +85,8 @@ impl IntelligentRouter {
         self.fallback_chain.add_provider(provider.clone());
 
         // Create circuit breaker for provider
-        self.circuit_breakers.insert(
-            provider_id.clone(),
-            CircuitBreaker::default(),
-        );
+        self.circuit_breakers
+            .insert(provider_id.clone(), CircuitBreaker::default());
     }
 
     /// Remove a provider from the router
@@ -104,7 +100,8 @@ impl IntelligentRouter {
 
     /// Get a provider by ID
     pub fn get_provider(&self, provider_id: &ProviderId) -> Option<Arc<ProviderWithStats>> {
-        self.load_balancer.providers()
+        self.load_balancer
+            .providers()
             .iter()
             .find(|p| p.provider().id() == provider_id)
             .cloned()
@@ -174,9 +171,8 @@ impl IntelligentRouter {
         }
 
         // All attempts failed
-        Err(last_error.unwrap_or_else(|| {
-            AIError::Internal("All provider attempts failed".to_string())
-        }))
+        Err(last_error
+            .unwrap_or_else(|| AIError::Internal("All provider attempts failed".to_string())))
     }
 
     /// Complete a chat request with streaming
@@ -242,16 +238,12 @@ impl IntelligentRouter {
         }
 
         // All attempts failed
-        Err(last_error.unwrap_or_else(|| {
-            AIError::Internal("All provider attempts failed".to_string())
-        }))
+        Err(last_error
+            .unwrap_or_else(|| AIError::Internal("All provider attempts failed".to_string())))
     }
 
     /// Generate embeddings with intelligent routing
-    pub async fn embed(
-        &self,
-        request: EmbeddingRequest,
-    ) -> ProviderResult<EmbeddingResponse> {
+    pub async fn embed(&self, request: EmbeddingRequest) -> ProviderResult<EmbeddingResponse> {
         let mut last_error = None;
 
         for attempt in 0..self.config.max_retries {
@@ -306,9 +298,8 @@ impl IntelligentRouter {
         }
 
         // All attempts failed
-        Err(last_error.unwrap_or_else(|| {
-            AIError::Internal("All provider attempts failed".to_string())
-        }))
+        Err(last_error
+            .unwrap_or_else(|| AIError::Internal("All provider attempts failed".to_string())))
     }
 
     /// Select a provider for a request
@@ -325,22 +316,28 @@ impl IntelligentRouter {
 
         // If cost optimization is enabled, try cost optimizer first
         if self.config.enable_cost_optimization {
-            let estimated_input = request.messages.iter()
+            let estimated_input = request
+                .messages
+                .iter()
                 .map(|m| m.content.len() as u32 / 4) // Rough estimate: 4 chars per token
                 .sum::<u32>();
             let estimated_output = request.max_tokens.unwrap_or(1000);
 
-            if let Some(provider) = self.cost_optimizer.select_provider(
-                estimated_input,
-                estimated_output,
-            ) {
+            if let Some(provider) = self
+                .cost_optimizer
+                .select_provider(estimated_input, estimated_output)
+            {
                 return Some(provider);
             }
         }
 
         // If capability matching is enabled, try capability matcher
         if self.config.enable_capability_matching {
-            if let Some(provider) = self.capability_matcher.select_best_provider(&required).await {
+            if let Some(provider) = self
+                .capability_matcher
+                .select_best_provider(&required)
+                .await
+            {
                 return Some(provider);
             }
         }
@@ -355,12 +352,16 @@ impl IntelligentRouter {
         _request: &EmbeddingRequest,
     ) -> Option<Arc<ProviderWithStats>> {
         // Build required capabilities
-        let required = crate::ai::router::capability_matcher::RequiredCapabilities::new()
-            .require_embeddings();
+        let required =
+            crate::ai::router::capability_matcher::RequiredCapabilities::new().require_embeddings();
 
         // Try capability matcher first
         if self.config.enable_capability_matching {
-            if let Some(provider) = self.capability_matcher.select_best_provider(&required).await {
+            if let Some(provider) = self
+                .capability_matcher
+                .select_best_provider(&required)
+                .await
+            {
                 return Some(provider);
             }
         }
@@ -380,15 +381,14 @@ impl IntelligentRouter {
 
     /// Count healthy providers
     fn count_healthy_providers(&self) -> usize {
-        self.load_balancer.providers()
+        self.load_balancer
+            .providers()
             .iter()
             .filter(|p| {
                 let provider_id = p.provider().id();
                 if let Some(cb) = self.circuit_breakers.get(provider_id) {
                     // Use blocking call for stats
-                    let state = futures::executor::block_on(async {
-                        cb.state().await
-                    });
+                    let state = futures::executor::block_on(async { cb.state().await });
                     state == crate::ai::router::circuit_breaker::CircuitState::Closed
                 } else {
                     true
@@ -402,9 +402,7 @@ impl IntelligentRouter {
         self.circuit_breakers
             .values()
             .filter(|cb| {
-                let state = futures::executor::block_on(async {
-                    cb.state().await
-                });
+                let state = futures::executor::block_on(async { cb.state().await });
                 state == crate::ai::router::circuit_breaker::CircuitState::Open
             })
             .count()

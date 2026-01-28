@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use super::director_agent::{AssignmentStatus, DirectorAgent, SubTask};
 use super::*;
 use crate::ai::provider::AIProviderManager;
 

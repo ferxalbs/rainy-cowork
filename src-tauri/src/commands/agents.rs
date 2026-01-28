@@ -29,8 +29,8 @@
 // ```
 
 use crate::agents::{
-    Agent, AgentConfig, AgentError, AgentInfo, AgentMessage, AgentRegistry, AgentType, Task,
-    TaskContext, TaskPriority, TaskResult,
+    Agent, AgentConfig, AgentInfo, AgentMessage, AgentRegistry, AgentType, Task, TaskContext,
+    TaskPriority, TaskResult,
 };
 use std::sync::Arc;
 use tauri::State;
@@ -72,59 +72,43 @@ pub async fn register_agent(
             Arc::new(director)
         }
         "researcher" => {
-            let researcher = crate::agents::researcher::ResearcherAgent::new(
-                config.clone(),
-                registry.0.clone(),
-            );
+            let researcher =
+                crate::agents::researcher::ResearcherAgent::new(config.clone(), registry.0.clone());
             Arc::new(researcher)
         }
         "executor" => {
-            let executor = crate::agents::executor::ExecutorAgent::new(
-                config.clone(),
-                registry.0.clone(),
-            );
+            let executor =
+                crate::agents::executor::ExecutorAgent::new(config.clone(), registry.0.clone());
             Arc::new(executor)
         }
         "creator" => {
-            let creator = crate::agents::creator::CreatorAgent::new(
-                config.clone(),
-                registry.0.clone(),
-            );
+            let creator =
+                crate::agents::creator::CreatorAgent::new(config.clone(), registry.0.clone());
             Arc::new(creator)
         }
         "designer" => {
-            let designer = crate::agents::designer::DesignerAgent::new(
-                config.clone(),
-                registry.0.clone(),
-            );
+            let designer =
+                crate::agents::designer::DesignerAgent::new(config.clone(), registry.0.clone());
             Arc::new(designer)
         }
         "developer" => {
-            let developer = crate::agents::developer::DeveloperAgent::new(
-                config.clone(),
-                registry.0.clone(),
-            );
+            let developer =
+                crate::agents::developer::DeveloperAgent::new(config.clone(), registry.0.clone());
             Arc::new(developer)
         }
         "analyst" => {
-            let analyst = crate::agents::analyst::AnalystAgent::new(
-                config.clone(),
-                registry.0.clone(),
-            );
+            let analyst =
+                crate::agents::analyst::AnalystAgent::new(config.clone(), registry.0.clone());
             Arc::new(analyst)
         }
         "critic" => {
-            let critic = crate::agents::critic::CriticAgent::new(
-                config.clone(),
-                registry.0.clone(),
-            );
+            let critic =
+                crate::agents::critic::CriticAgent::new(config.clone(), registry.0.clone());
             Arc::new(critic)
         }
         "governor" => {
-            let governor = crate::agents::governor::GovernorAgent::new(
-                config.clone(),
-                registry.0.clone(),
-            );
+            let governor =
+                crate::agents::governor::GovernorAgent::new(config.clone(), registry.0.clone());
             Arc::new(governor)
         }
         _ => {
@@ -376,7 +360,10 @@ pub async fn send_agent_message(
         .get_agent(&to_agent_id)
         .ok_or_else(|| format!("Agent {} not found", to_agent_id))?;
 
-    agent.handle_message(message).await.map_err(|e| e.to_string())
+    agent
+        .handle_message(message)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 /// Get pending messages for an agent

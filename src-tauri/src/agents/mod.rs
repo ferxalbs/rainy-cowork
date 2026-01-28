@@ -45,15 +45,15 @@
 pub mod agent_trait;
 pub mod analyst;
 pub mod base_agent;
-pub mod critic;
 pub mod creator;
+pub mod critic;
 pub mod designer;
 pub mod developer;
 pub mod director_agent;
-pub mod executor;
-pub mod governor;
 #[cfg(test)]
 mod director_agent_tests;
+pub mod executor;
+pub mod governor;
 pub mod message_bus;
 pub mod registry;
 pub mod researcher;
@@ -63,21 +63,12 @@ pub mod types;
 
 // Re-export commonly used types for convenience
 pub use agent_trait::{Agent, AgentConfig, AgentError};
-pub use analyst::AnalystAgent;
 pub use base_agent::BaseAgent;
-pub use critic::{CriticAgent, QualityEvaluation};
-pub use creator::CreatorAgent;
-pub use designer::DesignerAgent;
-pub use developer::DeveloperAgent;
-pub use director_agent::{DirectorAgent, SubTask, TaskAssignment, AssignmentStatus};
-pub use executor::ExecutorAgent;
-pub use governor::{GovernorAgent, SecurityPolicy, ApprovalDecision};
-pub use message_bus::MessageBus;
 pub use registry::{AgentRegistry, RegistryStatistics};
-pub use researcher::ResearcherAgent;
-pub use status_monitoring::StatusMonitor;
-pub use task_management::TaskManager;
 pub use types::{
-    AgentInfo, AgentMessage, AgentStatus, AgentType, MemoryEntry, Task, TaskContext,
-    TaskPriority, TaskResult,
+    AgentInfo, AgentMessage, AgentStatus, AgentType, MemoryEntry, Task, TaskContext, TaskPriority,
+    TaskResult,
 };
+
+// PHASE 2 specialized agents - available but not re-exported to avoid dead code
+// Use directly when needed: agents::analyst::AnalystAgent, etc.

@@ -1,17 +1,15 @@
 // Rainy Cowork - AI Provider Commands (PHASE 3)
 // Tauri commands for AI provider management using the new provider registry
 
-use crate::ai::{
-    ProviderRegistry, ProviderId, ProviderType, ProviderConfig, ProviderCapabilities,
-    ProviderHealth, ChatCompletionRequest, ChatCompletionResponse,
-    EmbeddingRequest, EmbeddingResponse, StreamingChunk,
-    AIError, ProviderResult, AIProvider,
-};
-use crate::ai::providers::{
-    RainySDKProviderFactory, OpenAIProviderFactory,
-    AnthropicProviderFactory, XAIProviderFactory
-};
 use crate::ai::provider_trait::AIProviderFactory;
+use crate::ai::providers::{
+    AnthropicProviderFactory, OpenAIProviderFactory, RainySDKProviderFactory, XAIProviderFactory,
+};
+use crate::ai::{
+    AIProvider, ChatCompletionRequest, ChatCompletionResponse, EmbeddingRequest, EmbeddingResponse,
+    ProviderCapabilities, ProviderConfig, ProviderHealth, ProviderId, ProviderRegistry,
+    ProviderType,
+};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tauri::State;
@@ -111,9 +109,13 @@ pub async fn list_all_providers(
         let provider_type = provider_ref.provider_type().to_string();
         let model = provider_ref.default_model().to_string();
         let config = provider_ref.config();
-        let capabilities = provider_ref.capabilities().await
+        let capabilities = provider_ref
+            .capabilities()
+            .await
             .map_err(|e| format!("Failed to get capabilities: {}", e))?;
-        let health = provider_ref.health_check().await
+        let health = provider_ref
+            .health_check()
+            .await
             .map_err(|e| format!("Failed to check health: {}", e))?;
 
         provider_infos.push(ProviderInfo {
@@ -137,13 +139,16 @@ pub async fn get_provider_info(
     registry: State<'_, ProviderRegistryState>,
 ) -> Result<ProviderInfo, String> {
     let provider_id = ProviderId::new(id);
-    let provider = registry.0.get(&provider_id)
-        .map_err(|e| e.to_string())?;
+    let provider = registry.0.get(&provider_id).map_err(|e| e.to_string())?;
     let provider_ref = provider.provider();
 
-    let capabilities = provider_ref.capabilities().await
+    let capabilities = provider_ref
+        .capabilities()
+        .await
         .map_err(|e| format!("Failed to get capabilities: {}", e))?;
-    let health = provider_ref.health_check().await
+    let health = provider_ref
+        .health_check()
+        .await
         .map_err(|e| format!("Failed to check health: {}", e))?;
 
     Ok(ProviderInfo {
@@ -192,25 +197,29 @@ pub async fn register_provider(
         ProviderType::RainySDK => {
             <RainySDKProviderFactory as AIProviderFactory>::validate_config(&config)
                 .map_err(|e| format!("Invalid config: {}", e))?;
-            <RainySDKProviderFactory as AIProviderFactory>::create(config).await
+            <RainySDKProviderFactory as AIProviderFactory>::create(config)
+                .await
                 .map_err(|e| format!("Failed to create provider: {}", e))?
         }
         ProviderType::OpenAI => {
             <OpenAIProviderFactory as AIProviderFactory>::validate_config(&config)
                 .map_err(|e| format!("Invalid config: {}", e))?;
-            <OpenAIProviderFactory as AIProviderFactory>::create(config).await
+            <OpenAIProviderFactory as AIProviderFactory>::create(config)
+                .await
                 .map_err(|e| format!("Failed to create provider: {}", e))?
         }
         ProviderType::Anthropic => {
             <AnthropicProviderFactory as AIProviderFactory>::validate_config(&config)
                 .map_err(|e| format!("Invalid config: {}", e))?;
-            <AnthropicProviderFactory as AIProviderFactory>::create(config).await
+            <AnthropicProviderFactory as AIProviderFactory>::create(config)
+                .await
                 .map_err(|e| format!("Failed to create provider: {}", e))?
         }
         ProviderType::XAI => {
             <XAIProviderFactory as AIProviderFactory>::validate_config(&config)
                 .map_err(|e| format!("Invalid config: {}", e))?;
-            <XAIProviderFactory as AIProviderFactory>::create(config).await
+            <XAIProviderFactory as AIProviderFactory>::create(config)
+                .await
                 .map_err(|e| format!("Failed to create provider: {}", e))?
         }
 
@@ -223,7 +232,9 @@ pub async fn register_provider(
     };
 
     // Register provider
-    registry.0.register(provider)
+    registry
+        .0
+        .register(provider)
         .map_err(|e| format!("Failed to register provider: {}", e))?;
 
     Ok(request.id)
@@ -236,7 +247,9 @@ pub async fn unregister_provider(
     registry: State<'_, ProviderRegistryState>,
 ) -> Result<(), String> {
     let provider_id = ProviderId::new(id);
-    registry.0.unregister(&provider_id)
+    registry
+        .0
+        .unregister(&provider_id)
         .map_err(|e| e.to_string())
 }
 
@@ -247,7 +260,10 @@ pub async fn set_default_provider(
     registry: State<'_, ProviderRegistryState>,
 ) -> Result<(), String> {
     let provider_id = ProviderId::new(id);
-    registry.0.set_default(&provider_id).await
+    registry
+        .0
+        .set_default(&provider_id)
+        .await
         .map_err(|e| e.to_string())
 }
 
@@ -256,13 +272,16 @@ pub async fn set_default_provider(
 pub async fn get_default_provider(
     registry: State<'_, ProviderRegistryState>,
 ) -> Result<ProviderInfo, String> {
-    let provider = registry.0.get_default().await
-        .map_err(|e| e.to_string())?;
+    let provider = registry.0.get_default().await.map_err(|e| e.to_string())?;
     let provider_ref = provider.provider();
 
-    let capabilities = provider_ref.capabilities().await
+    let capabilities = provider_ref
+        .capabilities()
+        .await
         .map_err(|e| format!("Failed to get capabilities: {}", e))?;
-    let health = provider_ref.health_check().await
+    let health = provider_ref
+        .health_check()
+        .await
         .map_err(|e| format!("Failed to check health: {}", e))?;
 
     Ok(ProviderInfo {
@@ -283,7 +302,9 @@ pub async fn get_provider_stats(
     registry: State<'_, ProviderRegistryState>,
 ) -> Result<ProviderStatsDto, String> {
     let provider_id = ProviderId::new(id);
-    let stats = registry.0.get_stats(&provider_id)
+    let stats = registry
+        .0
+        .get_stats(&provider_id)
         .map_err(|e| e.to_string())?;
 
     Ok(ProviderStatsDto {
@@ -328,7 +349,10 @@ pub async fn test_provider_connection(
     registry: State<'_, ProviderRegistryState>,
 ) -> Result<ProviderHealth, String> {
     let provider_id = ProviderId::new(id);
-    let health = registry.0.check_health(&provider_id).await
+    let health = registry
+        .0
+        .check_health(&provider_id)
+        .await
         .map_err(|e| e.to_string())?;
     Ok(health)
 }
@@ -340,7 +364,10 @@ pub async fn get_provider_capabilities(
     registry: State<'_, ProviderRegistryState>,
 ) -> Result<ProviderCapabilities, String> {
     let provider_id = ProviderId::new(id);
-    let capabilities = registry.0.get_capabilities(&provider_id).await
+    let capabilities = registry
+        .0
+        .get_capabilities(&provider_id)
+        .await
         .map_err(|e| e.to_string())?;
     Ok(capabilities)
 }
@@ -356,16 +383,17 @@ pub async fn complete_chat(
         ProviderId::new(id)
     } else {
         // Use default provider
-        let default_provider = registry.0.get_default().await
+        let default_provider = registry
+            .0
+            .get_default()
+            .await
             .map_err(|e| format!("No default provider: {}", e))?;
         default_provider.provider().id().clone()
     };
 
     // Convert messages
-    let messages: Vec<crate::ai::ChatMessage> = request.messages
-        .into_iter()
-        .map(|m| m.into())
-        .collect();
+    let messages: Vec<crate::ai::ChatMessage> =
+        request.messages.into_iter().map(|m| m.into()).collect();
 
     // Determine model
     let model = request.model.unwrap_or_else(|| {
@@ -388,7 +416,10 @@ pub async fn complete_chat(
     };
 
     // Execute completion
-    let response = registry.0.complete(&provider_id, completion_request).await
+    let response = registry
+        .0
+        .complete(&provider_id, completion_request)
+        .await
         .map_err(|e| e.to_string())?;
 
     Ok(response)
@@ -405,7 +436,10 @@ pub async fn generate_embeddings(
         ProviderId::new(id)
     } else {
         // Use default provider
-        let default_provider = registry.0.get_default().await
+        let default_provider = registry
+            .0
+            .get_default()
+            .await
             .map_err(|e| format!("No default provider: {}", e))?;
         default_provider.provider().id().clone()
     };
@@ -424,7 +458,10 @@ pub async fn generate_embeddings(
     };
 
     // Execute embedding
-    let response = registry.0.embed(&provider_id, embedding_request).await
+    let response = registry
+        .0
+        .embed(&provider_id, embedding_request)
+        .await
         .map_err(|e| e.to_string())?;
 
     Ok(response)
@@ -437,18 +474,18 @@ pub async fn get_provider_available_models(
     registry: State<'_, ProviderRegistryState>,
 ) -> Result<Vec<String>, String> {
     let provider_id = ProviderId::new(id);
-    let provider = registry.0.get(&provider_id)
-        .map_err(|e| e.to_string())?;
-    let models = provider.provider().available_models().await
+    let provider = registry.0.get(&provider_id).map_err(|e| e.to_string())?;
+    let models = provider
+        .provider()
+        .available_models()
+        .await
         .map_err(|e| e.to_string())?;
     Ok(models)
 }
 
 /// Clear all providers
 #[tauri::command]
-pub async fn clear_providers(
-    registry: State<'_, ProviderRegistryState>,
-) -> Result<(), String> {
+pub async fn clear_providers(registry: State<'_, ProviderRegistryState>) -> Result<(), String> {
     registry.0.clear();
     Ok(())
 }

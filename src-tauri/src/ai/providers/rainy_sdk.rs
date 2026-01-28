@@ -1,17 +1,15 @@
 // Rainy SDK Provider
 // Wrapper around rainy-sdk v0.6.1 for the new provider abstraction layer
 
-use async_trait::async_trait;
-use std::sync::Arc;
-use crate::ai::provider_types::{
-    ProviderId, ProviderType, ProviderConfig, ProviderCapabilities, ProviderHealth,
-    ChatCompletionRequest, ChatCompletionResponse,
-    EmbeddingRequest, EmbeddingResponse,
-    StreamingChunk, StreamingCallback,
-    ProviderResult, AIError, ChatMessage,
-};
 use crate::ai::provider_trait::{AIProvider, AIProviderFactory};
+use crate::ai::provider_types::{
+    AIError, ChatCompletionRequest, ChatCompletionResponse, ChatMessage, EmbeddingRequest,
+    EmbeddingResponse, ProviderCapabilities, ProviderConfig, ProviderHealth, ProviderId,
+    ProviderResult, ProviderType, StreamingCallback,
+};
+use async_trait::async_trait;
 use rainy_sdk::RainyClient;
+use std::sync::Arc;
 
 /// Rainy SDK provider
 pub struct RainySDKProvider {
@@ -26,11 +24,14 @@ pub struct RainySDKProvider {
 impl RainySDKProvider {
     /// Create a new Rainy SDK provider
     pub fn new(config: ProviderConfig) -> ProviderResult<Self> {
-        let api_key = config.api_key.as_ref()
+        let api_key = config
+            .api_key
+            .as_ref()
             .ok_or_else(|| AIError::Authentication("API key is required".to_string()))?;
 
-        let client = RainyClient::with_api_key(api_key)
-            .map_err(|e| AIError::Authentication(format!("Failed to create Rainy client: {}", e)))?;
+        let client = RainyClient::with_api_key(api_key).map_err(|e| {
+            AIError::Authentication(format!("Failed to create Rainy client: {}", e))
+        })?;
 
         Ok(Self {
             config,
@@ -46,7 +47,8 @@ impl RainySDKProvider {
 
     /// Convert chat messages to a single prompt string
     fn convert_messages_to_prompt(messages: &[ChatMessage]) -> String {
-        messages.iter()
+        messages
+            .iter()
             .map(|msg| {
                 let role = match msg.role.as_str() {
                     "system" => "System",
@@ -86,14 +88,18 @@ impl AIProvider for RainySDKProvider {
         }
 
         // Fetch capabilities from rainy-sdk
-        let is_cowork = self.config.api_key.as_ref()
+        let is_cowork = self
+            .config
+            .api_key
+            .as_ref()
             .map(|k| Self::is_cowork_key(k))
             .unwrap_or(false);
 
         let capabilities = if is_cowork {
             // Get Cowork capabilities
-            let caps = self.client.get_cowork_capabilities().await
-                .map_err(|e| AIError::APIError(format!("Failed to get Cowork capabilities: {}", e)))?;
+            let caps = self.client.get_cowork_capabilities().await.map_err(|e| {
+                AIError::APIError(format!("Failed to get Cowork capabilities: {}", e))
+            })?;
 
             ProviderCapabilities {
                 chat_completions: true,
@@ -158,10 +164,16 @@ impl AIProvider for RainySDKProvider {
         }
     }
 
-    async fn complete(&self, request: ChatCompletionRequest) -> ProviderResult<ChatCompletionResponse> {
+    async fn complete(
+        &self,
+        request: ChatCompletionRequest,
+    ) -> ProviderResult<ChatCompletionResponse> {
         let prompt = Self::convert_messages_to_prompt(&request.messages);
 
-        let response = self.client.simple_chat(&request.model, &prompt).await
+        let response = self
+            .client
+            .simple_chat(&request.model, &prompt)
+            .await
             .map_err(|e| AIError::APIError(format!("Chat completion failed: {}", e)))?;
 
         Ok(ChatCompletionResponse {
@@ -182,12 +194,16 @@ impl AIProvider for RainySDKProvider {
         _callback: StreamingCallback,
     ) -> ProviderResult<()> {
         // Streaming not yet supported in rainy-sdk
-        Err(AIError::UnsupportedCapability("Streaming not yet supported in rainy-sdk".to_string()))
+        Err(AIError::UnsupportedCapability(
+            "Streaming not yet supported in rainy-sdk".to_string(),
+        ))
     }
 
     async fn embed(&self, request: EmbeddingRequest) -> ProviderResult<EmbeddingResponse> {
         // Embeddings not yet supported in rainy-sdk
-        Err(AIError::UnsupportedCapability("Embeddings not yet supported in rainy-sdk".to_string()))
+        Err(AIError::UnsupportedCapability(
+            "Embeddings not yet supported in rainy-sdk".to_string(),
+        ))
     }
 
     fn supports_capability(&self, capability: &str) -> bool {
@@ -241,7 +257,9 @@ mod tests {
 
     #[test]
     fn test_is_cowork_key() {
-        assert!(RainySDKProvider::is_cowork_key("ra-cowork12345678901234567890123456789012345678901234567890"));
+        assert!(RainySDKProvider::is_cowork_key(
+            "ra-cowork12345678901234567890123456789012345678901234567890"
+        ));
         assert!(!RainySDKProvider::is_cowork_key("ra-1234567890"));
     }
 

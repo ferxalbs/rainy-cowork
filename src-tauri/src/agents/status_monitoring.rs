@@ -154,11 +154,10 @@ impl StatusMonitor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::agents::base_agent::BaseAgent;
     use crate::agents::agent_trait::AgentConfig;
-    use crate::agents::types::AgentType;
-    use crate::ai::provider::AIProviderManager;
+    use crate::agents::base_agent::BaseAgent;
     use crate::agents::message_bus::MessageBus;
+    use crate::ai::provider::AIProviderManager;
 
     #[tokio::test]
     async fn test_get_agent_status() {
@@ -174,7 +173,8 @@ mod tests {
             settings: serde_json::json!({}),
         };
 
-        let agent: Arc<dyn Agent> = Arc::new(BaseAgent::new(config.clone(), ai_provider, message_bus));
+        let agent: Arc<dyn Agent> =
+            Arc::new(BaseAgent::new(config.clone(), ai_provider, message_bus));
         agents.insert(config.agent_id.clone(), agent);
 
         let monitor = StatusMonitor::new(agents);
@@ -201,7 +201,8 @@ mod tests {
             settings: serde_json::json!({}),
         };
 
-        let agent: Arc<dyn Agent> = Arc::new(BaseAgent::new(config.clone(), ai_provider, message_bus));
+        let agent: Arc<dyn Agent> =
+            Arc::new(BaseAgent::new(config.clone(), ai_provider, message_bus));
         agents.insert(config.agent_id.clone(), agent);
 
         let monitor = StatusMonitor::new(agents);
@@ -225,7 +226,8 @@ mod tests {
             settings: serde_json::json!({}),
         };
 
-        let agent: Arc<dyn Agent> = Arc::new(BaseAgent::new(config.clone(), ai_provider, message_bus));
+        let agent: Arc<dyn Agent> =
+            Arc::new(BaseAgent::new(config.clone(), ai_provider, message_bus));
         agents.insert(config.agent_id.clone(), agent);
 
         let monitor = StatusMonitor::new(agents);
@@ -261,7 +263,8 @@ mod tests {
             ai_provider.clone(),
             message_bus.clone(),
         ));
-        let agent2: Arc<dyn Agent> = Arc::new(BaseAgent::new(config2.clone(), ai_provider, message_bus));
+        let agent2: Arc<dyn Agent> =
+            Arc::new(BaseAgent::new(config2.clone(), ai_provider, message_bus));
 
         agents.insert(config1.agent_id.clone(), agent1);
         agents.insert(config2.agent_id.clone(), agent2);
@@ -286,7 +289,8 @@ mod tests {
             settings: serde_json::json!({}),
         };
 
-        let agent: Arc<dyn Agent> = Arc::new(BaseAgent::new(config.clone(), ai_provider, message_bus));
+        let agent: Arc<dyn Agent> =
+            Arc::new(BaseAgent::new(config.clone(), ai_provider, message_bus));
         agents.insert(config.agent_id.clone(), agent);
 
         let monitor = StatusMonitor::new(agents);

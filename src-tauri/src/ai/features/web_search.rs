@@ -2,7 +2,7 @@
 // Web search integration using rainy-sdk
 
 use crate::ai::provider_types::{AIError, ProviderResult};
-use rainy_sdk::{SearchOptions, SearchResult as SdkSearchResult, SearchResponse};
+use rainy_sdk::SearchOptions;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
@@ -19,36 +19,57 @@ impl WebSearchService {
     }
 
     /// Perform web search
-    pub async fn search(&self, query: &str, options: Option<SearchOptions>) -> ProviderResult<SearchResults> {
-        let response = self.client.web_search(query, options).await
+    pub async fn search(
+        &self,
+        query: &str,
+        options: Option<SearchOptions>,
+    ) -> ProviderResult<SearchResults> {
+        let response = self
+            .client
+            .web_search(query, options)
+            .await
             .map_err(|e| AIError::APIError(format!("Web search failed: {}", e)))?;
 
         Ok(SearchResults {
             query: query.to_string(),
-            results: response.results.into_iter().map(|r| SearchResult {
-                title: r.title,
-                url: r.url,
-                content: r.content,
-                score: r.score,
-            }).collect(),
+            results: response
+                .results
+                .into_iter()
+                .map(|r| SearchResult {
+                    title: r.title,
+                    url: r.url,
+                    content: r.content,
+                    score: r.score,
+                })
+                .collect(),
             answer: response.answer,
         })
     }
 
     /// Get search results only (no AI answer)
-    pub async fn search_results_only(&self, query: &str, max_results: u32) -> ProviderResult<Vec<SearchResult>> {
-        let options = SearchOptions::advanced()
-            .with_max_results(max_results);
+    pub async fn search_results_only(
+        &self,
+        query: &str,
+        max_results: u32,
+    ) -> ProviderResult<Vec<SearchResult>> {
+        let options = SearchOptions::advanced().with_max_results(max_results);
 
-        let response = self.client.web_search(query, Some(options)).await
+        let response = self
+            .client
+            .web_search(query, Some(options))
+            .await
             .map_err(|e| AIError::APIError(format!("Web search failed: {}", e)))?;
 
-        Ok(response.results.into_iter().map(|r| SearchResult {
-            title: r.title,
-            url: r.url,
-            content: r.content,
-            score: r.score,
-        }).collect())
+        Ok(response
+            .results
+            .into_iter()
+            .map(|r| SearchResult {
+                title: r.title,
+                url: r.url,
+                content: r.content,
+                score: r.score,
+            })
+            .collect())
     }
 }
 
@@ -91,14 +112,12 @@ mod tests {
     fn test_search_results_serialization() {
         let results = SearchResults {
             query: "test query".to_string(),
-            results: vec![
-                SearchResult {
-                    title: "Result 1".to_string(),
-                    url: "https://example1.com".to_string(),
-                    content: "Content 1".to_string(),
-                    score: 0.9,
-                },
-            ],
+            results: vec![SearchResult {
+                title: "Result 1".to_string(),
+                url: "https://example1.com".to_string(),
+                content: "Content 1".to_string(),
+                score: 0.9,
+            }],
             answer: Some("AI answer".to_string()),
         };
 

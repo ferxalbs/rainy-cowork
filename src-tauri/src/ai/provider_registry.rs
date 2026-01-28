@@ -2,10 +2,10 @@
 // Manages registration and retrieval of AI providers
 
 use crate::ai::provider_types::{
-    ProviderId, ProviderType, ProviderConfig, ProviderCapabilities, ProviderHealth,
+    ProviderId, ProviderType, ProviderCapabilities, ProviderHealth,
     ChatCompletionRequest, ChatCompletionResponse,
     EmbeddingRequest, EmbeddingResponse,
-    StreamingChunk, StreamingCallback,
+    StreamingCallback,
     ProviderResult, AIError,
 };
 use crate::ai::provider_trait::{AIProvider, ProviderWithStats};

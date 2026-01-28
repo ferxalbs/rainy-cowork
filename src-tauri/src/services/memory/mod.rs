@@ -29,9 +29,12 @@
 //! let results = manager.search("query", 10).await?;
 //! ```
 
-pub mod short_term;
 pub mod long_term;
 pub mod memory_manager;
+pub mod short_term;
 
 pub use memory_manager::MemoryManager;
-pub use long_term::{MemoryError, MemoryStats};
+
+// Not re-exported here, available via full path:
+// - long_term::MemoryError
+// - long_term::MemoryStats

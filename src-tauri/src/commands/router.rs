@@ -6,7 +6,7 @@ use crate::ai::router::load_balancer::LoadBalancingStrategy;
 use crate::ai::router::router::{RouterConfig, RouterStats};
 use crate::ai::{
     ChatCompletionRequest, ChatCompletionResponse, ChatMessage, EmbeddingRequest,
-    EmbeddingResponse, IntelligentRouter, ProviderId, ProviderWithStats, StreamingChunk,
+    EmbeddingResponse, IntelligentRouter, ProviderId, StreamingChunk,
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -252,8 +252,7 @@ pub async fn stream_with_routing(
         provider_id: "intelligent_router".to_string(),
     });
 
-    // Track chunks
-    let mut chunk_count = 0usize;
+    // Create channel for callback
     let channel = on_event.clone();
 
     // Create callback for streaming chunks
@@ -269,9 +268,10 @@ pub async fn stream_with_routing(
     match router.complete_stream(chat_request, callback).await {
         Ok(()) => {
             // Send finished event
+            // Note: chunk_count tracking not implemented yet
             let _ = on_event.send(StreamingEvent::Finished {
                 finish_reason: "stop".to_string(),
-                total_chunks: chunk_count,
+                total_chunks: 0,
             });
             Ok(())
         }
