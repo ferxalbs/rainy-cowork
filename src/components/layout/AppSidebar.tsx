@@ -114,14 +114,14 @@ export function AppSidebar({
 
   return (
     <aside
-      className={`flex flex-col h-full border-r border-border/10 transition-all duration-300 ease-in-out z-30 ${
+      className={`flex flex-col h-full border-r border-border/50 transition-all duration-300 ease-in-out z-30 ${
         isCollapsed ? "w-16" : "w-64"
-      } bg-sidebar/50 backdrop-blur-2xl dark:bg-sidebar/30`}
+      } bg-sidebar`}
     >
       {/* Sidebar Header / Logo */}
       <div
         data-tauri-drag-region
-        className={`pt-5 px-4 pb-2 flex items-center h-20 shrink-0 overflow-hidden ${isCollapsed ? "justify-center" : "gap-3"}`}
+        className={`mt-8 px-4 pb-4 flex items-center shrink-0 overflow-hidden ${isCollapsed ? "justify-center" : "gap-3"}`}
       >
         <div className="size-8 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/20 shrink-0">
           <LayoutGrid className="size-5 text-white" />

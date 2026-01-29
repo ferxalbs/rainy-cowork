@@ -2,18 +2,20 @@
 // Chat-style AI agent interface for file operations
 
 import { useState, useRef, useEffect, useMemo } from "react";
-import { Button, TextArea, Spinner } from "@heroui/react";
+import { Button, TextArea, Spinner, Tooltip } from "@heroui/react";
 import * as tauri from "../../services/tauri";
 import {
-  Settings as SettingsIcon,
-  BrainCircuit,
   FolderSearch,
   Play,
-  Send,
+  ArrowUp,
   Sparkles,
   Trash2,
-  X,
   AlertCircle,
+  Paperclip,
+  Folder,
+  SlidersHorizontal,
+  ChevronDown,
+  X,
 } from "lucide-react";
 import { useCoworkAgent, AgentMessage } from "../../hooks/useCoworkAgent";
 import { useCoworkStatus } from "../../hooks/useCoworkStatus";
@@ -91,15 +93,29 @@ export function CoworkPanel({
 
   const quickActions = [
     {
-      label: "Analyze",
-      icon: FolderSearch,
-      action: () => analyzeWorkspace(workspacePath),
+      label: "File Organization",
+      icon: Folder,
+      action: () => sendInstruction("Organize files by type", workspacePath),
+      color: "text-amber-500",
     },
     {
-      label: "Organize by type",
+      label: "Media Publish",
       icon: Sparkles,
       action: () =>
-        sendInstruction("Organize all files by type", workspacePath),
+        sendInstruction("Process and publish media files", workspacePath),
+      color: "text-red-500",
+    },
+    {
+      label: "Batch Processing",
+      icon: FolderSearch,
+      action: () => analyzeWorkspace(workspacePath),
+      color: "text-green-500",
+    },
+    {
+      label: "More",
+      icon: null,
+      action: () => {}, // Placeholder
+      color: "text-muted-foreground",
     },
   ];
 
@@ -140,208 +156,194 @@ export function CoworkPanel({
     return false;
   }, [currentModelInfo, hasApiKey]);
 
-  // Determine model type based on provider (strict matching)
-  const isRainyApiModel = currentModelInfo?.provider === "Rainy API";
-  const isCoworkApiModel = currentModelInfo?.provider === "Cowork Subscription";
-  const isByokModel = currentModelInfo?.provider === "Google Gemini";
-
   // Fallback state: model not available or no model info
   const isFallback = !isModelAvailable && !statusLoading;
 
   // Display model name
   const modelDisplay = isFallback
-    ? "Gemini Flash (Fallback)"
-    : currentModelInfo?.name || currentModel || "Loading...";
+    ? "Auto (Fallback)"
+    : currentModelInfo?.name || "Auto";
 
-  // Badge states for UI display
-  const isRainyApiBadge = isRainyApiModel && isModelAvailable;
-  const isCoworkApiBadge = isCoworkApiModel && isModelAvailable;
-  const isByokBadge = isByokModel && isModelAvailable;
-  const isFallbackBadge = isFallback;
+  const renderInputArea = (centered: boolean) => (
+    <div
+      className={`w-full max-w-2xl mx-auto transition-all duration-500 ${
+        centered ? "scale-100 opacity-100" : "scale-100 opacity-100"
+      }`}
+    >
+      <div className="relative group rounded-3xl bg-muted/30 border border-white/5 shadow-2xl backdrop-blur-xl overflow-hidden transition-all focus-within:ring-1 focus-within:ring-primary/20 focus-within:bg-muted/40">
+        <TextArea
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={
+            centered ? "Describe what you want to do..." : "Type a message..."
+          }
+          rows={centered ? 3 : 1}
+          className={`w-full bg-transparent border-none shadow-none text-foreground placeholder:text-muted-foreground/50 focus:ring-0 px-4 py-3 resize-none ${
+            centered ? "text-base min-h-[80px]" : "text-sm min-h-[44px]"
+          }`}
+          disabled={isProcessing}
+        />
 
-  return (
-    <div className="flex flex-col h-full bg-sidebar/20 dark:bg-black/10 backdrop-blur-2xl backdrop-saturate-200 rounded-2xl border border-white/10 dark:border-white/5 overflow-hidden ml-3 transition-all duration-300">
-      {/* Decorative Gradient Background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 pointer-events-none opacity-30" />
-
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-white/5 relative z-10 shrink-0 h-14">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 ">
-            <Sparkles className="w-5 h-5 text-primary animate-pulse-slow" />
-            <span className="font-medium text-foreground tracking-tight">
-              AI Cowork Agent
-            </span>
-          </div>
-
-          {/* Model Indicator */}
-          <div
-            className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs border cursor-pointer hover:bg-white/5 transition-colors ${
-              isCoworkApiBadge
-                ? "bg-purple-500/10 border-purple-500/30 text-purple-300"
-                : isRainyApiBadge
-                  ? "bg-indigo-500/10 border-indigo-500/30 text-indigo-300"
-                  : isByokBadge
-                    ? "bg-blue-500/10 border-blue-500/30 text-blue-300"
-                    : isFallbackBadge
-                      ? "bg-orange-500/10 border-orange-500/30 text-orange-300"
-                      : "bg-gray-500/10 border-gray-500/30 text-gray-300"
-            }`}
-            onClick={onOpenSettings}
-            title={
-              isCoworkApiBadge
-                ? "Using Cowork Subscription models (available for free and paid plans)"
-                : isRainyApiBadge
-                  ? "Using Rainy API pay-as-you-go models"
-                  : isByokBadge
-                    ? "Using your own Gemini API key (BYOK)"
-                    : isFallbackBadge
-                      ? "Model not available. Configure API keys in settings."
-                      : "Click to change model in settings"
-            }
-          >
-            {isFallbackBadge ? (
-              <AlertCircle className="w-3 h-3" />
-            ) : (
-              <BrainCircuit className="w-3 h-3" />
-            )}
-            <span className="font-medium truncate max-w-[120px]">
-              {modelDisplay}
-            </span>
-            <span className="opacity-60 text-[10px] uppercase tracking-wider font-semibold">
-              {isCoworkApiBadge
-                ? "COWORK"
-                : isRainyApiBadge
-                  ? "RAINY"
-                  : isByokBadge
-                    ? "BYOK"
-                    : isFallbackBadge
-                      ? "FALLBACK"
-                      : "UNKNOWN"}
-            </span>
-          </div>
-        </div>
-        <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            isIconOnly
-            onPress={onOpenSettings}
-            className="text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
-          >
-            <SettingsIcon className="w-4 h-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            isIconOnly
-            onPress={clearMessages}
-            isDisabled={messages.length === 0}
-            className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-          >
-            <Trash2 className="w-4 h-4" />
-          </Button>
-          {onClose && (
+        <div className="flex items-center justify-between px-2 pb-2 mt-1">
+          <div className="flex items-center gap-1">
+            <Tooltip delay={0}>
+              <Button
+                size="sm"
+                variant="ghost"
+                isIconOnly
+                className="text-muted-foreground hover:text-foreground rounded-full data-[hover=true]:bg-white/5"
+              >
+                <Paperclip className="size-4" />
+              </Button>
+              <Tooltip.Content>Attach files</Tooltip.Content>
+            </Tooltip>
+            <Tooltip delay={0}>
+              <Button
+                size="sm"
+                variant="ghost"
+                isIconOnly
+                onPress={onOpenSettings}
+                className="text-muted-foreground hover:text-foreground rounded-full data-[hover=true]:bg-white/5"
+              >
+                <SlidersHorizontal className="size-4" />
+              </Button>
+              <Tooltip.Content>Settings</Tooltip.Content>
+            </Tooltip>
+            <div className="h-4 w-px bg-border/30 mx-1" />
             <Button
+              size="sm"
               variant="ghost"
+              className="text-xs text-muted-foreground hover:text-foreground h-7 gap-1.5 rounded-full px-3 data-[hover=true]:bg-white/5 border border-transparent hover:border-white/10"
+            >
+              <Folder className="size-3.5" />
+              <span>projects</span>
+              <ChevronDown className="size-3 opacity-50" />
+            </Button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-xs text-muted-foreground hover:text-foreground h-7 gap-1.5 rounded-full px-3 data-[hover=true]:bg-white/5"
+              onPress={onOpenSettings}
+            >
+              {isFallback && <AlertCircle className="size-3 text-orange-400" />}
+              <span>{modelDisplay.split(" ")[0]}</span>
+              <ChevronDown className="size-3 opacity-50" />
+            </Button>
+
+            <Button
               size="sm"
               isIconOnly
-              onPress={onClose}
-              className="hover:bg-destructive/10 hover:text-destructive"
+              onPress={handleSubmit}
+              isDisabled={!input.trim() || isProcessing}
+              isPending={isProcessing}
+              className={`rounded-full transition-all duration-300 ${
+                input.trim()
+                  ? "bg-foreground text-background hover:opacity-90 shadow-lg shadow-black/20"
+                  : "bg-muted/50 text-muted-foreground cursor-not-allowed"
+              }`}
             >
-              <X className="w-4 h-4" />
+              {!isProcessing && <ArrowUp className="size-4" />}
             </Button>
-          )}
+          </div>
         </div>
       </div>
+    </div>
+  );
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-6 relative z-10 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
+  return (
+    <div className="flex flex-col h-full bg-sidebar/20 dark:bg-black/20 backdrop-blur-3xl rounded-3xl border border-white/5 shadow-2xl overflow-hidden ml-3 transition-all duration-300 relative group">
+      {/* Decorative Elements */}
+      <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent pointer-events-none opacity-20" />
+
+      {/* Messages Area */}
+      <div className="flex-1 overflow-y-auto px-4 py-6 scrollbar-thin scrollbar-thumb-border/20 scrollbar-track-transparent">
         {messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground animate-in fade-in zoom-in duration-500">
-            <div className="p-4 rounded-full bg-primary/5 mb-6 ring-1 ring-primary/10">
-              <Sparkles className="w-8 h-8 text-primary" />
-            </div>
-            <p className="text-xl font-medium mb-3 text-foreground">
-              AI File Assistant
-            </p>
-            <p className="text-sm max-w-sm text-balance leading-relaxed text-muted-foreground">
-              Describe what you want to do with your files. For example:
-              "Organize my downloads by file type" or "Rename all photos with
-              date prefix"
-            </p>
+          <div className="h-full flex flex-col items-center justify-center -mt-10 animate-in fade-in zoom-in duration-500">
+            {/* Header Text */}
+            <h1 className="text-2xl font-medium text-foreground mb-12 tracking-tight opacity-90 drop-shadow-sm">
+              Good afternoon, cowork with me!
+            </h1>
+            {onClose && (
+              <Button
+                variant="ghost"
+                size="sm"
+                isIconOnly
+                onPress={onClose}
+                className="absolute top-4 right-4 opacity-50 hover:opacity-100"
+              >
+                <X size={16} />
+              </Button>
+            )}
+
+            {/* Input Area */}
+            {renderInputArea(true)}
 
             {/* Quick Actions */}
-            <div className="flex gap-2.5 mt-8">
-              {quickActions.map((action) => (
+            <div className="flex flex-wrap justify-center gap-3 mt-8">
+              {quickActions.map((action, idx) => (
                 <Button
-                  key={action.label}
+                  key={idx}
                   variant="secondary"
                   size="sm"
                   onPress={action.action}
-                  isDisabled={isProcessing}
-                  className="bg-card hover:bg-accent hover:text-accent-foreground border border-border/50 shadow-sm transition-all duration-200"
+                  className="bg-muted/20 border border-white/5 hover:bg-muted/40 text-xs font-medium h-8 rounded-full px-4 transition-all"
                 >
-                  <action.icon className="w-4 h-4 mr-1.5 opacity-70" />
-                  {action.label}
+                  {action.icon && (
+                    <action.icon className={`size-3.5 mr-2 ${action.color}`} />
+                  )}
+                  <span className="opacity-80">{action.label}</span>
                 </Button>
               ))}
             </div>
           </div>
         ) : (
-          messages.map((message) => (
-            <MessageBubble
-              key={message.id}
-              message={message}
-              currentPlan={currentPlan}
-              isExecuting={isExecuting}
-              onExecute={executePlan}
-              onCancel={cancelPlan}
-            />
-          ))
+          <div className="space-y-6 max-w-3xl mx-auto pb-4">
+            {/* Top Toolbar for chat mode */}
+            <div className="sticky top-0 z-20 flex justify-between items-center py-2 mb-4 bg-transparent backdrop-blur-sm">
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-widest pl-2">
+                Chat Session
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                isIconOnly
+                onPress={clearMessages}
+                className="text-muted-foreground hover:text-destructive opacity-50 hover:opacity-100 transition-opacity"
+              >
+                <Trash2 className="size-4" />
+              </Button>
+            </div>
+
+            {messages.map((message) => (
+              <MessageBubble
+                key={message.id}
+                message={message}
+                currentPlan={currentPlan}
+                isExecuting={isExecuting}
+                onExecute={executePlan}
+                onCancel={cancelPlan}
+              />
+            ))}
+            <div ref={messagesEndRef} />
+          </div>
         )}
-        <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
-      <div className="p-4 border-t border-white/5 bg-white/5 backdrop-blur-md relative z-10 shrink-0">
-        <div className="flex gap-2 items-end bg-default-100/50 border-none rounded-2xl p-1.5 transition-all duration-200 focus-within:bg-default-100">
-          <TextArea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Describe what you want to do..."
-            rows={1}
-            className="flex-1 bg-transparent border-none shadow-none text-foreground placeholder:text-muted-foreground focus:ring-0 px-3 py-2 min-h-[44px]"
-            disabled={isProcessing}
-          />
-          <Button
-            size="sm"
-            isIconOnly
-            onPress={handleSubmit}
-            isDisabled={!input.trim() || isProcessing}
-            isPending={isProcessing}
-            className={`mb-0.5 mr-0.5 w-8 h-8 min-w-8 rounded-lg transition-all duration-200 ${
-              input.trim() && !isProcessing
-                ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"
-                : "bg-muted text-muted-foreground opacity-50"
-            }`}
-          >
-            {!isProcessing && <Send className="w-4 h-4" />}
-          </Button>
+      {/* Bottom Input Area (Only visible when messages exist) */}
+      {messages.length > 0 && (
+        <div className="p-4 relative z-20 shrink-0 bg-gradient-to-t from-background/80 to-transparent pt-10">
+          {renderInputArea(false)}
+          <div className="text-center mt-2">
+            <p className="text-[10px] text-muted-foreground/40 font-medium tracking-tight">
+              AI can make mistakes. Review generated plans carefully.
+            </p>
+          </div>
         </div>
-        <p className="text-[10px] text-muted-foreground mt-2.5 ml-1 flex items-center gap-1.5 opacity-60">
-          <span className="px-1.5 py-0.5 rounded border border-border bg-card/50">
-            Enter
-          </span>{" "}
-          to send
-          <span className="w-1 h-1 rounded-full bg-border" />
-          <span className="px-1.5 py-0.5 rounded border border-border bg-card/50">
-            Shift + Enter
-          </span>{" "}
-          for new line
-        </p>
-      </div>
+      )}
     </div>
   );
 }
@@ -367,21 +369,27 @@ function MessageBubble({
 
   return (
     <div
-      className={`flex w-full ${isUser ? "justify-end" : "justify-start"} animate-in slide-in-from-bottom-2 fade-in duration-300`}
+      className={`flex w-full ${isUser ? "justify-end" : "justify-start"} animate-in slide-in-from-bottom-2 fade-in duration-300 group`}
     >
+      {!isUser && (
+        <div className="size-8 rounded-full bg-gradient-to-tr from-primary/20 to-secondary/20 flex items-center justify-center mr-3 mt-1 shrink-0 border border-white/10">
+          <Sparkles className="size-4 text-primary" />
+        </div>
+      )}
+
       <div
-        className={`max-w-[85%] rounded-2xl px-5 py-3.5 shadow-sm text-sm leading-relaxed ${
+        className={`max-w-[85%] rounded-2xl px-5 py-4 shadow-sm text-sm leading-relaxed ${
           isUser
-            ? "bg-primary text-primary-foreground rounded-br-sm"
+            ? "bg-muted/40 text-foreground/90 backdrop-blur-md border border-white/5 rounded-br-sm"
             : isSystem
-              ? "bg-warning/10 text-warning-700 dark:text-warning-400 border border-warning/20"
-              : "bg-default-100/50 hover:bg-default-100 transition-colors text-foreground rounded-bl-sm"
+              ? "bg-warning/10 text-warning-600 dark:text-warning-400 border border-warning/10"
+              : "bg-transparent text-foreground/90"
         }`}
       >
         {message.isLoading && (
-          <div className="flex items-center gap-2.5 mb-2">
-            <Spinner size="sm" color="current" className="opacity-60" />
-            <span className="text-xs font-medium opacity-70 tracking-wide">
+          <div className="flex items-center gap-2 mb-2">
+            <Spinner size="sm" color="current" className="opacity-40" />
+            <span className="text-xs font-semibold opacity-40 tracking-wider">
               THINKING...
             </span>
           </div>
@@ -390,7 +398,9 @@ function MessageBubble({
         <MarkdownRenderer
           content={message.content}
           className={
-            isUser ? "prose-invert text-primary-foreground" : "text-foreground"
+            isUser
+              ? "prose-neutral dark:prose-invert"
+              : "prose-neutral dark:prose-invert"
           }
         />
 
@@ -398,15 +408,15 @@ function MessageBubble({
         {message.plan &&
           currentPlan?.id === message.plan.id &&
           !message.result && (
-            <div className="flex gap-2 mt-4 pt-3 border-t border-border/10">
+            <div className="flex gap-2 mt-4 pt-4 border-t border-border/10">
               <Button
                 size="sm"
                 onPress={() => onExecute(message.plan!.id)}
                 isDisabled={isExecuting}
                 isPending={isExecuting}
-                className="bg-primary text-primary-foreground shadow-sm hover:shadow-md transition-all"
+                className="bg-foreground text-background shadow-lg shadow-black/10 hover:opacity-90 font-medium"
               >
-                {!isExecuting && <Play className="w-3.5 h-3.5 mr-1.5" />}
+                {!isExecuting && <Play className="size-3.5 mr-1.5" />}
                 Execute Plan
               </Button>
               <Button
@@ -414,7 +424,7 @@ function MessageBubble({
                 size="sm"
                 onPress={() => onCancel(message.plan!.id)}
                 isDisabled={isExecuting}
-                className="border-border text-muted-foreground hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30"
+                className="border-border/40 text-muted-foreground hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30"
               >
                 Cancel
               </Button>
@@ -423,9 +433,12 @@ function MessageBubble({
 
         {/* Execution Result */}
         {message.result && (
-          <div className="mt-2 pt-2 border-t border-white/10 text-xs opacity-70">
-            {message.result.completedSteps}/{message.result.totalSteps} steps •
-            {message.result.totalChanges} changes •{message.result.durationMs}ms
+          <div className="mt-3 pt-3 border-t border-dashed border-border/20 text-xs text-muted-foreground flex items-center gap-2">
+            <Sparkles className="size-3 text-green-500" />
+            <span>
+              Completed {message.result.completedSteps} steps in{" "}
+              {message.result.durationMs}ms
+            </span>
           </div>
         )}
       </div>
