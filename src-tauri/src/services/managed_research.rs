@@ -81,21 +81,47 @@ impl ManagedResearchService {
                     if let Some(results) = state.get("_results") {
                         if let Some(output) = results.get("output") {
                             if let Some(output_arr) = output.as_array() {
-                                // Try to find the last assistant message that is NOT just a tool call
-                                // Or just dump the last message's content
-                                if let Some(last) = output_arr.last() {
-                                    if let Some(c) = last.get("content") {
-                                        if let Some(s) = c.as_str() {
-                                            s.to_string()
-                                        } else {
-                                            c.to_string()
-                                        }
-                                    } else {
-                                        output.to_string()
+                                // Iterate backwards to find the last actual ASISTANT message content
+                                let last_text = output_arr.iter().rev().find_map(|msg| {
+                                    // 1. Check if role is 'assistant' (to avoid tool_result, system, user)
+                                    let is_assistant = msg
+                                        .get("role")
+                                        .and_then(|r| r.as_str())
+                                        .map(|r| r == "assistant" || r == "model") // Handle both conventions
+                                        .unwrap_or(false);
+
+                                    if !is_assistant {
+                                        return None;
                                     }
-                                } else {
-                                    output.to_string()
-                                }
+
+                                    // 2. Check for text content
+                                    if let Some(content) = msg.get("content") {
+                                        if let Some(s) = content.as_str() {
+                                            if !s.trim().is_empty() {
+                                                return Some(s.to_string());
+                                            }
+                                        }
+                                    }
+                                    None
+                                });
+
+                                last_text.unwrap_or_else(|| {
+                                     // If we found no assistant text, check if the last message was a tool result (agent stopped early)
+                                     if let Some(last) = output_arr.last() {
+                                         let role = last.get("role").and_then(|r| r.as_str()).unwrap_or("unknown");
+                                         if role == "tool_result" || role == "function" {
+                                              // Provide a more user-friendly status if we are seeing raw tool results
+                                             "Research completed but no final summary was generated. The agent might have hit a limit or stopped unexpectedly.".to_string()
+                                         } else if role == "tool_call" || role == "assistant" { // assistant with no content = tool call usually
+                                             "Research agent is processing...".to_string()
+                                         } else {
+                                             // Fallback for debugging, but try to be cleaner than raw JSON
+                                              format!("Status: {}", role)
+                                         }
+                                     } else {
+                                         "No output content found.".to_string()
+                                     }
+                                 })
                             } else {
                                 output.to_string()
                             }
