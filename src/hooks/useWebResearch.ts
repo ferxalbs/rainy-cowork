@@ -15,6 +15,8 @@ interface UseWebResearchReturn {
     topic: string,
     depth?: "basic" | "advanced",
     maxSources?: number,
+    provider?: "exa" | "tavily",
+    model?: string,
   ) => Promise<AgentResult | null>;
   /** Get cache statistics */
   getCacheStats: () => Promise<WebCacheStats>;
@@ -76,9 +78,11 @@ export function useWebResearch(): UseWebResearchReturn {
   // AI-powered research (remote agent with Tavily)
   const researchTopic = useCallback(
     async (
-      topic: string,
+      topic: String,
       depth: "basic" | "advanced" = "basic",
       maxSources: number = 5,
+      provider: "exa" | "tavily" = "exa",
+      model?: string,
     ): Promise<AgentResult | null> => {
       setIsResearching(true);
       setError(null);
@@ -89,6 +93,8 @@ export function useWebResearch(): UseWebResearchReturn {
           topic,
           depth,
           maxSources,
+          provider,
+          model,
         });
 
         setResearchResult(result);

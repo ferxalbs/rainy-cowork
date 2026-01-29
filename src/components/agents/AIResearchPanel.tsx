@@ -3,7 +3,7 @@
 // Uses HeroUI v3 compound components
 // Part of Phase 3 - Rainy Cowork
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Card,
   Button,
@@ -12,21 +12,34 @@ import {
   Label,
   Radio,
   RadioGroup,
+  Select,
+  ListBox,
 } from "@heroui/react";
 import { Search, Globe, Copy } from "lucide-react";
 import { useWebResearch } from "../../hooks/useWebResearch";
+import { useCoworkModels } from "../../hooks/useCoworkModels";
 
 export function AIResearchPanel() {
   const { researchTopic, researchResult, isResearching, error } =
     useWebResearch();
 
+  const { models, loading: modelsLoading } = useCoworkModels();
   const [topic, setTopic] = useState("");
   const [depth, setDepth] = useState<"basic" | "advanced">("basic");
+  const [provider, setProvider] = useState<"exa" | "tavily">("exa");
+  const [selectedModel, setSelectedModel] = useState<string>("");
   const [copied, setCopied] = useState(false);
+
+  // Set default model when loaded
+  useEffect(() => {
+    if (models.length > 0 && !selectedModel) {
+      setSelectedModel(models[0]);
+    }
+  }, [models, selectedModel]);
 
   const handleResearch = async () => {
     if (!topic.trim()) return;
-    await researchTopic(topic, depth, 5);
+    await researchTopic(topic, depth, 5, provider, selectedModel || undefined);
   };
 
   const handleCopy = async () => {
@@ -90,6 +103,68 @@ export function AIResearchPanel() {
                   <span className="text-sm font-medium">Advanced</span>
                   <span className="text-xs text-muted-foreground">
                     Thorough, deep dive
+                  </span>
+                </div>
+              </Radio>
+            </RadioGroup>
+          </div>
+
+          {/* Model Selection */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">AI Model</Label>
+            <div className="flex gap-4">
+              <Select
+                className="max-w-xs"
+                placeholder="Select an AI model"
+                selectedKey={selectedModel || null}
+                onSelectionChange={(key) => {
+                  if (key) setSelectedModel(key.toString());
+                }}
+                isDisabled={isResearching || modelsLoading}
+              >
+                <Label>Select Agent Model</Label>
+                <Select.Trigger>
+                  <Select.Value />
+                  <Select.Indicator />
+                </Select.Trigger>
+                <Select.Popover>
+                  <ListBox>
+                    {models.map((model) => (
+                      <ListBox.Item key={model} id={model} textValue={model}>
+                        {model}
+                      </ListBox.Item>
+                    ))}
+                  </ListBox>
+                </Select.Popover>
+              </Select>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Select the AI model that will analyze your research.
+            </p>
+          </div>
+
+          {/* Provider Selection */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Search Provider</Label>
+            <RadioGroup
+              value={provider}
+              onChange={(val) => setProvider(val as "exa" | "tavily")}
+              orientation="horizontal"
+              className="flex gap-4"
+            >
+              <Radio value="exa" className="max-w-[200px]">
+                <div className="flex flex-col gap-1">
+                  <span className="text-sm font-medium">Exa AI</span>
+                  <span className="text-xs text-muted-foreground">
+                    Best for deep context
+                  </span>
+                </div>
+              </Radio>
+              <Radio value="tavily" className="max-w-[200px]">
+                <div className="flex flex-col gap-1">
+                  <span className="text-sm font-medium">Tavily</span>
+                  <span className="text-xs text-muted-foreground">
+                    Best for latest news
                   </span>
                 </div>
               </Radio>
