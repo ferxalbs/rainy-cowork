@@ -45,7 +45,11 @@ pub fn run() {
         settings_manager.clone(),
     ));
 
-    // Initialize web research service
+    // Initialize web research service (Phase 3 AI features)
+    let managed_research =
+        services::managed_research::ManagedResearchService::new(ai_provider.clone());
+
+    // Initialize legacy web scraper service
     let web_research = WebResearchService::new();
 
     // Initialize document service
@@ -82,6 +86,7 @@ pub fn run() {
         .manage(file_ops)
         .manage(cowork_agent)
         .manage(web_research)
+        .manage(managed_research) // Manage the new AI research service
         .manage(document_service)
         .manage(image_service)
         .manage(workspace_manager) // Arc<WorkspaceManager>
@@ -307,6 +312,8 @@ pub fn run() {
             commands::remove_provider_from_router,
             commands::get_router_providers,
             commands::router_has_providers,
+            // Research commands
+            commands::research::perform_research,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

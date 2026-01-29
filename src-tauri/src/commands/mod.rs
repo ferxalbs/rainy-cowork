@@ -11,6 +11,7 @@ pub mod folder;
 pub mod image;
 pub mod memory;
 pub mod reflection;
+pub mod research;
 pub mod router;
 pub mod settings;
 pub mod task;

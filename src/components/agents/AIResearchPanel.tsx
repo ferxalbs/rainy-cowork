@@ -63,13 +63,8 @@ export function AIResearchPanel() {
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
               disabled={isResearching}
-              className="w-full"
+              className="w-full bg-background/50 border-border/50 focus-within:bg-background transition-colors h-12"
               size="lg"
-              classNames={{
-                input: "bg-transparent",
-                inputWrapper:
-                  "bg-background/50 border-border/50 focus-within:bg-background transition-colors h-12",
-              }}
             />
           </div>
 
