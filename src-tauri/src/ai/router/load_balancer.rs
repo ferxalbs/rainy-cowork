@@ -126,7 +126,7 @@ impl LoadBalancer {
         }
 
         // Select random value
-        let mut random_value = rand::random::<u32>() % total_weight;
+        let random_value = rand::random::<u32>() % total_weight;
         let mut current_weight = 0u32;
 
         // Find provider based on weight

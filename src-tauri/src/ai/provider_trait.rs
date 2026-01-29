@@ -1,15 +1,13 @@
 // AI Provider Trait
 // Defines the interface that all AI providers must implement
 
+use crate::ai::provider_types::{
+    ChatCompletionRequest, ChatCompletionResponse, EmbeddingRequest, EmbeddingResponse,
+    ProviderCapabilities, ProviderHealth, ProviderId, ProviderResult, ProviderType,
+    StreamingCallback,
+};
 use async_trait::async_trait;
 use std::sync::Arc;
-use crate::ai::provider_types::{
-    ProviderId, ProviderType, ProviderCapabilities, ProviderHealth,
-    ChatCompletionRequest, ChatCompletionResponse,
-    EmbeddingRequest, EmbeddingResponse,
-    StreamingCallback,
-    ProviderResult,
-};
 
 /// AI Provider trait - all providers must implement this
 #[async_trait]
@@ -27,7 +25,10 @@ pub trait AIProvider: Send + Sync {
     async fn health_check(&self) -> ProviderResult<ProviderHealth>;
 
     /// Complete a chat request
-    async fn complete(&self, request: ChatCompletionRequest) -> ProviderResult<ChatCompletionResponse>;
+    async fn complete(
+        &self,
+        request: ChatCompletionRequest,
+    ) -> ProviderResult<ChatCompletionResponse>;
 
     /// Complete a chat request with streaming
     async fn complete_stream(
@@ -40,7 +41,7 @@ pub trait AIProvider: Send + Sync {
     async fn embed(&self, request: EmbeddingRequest) -> ProviderResult<EmbeddingResponse>;
 
     /// Check if the provider supports a specific capability
-    fn supports_capability(&self, capability: &str) -> bool {
+    fn supports_capability(&self, _capability: &str) -> bool {
         // Default implementation - can be overridden
         false
     }
@@ -127,7 +128,8 @@ impl ProviderWithStats {
         // Update average latency
         if self.stats.total_requests > 0 {
             let total_latency = self.stats.avg_latency_ms * (self.stats.total_requests - 1) as f64;
-            self.stats.avg_latency_ms = (total_latency + latency_ms as f64) / self.stats.total_requests as f64;
+            self.stats.avg_latency_ms =
+                (total_latency + latency_ms as f64) / self.stats.total_requests as f64;
         }
 
         self.stats.total_tokens += tokens;

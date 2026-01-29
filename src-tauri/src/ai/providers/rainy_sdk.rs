@@ -199,7 +199,7 @@ impl AIProvider for RainySDKProvider {
         ))
     }
 
-    async fn embed(&self, request: EmbeddingRequest) -> ProviderResult<EmbeddingResponse> {
+    async fn embed(&self, _request: EmbeddingRequest) -> ProviderResult<EmbeddingResponse> {
         // Embeddings not yet supported in rainy-sdk
         Err(AIError::UnsupportedCapability(
             "Embeddings not yet supported in rainy-sdk".to_string(),

@@ -15,7 +15,7 @@ const API_BASE = 'https://rainy-api-v2-179843975974.us-west1.run.app/api/v1';
  */
 async function getApiKey(): Promise<string | null> {
     try {
-        return await invoke<string | null>('get_api_key', { provider: 'rainy' });
+        return await invoke<string | null>('get_api_key', { provider: 'rainy_api' });
     } catch {
         return null;
     }

@@ -27,8 +27,7 @@ use crate::agents::agent_trait::{Agent, AgentConfig, AgentError};
 use crate::agents::base_agent::BaseAgent;
 use crate::agents::registry::AgentRegistry;
 use crate::agents::types::{
-    AgentInfo, AgentMessage, AgentStatus, AgentType, Task, TaskContext, TaskPriority,
-    TaskResult,
+    AgentInfo, AgentMessage, AgentStatus, AgentType, Task, TaskContext, TaskPriority, TaskResult,
 };
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -237,12 +236,15 @@ impl DirectorAgent {
     /// # Returns
     ///
     /// A vector of TaskAssignment structs
-    async fn assign_subtasks(&self, subtasks: Vec<SubTask>) -> Result<Vec<TaskAssignment>, AgentError> {
+    async fn assign_subtasks(
+        &self,
+        subtasks: Vec<SubTask>,
+    ) -> Result<Vec<TaskAssignment>, AgentError> {
         let mut assignments = Vec::new();
 
         for subtask in subtasks {
             // Find appropriate agent for this subtask
-            let agent_id = self.find_agent_for_subtask(&subtask).await?;
+            let _agent_id = self.find_agent_for_subtask(&subtask).await?;
 
             // Create task for the agent
             let task = Task {
@@ -371,7 +373,7 @@ impl DirectorAgent {
             let mut handles = Vec::new();
             for idx in ready_indices {
                 let assignment = assignments[idx].clone();
-                let registry = self.registry.clone();
+                let _registry = self.registry.clone();
                 let results_ref = self.results.clone();
 
                 let handle = tokio::spawn(async move {

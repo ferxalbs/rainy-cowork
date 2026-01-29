@@ -1,7 +1,7 @@
 // Rainy Cowork - Streaming Feature (PHASE 3)
 // Streaming chat completions using rainy-sdk
 
-use crate::ai::provider_types::{AIError, ProviderResult, StreamingChunk, StreamingCallback};
+use crate::ai::provider_types::{AIError, ProviderResult, StreamingCallback, StreamingChunk};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
@@ -20,9 +20,9 @@ impl StreamingService {
     /// Stream chat completion
     pub async fn stream_chat(
         &self,
-        model: &str,
-        messages: &[crate::ai::ChatMessage],
-        callback: StreamingCallback,
+        _model: &str,
+        _messages: &[crate::ai::ChatMessage],
+        _callback: StreamingCallback,
     ) -> ProviderResult<()> {
         // Note: rainy-sdk doesn't currently support streaming
         // This is a placeholder for future implementation
@@ -34,11 +34,11 @@ impl StreamingService {
     /// Stream chat completion with options
     pub async fn stream_chat_with_options(
         &self,
-        model: &str,
-        messages: &[crate::ai::ChatMessage],
-        temperature: Option<f32>,
-        max_tokens: Option<u32>,
-        callback: StreamingCallback,
+        _model: &str,
+        _messages: &[crate::ai::ChatMessage],
+        _temperature: Option<f32>,
+        _max_tokens: Option<u32>,
+        _callback: StreamingCallback,
     ) -> ProviderResult<()> {
         // Note: rainy-sdk doesn't currently support streaming
         // This is a placeholder for future implementation
@@ -49,7 +49,8 @@ impl StreamingService {
 
     /// Convert streaming chunks to complete text
     pub fn chunks_to_text(chunks: &[StreamingChunk]) -> String {
-        chunks.iter()
+        chunks
+            .iter()
             .filter(|c| !c.is_final)
             .map(|c| c.content.clone())
             .collect::<Vec<_>>()

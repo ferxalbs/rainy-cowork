@@ -49,7 +49,7 @@ interface UseDocumentReturn {
  */
 async function getApiKey(): Promise<string | null> {
     try {
-        return await invoke<string | null>('get_api_key', { provider: 'rainy' });
+        return await invoke<string | null>('get_api_key', { provider: 'rainy_api' });
     } catch {
         return null;
     }
