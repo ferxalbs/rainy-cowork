@@ -170,7 +170,7 @@ export function CoworkPanel({
         centered ? "scale-100 opacity-100" : "scale-100 opacity-100"
       }`}
     >
-      <div className="relative group rounded-3xl bg-muted/30 border border-white/5 shadow-2xl backdrop-blur-xl overflow-hidden transition-all focus-within:ring-1 focus-within:ring-primary/20 focus-within:bg-muted/40">
+      <div className="relative group rounded-3xl bg-muted/20 border border-border/10 focus-within:bg-muted/30 transition-all">
         <TextArea
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -185,6 +185,7 @@ export function CoworkPanel({
           disabled={isProcessing}
         />
 
+        {/* Input Footer Controls */}
         <div className="flex items-center justify-between px-2 pb-2 mt-1">
           <div className="flex items-center gap-1">
             <Tooltip delay={0}>
@@ -192,7 +193,7 @@ export function CoworkPanel({
                 size="sm"
                 variant="ghost"
                 isIconOnly
-                className="text-muted-foreground hover:text-foreground rounded-full data-[hover=true]:bg-white/5"
+                className="text-muted-foreground hover:text-foreground rounded-full"
               >
                 <Paperclip className="size-4" />
               </Button>
@@ -204,20 +205,21 @@ export function CoworkPanel({
                 variant="ghost"
                 isIconOnly
                 onPress={onOpenSettings}
-                className="text-muted-foreground hover:text-foreground rounded-full data-[hover=true]:bg-white/5"
+                className="text-muted-foreground hover:text-foreground rounded-full"
               >
                 <SlidersHorizontal className="size-4" />
               </Button>
               <Tooltip.Content>Settings</Tooltip.Content>
             </Tooltip>
+            {/* Project Selector - simplified */}
             <div className="h-4 w-px bg-border/30 mx-1" />
             <Button
               size="sm"
               variant="ghost"
-              className="text-xs text-muted-foreground hover:text-foreground h-7 gap-1.5 rounded-full px-3 data-[hover=true]:bg-white/5 border border-transparent hover:border-white/10"
+              className="text-xs text-muted-foreground hover:text-foreground h-7 gap-1.5 rounded-full px-3"
             >
               <Folder className="size-3.5" />
-              <span>projects</span>
+              <span>Project</span>
               <ChevronDown className="size-3 opacity-50" />
             </Button>
           </div>
@@ -226,7 +228,7 @@ export function CoworkPanel({
             <Button
               size="sm"
               variant="ghost"
-              className="text-xs text-muted-foreground hover:text-foreground h-7 gap-1.5 rounded-full px-3 data-[hover=true]:bg-white/5"
+              className="text-xs text-muted-foreground hover:text-foreground h-7 gap-1.5 rounded-full px-3"
               onPress={onOpenSettings}
             >
               {isFallback && <AlertCircle className="size-3 text-orange-400" />}
@@ -240,10 +242,10 @@ export function CoworkPanel({
               onPress={handleSubmit}
               isDisabled={!input.trim() || isProcessing}
               isPending={isProcessing}
-              className={`rounded-full transition-all duration-300 ${
+              className={`rounded-full transition-all duration-200 ${
                 input.trim()
-                  ? "bg-foreground text-background hover:opacity-90 shadow-lg shadow-black/20"
-                  : "bg-muted/50 text-muted-foreground cursor-not-allowed"
+                  ? "bg-foreground text-background"
+                  : "bg-muted text-muted-foreground"
               }`}
             >
               {!isProcessing && <ArrowUp className="size-4" />}
@@ -255,16 +257,16 @@ export function CoworkPanel({
   );
 
   return (
-    <div className="flex flex-col h-full bg-sidebar/20 dark:bg-black/20 backdrop-blur-3xl rounded-3xl border border-white/5 shadow-2xl overflow-hidden ml-3 transition-all duration-300 relative group">
-      {/* Decorative Elements */}
-      <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent pointer-events-none opacity-20" />
+    <div className="flex flex-col h-full w-full relative">
+      {/* Decorative gradient - very subtle */}
+      <div className="absolute inset-0 bg-gradient-to-tr from-primary/5 via-transparent to-secondary/5 pointer-events-none -z-10 opacity-50" />
 
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto px-4 py-6 scrollbar-thin scrollbar-thumb-border/20 scrollbar-track-transparent">
         {messages.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center -mt-10 animate-in fade-in zoom-in duration-500">
+          <div className="h-full flex flex-col items-center justify-center -mt-20 animate-in fade-in zoom-in duration-500">
             {/* Header Text */}
-            <h1 className="text-2xl font-medium text-foreground mb-12 tracking-tight opacity-90 drop-shadow-sm">
+            <h1 className="text-3xl font-medium text-foreground mb-8 tracking-tight">
               Good afternoon, cowork with me!
             </h1>
             {onClose && (
@@ -290,7 +292,7 @@ export function CoworkPanel({
                   variant="secondary"
                   size="sm"
                   onPress={action.action}
-                  className="bg-muted/20 border border-white/5 hover:bg-muted/40 text-xs font-medium h-8 rounded-full px-4 transition-all"
+                  className="bg-muted/30 hover:bg-muted/50 text-xs font-medium h-8 rounded-full px-4"
                 >
                   {action.icon && (
                     <action.icon className={`size-3.5 mr-2 ${action.color}`} />
@@ -303,19 +305,32 @@ export function CoworkPanel({
         ) : (
           <div className="space-y-6 max-w-3xl mx-auto pb-4">
             {/* Top Toolbar for chat mode */}
-            <div className="sticky top-0 z-20 flex justify-between items-center py-2 mb-4 bg-transparent backdrop-blur-sm">
+            <div className="sticky top-0 z-20 flex justify-between items-center py-2 mb-4 bg-background/80 backdrop-blur-md border-b border-border/5">
               <span className="text-xs font-medium text-muted-foreground uppercase tracking-widest pl-2">
-                Chat Session
+                Session
               </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                isIconOnly
-                onPress={clearMessages}
-                className="text-muted-foreground hover:text-destructive opacity-50 hover:opacity-100 transition-opacity"
-              >
-                <Trash2 className="size-4" />
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  isIconOnly
+                  onPress={clearMessages}
+                  className="text-muted-foreground hover:text-destructive transition-colors"
+                >
+                  <Trash2 className="size-4" />
+                </Button>
+                {onClose && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    isIconOnly
+                    onPress={onClose}
+                    className="opacity-50 hover:opacity-100"
+                  >
+                    <X className="size-4" />
+                  </Button>
+                )}
+              </div>
             </div>
 
             {messages.map((message) => (
@@ -335,7 +350,7 @@ export function CoworkPanel({
 
       {/* Bottom Input Area (Only visible when messages exist) */}
       {messages.length > 0 && (
-        <div className="p-4 relative z-20 shrink-0 bg-gradient-to-t from-background/80 to-transparent pt-10">
+        <div className="relative z-20 shrink-0 bg-background/80 backdrop-blur-xl border-t border-border/10 p-4">
           {renderInputArea(false)}
           <div className="text-center mt-2">
             <p className="text-[10px] text-muted-foreground/40 font-medium tracking-tight">
@@ -372,18 +387,18 @@ function MessageBubble({
       className={`flex w-full ${isUser ? "justify-end" : "justify-start"} animate-in slide-in-from-bottom-2 fade-in duration-300 group`}
     >
       {!isUser && (
-        <div className="size-8 rounded-full bg-gradient-to-tr from-primary/20 to-secondary/20 flex items-center justify-center mr-3 mt-1 shrink-0 border border-white/10">
+        <div className="size-8 rounded-full bg-primary/10 flex items-center justify-center mr-3 mt-1 shrink-0">
           <Sparkles className="size-4 text-primary" />
         </div>
       )}
 
       <div
-        className={`max-w-[85%] rounded-2xl px-5 py-4 shadow-sm text-sm leading-relaxed ${
+        className={`max-w-[85%] rounded-2xl px-5 py-4 text-sm leading-relaxed ${
           isUser
-            ? "bg-muted/40 text-foreground/90 backdrop-blur-md border border-white/5 rounded-br-sm"
+            ? "bg-muted text-foreground"
             : isSystem
-              ? "bg-warning/10 text-warning-600 dark:text-warning-400 border border-warning/10"
-              : "bg-transparent text-foreground/90"
+              ? "bg-warning/10 text-warning-600 border border-warning/10"
+              : "text-foreground"
         }`}
       >
         {message.isLoading && (
@@ -414,7 +429,7 @@ function MessageBubble({
                 onPress={() => onExecute(message.plan!.id)}
                 isDisabled={isExecuting}
                 isPending={isExecuting}
-                className="bg-foreground text-background shadow-lg shadow-black/10 hover:opacity-90 font-medium"
+                className="bg-foreground text-background font-medium"
               >
                 {!isExecuting && <Play className="size-3.5 mr-1.5" />}
                 Execute Plan
@@ -424,7 +439,7 @@ function MessageBubble({
                 size="sm"
                 onPress={() => onCancel(message.plan!.id)}
                 isDisabled={isExecuting}
-                className="border-border/40 text-muted-foreground hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30"
+                className="border-border/40 text-muted-foreground"
               >
                 Cancel
               </Button>
