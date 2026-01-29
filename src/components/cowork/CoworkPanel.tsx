@@ -16,7 +16,10 @@ import {
   SlidersHorizontal,
   ChevronDown,
   X,
+  Check,
+  Cpu,
 } from "lucide-react";
+import { Popover } from "@heroui/react";
 import { useCoworkAgent, AgentMessage } from "../../hooks/useCoworkAgent";
 import { useCoworkStatus } from "../../hooks/useCoworkStatus";
 import { useAIProvider } from "../../hooks/useAIProvider";
@@ -49,13 +52,31 @@ export function CoworkPanel({
           tauri.getAvailableModels(),
         ]);
         setCurrentModel(model);
-        setAvailableModels(models);
+        setAvailableModels(models || []);
       } catch (err) {
-        console.error("Failed to fetch model data", err);
+        console.error("Failed to load models:", err);
       }
     };
     fetchData();
-  }, []);
+  }, []); // Run only once on mount
+
+  // Handle Model Selection
+  const handleModelSelect = async (modelId: string) => {
+    try {
+      await tauri.setSelectedModel(modelId);
+      setCurrentModel(modelId);
+    } catch (err) {
+      console.error("Failed to set model:", err);
+    }
+  };
+
+  const currentModelName = useMemo(() => {
+    return (
+      availableModels.find((m) => m.id === currentModel)?.name ||
+      currentModel ||
+      "Select Model"
+    );
+  }, [currentModel, availableModels]);
 
   const {
     messages,
@@ -159,11 +180,6 @@ export function CoworkPanel({
   // Fallback state: model not available or no model info
   const isFallback = !isModelAvailable && !statusLoading;
 
-  // Display model name
-  const modelDisplay = isFallback
-    ? "Auto (Fallback)"
-    : currentModelInfo?.name || "Auto";
-
   const renderInputArea = (centered: boolean) => (
     <div
       className={`w-full max-w-2xl mx-auto transition-all duration-500 ${
@@ -225,16 +241,90 @@ export function CoworkPanel({
           </div>
 
           <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              variant="ghost"
-              className="text-xs text-muted-foreground hover:text-foreground h-7 gap-1.5 rounded-full px-3"
-              onPress={onOpenSettings}
-            >
-              {isFallback && <AlertCircle className="size-3 text-orange-400" />}
-              <span>{modelDisplay.split(" ")[0]}</span>
-              <ChevronDown className="size-3 opacity-50" />
-            </Button>
+            {/* Model Selector Popover */}
+            <Popover>
+              <Popover.Trigger>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-xs text-muted-foreground hover:text-foreground h-7 gap-1.5 rounded-full px-3"
+                >
+                  {isFallback && (
+                    <AlertCircle className="size-3 text-orange-400" />
+                  )}
+                  <span className="truncate max-w-[120px]">
+                    {currentModelName}
+                  </span>
+                  <ChevronDown className="size-3 opacity-50" />
+                </Button>
+              </Popover.Trigger>
+              <Popover.Content
+                placement="bottom"
+                offset={10}
+                className="w-[240px] p-2 bg-background/90 backdrop-blur-xl border border-border/10 shadow-xl rounded-2xl"
+              >
+                <div className="flex flex-col gap-1 w-full">
+                  <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center justify-between">
+                    <span>AI Models</span>
+                    <span className="text-[10px] opacity-70">
+                      {availableModels.length} available
+                    </span>
+                  </div>
+
+                  <div className="flex flex-col gap-1 max-h-[300px] overflow-y-auto scrollbar-thin scrollbar-thumb-border/20 py-1">
+                    {availableModels.map((model) => (
+                      <Button
+                        key={model.id}
+                        variant={
+                          currentModel === model.id ? "secondary" : "ghost"
+                        }
+                        size="sm"
+                        className={`justify-start h-9 px-3 text-sm font-normal w-full ${
+                          currentModel === model.id
+                            ? "bg-secondary/50 text-foreground font-medium"
+                            : "hover:bg-muted/40 text-muted-foreground hover:text-foreground"
+                        }`}
+                        onPress={() => handleModelSelect(model.id)}
+                      >
+                        <div className="mr-2 p-1 rounded-full bg-background/50">
+                          {model.provider === "google" ? (
+                            <Sparkles className="size-3 text-blue-400" />
+                          ) : model.provider === "anthropic" ? (
+                            <Cpu className="size-3 text-orange-400" />
+                          ) : (
+                            <Cpu className="size-3 text-emerald-400" />
+                          )}
+                        </div>
+                        <div className="flex flex-col items-start gap-0.5 flex-1 min-w-0">
+                          <span className="truncate w-full">{model.name}</span>
+                          {model.thinkingLevel &&
+                            model.thinkingLevel !== "none" && (
+                              <span className="text-[10px] opacity-60 flex items-center gap-1">
+                                <Sparkles className="size-2" /> Thinking
+                              </span>
+                            )}
+                        </div>
+                        {currentModel === model.id && (
+                          <Check className="size-3.5 ml-auto text-primary" />
+                        )}
+                      </Button>
+                    ))}
+                  </div>
+
+                  <div className="h-px bg-border/10 my-1" />
+
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="justify-start h-8 px-3 text-xs text-muted-foreground w-full hover:bg-muted/50"
+                    onPress={onOpenSettings}
+                  >
+                    <SlidersHorizontal className="size-3 mr-2" />
+                    Manage API Keys
+                  </Button>
+                </div>
+              </Popover.Content>
+            </Popover>
 
             <Button
               size="sm"
