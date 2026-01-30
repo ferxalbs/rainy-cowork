@@ -747,8 +747,57 @@ Respond ONLY with valid JSON, no other text."#,
         };
 
         // Parse JSON
-        let parsed: serde_json::Value = serde_json::from_str(json_str.trim())
-            .map_err(|e| format!("Failed to parse AI response: {}", e))?;
+        println!("🔍 DEBUG: Raw AI response length: {} chars", response.len());
+        if response.len() < 200 {
+            println!("🔍 DEBUG: Raw AI response: {}", response);
+        } else {
+            println!(
+                "🔍 DEBUG: Raw AI response (first 200 chars): {}...",
+                &response[..200]
+            );
+        }
+
+        // Handle completely empty or whitespace-only response
+        let trimmed_response = json_str.trim();
+        if trimmed_response.is_empty() {
+            println!("⚠️ AI returned empty response, falling back to question intent");
+            return Ok(TaskPlan {
+                id: Uuid::new_v4().to_string(),
+                instruction: instruction.to_string(),
+                intent: TaskIntent::Question,
+                answer: Some("I received your request but couldn't process it properly. Could you please rephrase your question or command?".to_string()),
+                model_used: None,
+                steps: vec![],
+                estimated_changes: 0,
+                requires_confirmation: false,
+                warnings: vec!["AI returned an empty response".to_string()],
+                created_at: Utc::now(),
+            });
+        }
+
+        // Try to parse JSON, with fallback for non-JSON responses
+        let parsed: serde_json::Value = match serde_json::from_str(trimmed_response) {
+            Ok(v) => v,
+            Err(e) => {
+                println!(
+                    "⚠️ Failed to parse AI response as JSON: {}. Treating as plain text answer.",
+                    e
+                );
+                // Fallback: treat the response as a plain text answer
+                return Ok(TaskPlan {
+                    id: Uuid::new_v4().to_string(),
+                    instruction: instruction.to_string(),
+                    intent: TaskIntent::Question,
+                    answer: Some(response.to_string()),
+                    model_used: None,
+                    steps: vec![],
+                    estimated_changes: 0,
+                    requires_confirmation: false,
+                    warnings: vec![],
+                    created_at: Utc::now(),
+                });
+            }
+        };
 
         // Parse intent (default to command for backwards compatibility)
         let intent = parsed
