@@ -81,7 +81,13 @@ pub async fn get_unified_models(
 
     // Get models from other providers via AIProviderManager
     let other_models = get_provider_manager_models(&provider_manager).await?;
-    models.extend(other_models);
+
+    // Add other models, avoiding duplicates
+    for model in other_models {
+        if !models.iter().any(|m| m.id == model.id) {
+            models.push(model);
+        }
+    }
 
     // Apply user preferences (filter disabled models)
     let preferences = load_user_preferences(&app).await;
@@ -96,8 +102,17 @@ async fn get_rainy_sdk_models(app: &AppHandle) -> Result<Vec<UnifiedModel>, Stri
 
     // Try to get Rainy API key
     let api_key = match get_rainy_api_key(app).await {
-        Ok(key) => key,
-        Err(_) => return Ok(vec![]), // Return empty if no key
+        Ok(key) => {
+            println!(
+                "DEBUG: Found Rainy/Cowork API key: {}...",
+                &key[0..5.min(key.len())]
+            );
+            key
+        }
+        Err(e) => {
+            println!("DEBUG: No Rainy/Cowork API key found: {}", e);
+            return Ok(vec![]);
+        } // Return empty if no key
     };
 
     // Create Rainy client
@@ -118,12 +133,36 @@ async fn get_rainy_sdk_models(app: &AppHandle) -> Result<Vec<UnifiedModel>, Stri
     };
 
     // Convert to unified models
-    for (provider, model_list) in &available_models.providers {
+    println!(
+        "DEBUG: Processing SDK models. Provider count: {}",
+        available_models.providers.len()
+    );
+    for (_provider, model_list) in &available_models.providers {
+        println!(
+            "DEBUG: Processing provider models. Count: {}",
+            model_list.len()
+        );
         for model_name in model_list {
+            // Use processing_mode (rainy/cowork) as prefix to ensure correct routing
+            // instead of the upstream provider name (e.g. gemini)
+            let prefix = if processing_mode == "cowork" {
+                "cowork"
+            } else {
+                "rainy"
+            };
+
+            // Set provider name explicitly to distinguish from direct providers
+            // This ensures "Cowork", "Rainy API", and "Gemini" appear as separate groups
+            let provider_display = if prefix == "cowork" {
+                "Cowork".to_string()
+            } else {
+                "Rainy API".to_string()
+            };
+
             let model = UnifiedModel {
-                id: format!("{}:{}", provider, model_name),
+                id: format!("{}:{}", prefix, model_name),
                 name: model_name.clone(),
-                provider: provider.clone(),
+                provider: provider_display,
                 capabilities: get_default_capabilities(),
                 enabled: true,
                 processing_mode: processing_mode.clone(),
@@ -145,29 +184,34 @@ async fn get_provider_manager_models(
     let providers = provider_manager.list_providers().await;
 
     for config in providers {
-        let provider_str_opt = match config.provider {
-            ProviderType::Gemini => Some("gemini"),
-            ProviderType::RainyApi => Some("rainy_api"),
-            ProviderType::CoworkApi => Some("cowork_api"),
+        // Map provider type to internal string and display attributes
+        // We include RainyApi and CoworkApi here as a fallback in case SDK fails
+        // but get_unified_models will deduplicate if SDK succeeds
+        let (provider_str_opt, prefix, provider_display) = match config.provider {
+            ProviderType::Gemini => (Some("gemini"), "gemini", "Google Gemini"),
+            ProviderType::RainyApi => (Some("rainy_api"), "rainy", "Rainy API"),
+            ProviderType::CoworkApi => (Some("cowork_api"), "cowork", "Cowork"),
             #[allow(unreachable_patterns)]
-            _ => None,
+            _ => (None, "", ""),
         };
 
         if let Some(provider_str) = provider_str_opt {
             // Get models for this provider
             if let Ok(provider_models) = provider_manager.get_models(provider_str).await {
                 for model_name in provider_models {
-                    // Determine processing mode
-                    let processing_mode = if config.provider == ProviderType::CoworkApi {
-                        "cowork".to_string()
-                    } else {
-                        "rainy_api".to_string()
+                    // Determine processing mode based on provider type
+                    let processing_mode = match config.provider {
+                        ProviderType::CoworkApi => "cowork".to_string(),
+                        ProviderType::RainyApi => "rainy_api".to_string(),
+                        _ => "direct".to_string(),
                     };
 
                     let model = UnifiedModel {
-                        id: format!("{}:{}", provider_str, model_name),
+                        // Use consistent ID prefixing (cowork:, rainy:, gemini:)
+                        // to match SDK implementation
+                        id: format!("{}:{}", prefix, model_name),
                         name: model_name.clone(),
-                        provider: provider_str.to_string(),
+                        provider: provider_display.to_string(),
                         capabilities: get_default_capabilities(),
                         enabled: true,
                         processing_mode,
@@ -397,8 +441,8 @@ pub async fn get_recommended_model(
 
     // Fallback to default
     Ok(UnifiedModel {
-        id: "rainy:gemini-2.0-flash".to_string(),
-        name: "Gemini 2.0 Flash".to_string(),
+        id: "rainy:gemini-2.5-flash".to_string(),
+        name: "Gemini 2.5 Flash".to_string(),
         provider: "rainy".to_string(),
         capabilities: get_default_capabilities(),
         enabled: true,
