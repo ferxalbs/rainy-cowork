@@ -4,7 +4,6 @@ import {
   Popover,
   PopoverTrigger,
   PopoverContent,
-  Chip,
   Input,
 } from "@heroui/react";
 import {
@@ -103,16 +102,17 @@ export function UnifiedModelSelector({
         return false;
       }
 
-      // Context filter
-      if (filter === "chat" && model.processing_mode === "cowork") return false;
-      if (filter === "processing" && model.processing_mode === "rainy_api")
-        return false;
+      // Type filter
+      if (filter === "chat") {
+        return model.processing_mode === "rainy_api";
+      } else if (filter === "processing") {
+        return model.processing_mode === "cowork";
+      }
 
       return true;
     });
   }, [models, searchQuery, filter]);
 
-  // Group models by provider
   const groupedModels = useMemo(() => {
     const groups: Record<string, UnifiedModel[]> = {};
     filteredModels.forEach((model) => {
@@ -163,9 +163,7 @@ export function UnifiedModelSelector({
   // Helper to check if model supports thinking/reasoning
   const supportsThinking = (modelId: string): boolean => {
     return modelId.includes("gemini-3") || 
-           modelId.includes("gemini-2.5") ||
-           modelId.includes("claude") ||
-           modelId.includes("kimi");
+           modelId.includes("gemini-2.5");
   };
 
   // Get thinking level for a model
@@ -174,8 +172,6 @@ export function UnifiedModelSelector({
     if (modelId.includes("gemini-3-flash")) return "medium";
     if (modelId.includes("gemini-2.5-pro")) return "high";
     if (modelId.includes("gemini-2.5-flash")) return "medium";
-    if (modelId.includes("claude")) return "high";
-    if (modelId.includes("kimi")) return "high";
     return null;
   };
 
@@ -184,66 +180,59 @@ export function UnifiedModelSelector({
       <PopoverTrigger>
         <Button
           variant="ghost"
-          size="sm"
-          className={`h-8 gap-2 bg-background/50 hover:bg-background/80 border border-border/40 rounded-full px-3 transition-all ${className}`}
+          className={`h-8 px-3 gap-2 font-normal ${className}`}
         >
           {selectedModel ? (
             <>
-              <div className="flex items-center justify-center size-5 rounded-full bg-secondary/50">
-                {getProviderIcon(selectedModel.provider)}
+              <div className="flex items-center gap-2">
+                <div
+                  className={`size-6 rounded-md flex items-center justify-center ${
+                    selectedModel.provider === "Cowork"
+                      ? "bg-purple-500/10"
+                      : "bg-yellow-500/10"
+                  }`}
+                >
+                  {getProviderIcon(selectedModel.provider)}
+                </div>
+                <div className="flex flex-col items-start">
+                  <span className="text-sm font-medium leading-tight">
+                    {selectedModel.name}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground leading-tight">
+                    {selectedModel.provider}
+                    {getProcessingModeBadge(selectedModel.processing_mode)}
+                  </span>
+                </div>
               </div>
-              <span className="text-sm font-medium truncate max-w-[150px]">
-                {selectedModel.name}
-              </span>
-              {getProcessingModeBadge(selectedModel.processing_mode)}
             </>
           ) : (
-            <>
-              <Sparkles className="size-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">
-                Select Model
-              </span>
-            </>
+            <span className="text-muted-foreground">Select model...</span>
           )}
-          <ChevronDown className="size-3 text-muted-foreground opacity-50 ml-1" />
+          <ChevronDown className="size-4 text-muted-foreground" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent
-        placement="bottom"
-        className="p-0 w-[320px] overflow-hidden rounded-xl border border-border/50 shadow-xl bg-background/95 backdrop-blur-xl"
-      >
-        <div className="flex flex-col max-h-[400px]">
-          {/* Header & Search */}
-          <div className="p-3 border-b border-border/10 space-y-2 bg-muted/20">
-            <div className="flex items-center justify-between px-1">
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Select AI Model
-              </span>
-              <div className="flex gap-1">
-                <Chip size="sm" variant="secondary" className="h-5 text-[10px]">
-                  {filteredModels.length.toString()} available
-                </Chip>
-              </div>
-            </div>
+
+      <PopoverContent className="w-80 p-0">
+        <div className="flex flex-col">
+          {/* Search */}
+          <div className="p-3 border-b border-border/10">
             <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
               <Input
+                placeholder="Search models..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search models..."
-                className="w-full h-8 pl-8 text-xs bg-background/50 border-border/20 focus:ring-1 focus:ring-primary/20 rounded-lg"
-                // variant removed to use default or check docs later
+                className="w-full pl-9 text-sm"
               />
             </div>
           </div>
 
-          {/* Models List */}
-          <div className="overflow-y-auto flex-1 p-2 space-y-4 min-h-[200px] scrollbar-thin">
+          {/* Model List */}
+          <div className="max-h-[300px] overflow-y-auto py-2">
             {Object.entries(groupedModels).map(([provider, providerModels]) => (
-              <div key={provider} className="space-y-1">
-                <div className="px-2 text-[10px] font-bold text-muted-foreground/60 uppercase tracking-wider flex items-center gap-1.5 mb-1.5">
-                  {getProviderIcon(provider)}
-                  {provider.replace("_", " ")}
+              <div key={provider} className="px-2 py-1">
+                <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  {provider}
                 </div>
                 {providerModels.map((model) => (
                   <button
@@ -252,17 +241,17 @@ export function UnifiedModelSelector({
                       onSelect(model.id);
                       setIsPopoverOpen(false);
                     }}
-                    className={`w-full flex items-center gap-3 px-2 py-2 rounded-lg text-left transition-all ${
+                    className={`w-full flex items-center gap-3 px-2 py-2 rounded-lg text-left transition-colors ${
                       selectedModelId === model.id
-                        ? "bg-primary/10 text-primary"
-                        : "hover:bg-muted/50 text-foreground"
+                        ? "bg-accent"
+                        : "hover:bg-accent/50"
                     }`}
                   >
                     <div
-                      className={`size-8 rounded-lg flex items-center justify-center shrink-0 border ${
-                        selectedModelId === model.id
-                          ? "bg-primary/20 border-primary/20"
-                          : "bg-background border-border/30"
+                      className={`size-8 rounded-lg flex items-center justify-center shrink-0 ${
+                        model.processing_mode === "cowork"
+                          ? "bg-purple-500/10"
+                          : "bg-yellow-500/10"
                       }`}
                     >
                       {getProviderIcon(model.provider)}
@@ -278,7 +267,7 @@ export function UnifiedModelSelector({
                       </div>
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className="text-[10px] text-muted-foreground truncate">
-                          {model.capabilities.max_context / 1000}k context
+                          {(model.capabilities.max_context / 1000).toString()}k context
                         </span>
                         {model.capabilities.web_search && (
                           <span className="flex items-center gap-0.5 text-[10px] text-blue-500 bg-blue-500/5 px-1 rounded">
@@ -323,13 +312,13 @@ export function UnifiedModelSelector({
 }
 
 // Fallback data for development
-// Enterprise-grade model selection with Gemini 3, Kimi K2, and advanced reasoning
+// Models that actually exist in the Rainy SDK and are available via the API
 const MOCK_MODELS: UnifiedModel[] = [
-  // GEMINI 3 SERIES - Latest with thinking capabilities via Rainy API
+  // GEMINI 3 SERIES - Advanced reasoning models with thinking capabilities
   {
     id: "rainy:gemini-3-pro-preview",
     name: "Gemini 3 Pro (Preview)",
-    provider: "rainy",
+    provider: "Rainy API",
     capabilities: {
       chat: true,
       streaming: true,
@@ -346,7 +335,7 @@ const MOCK_MODELS: UnifiedModel[] = [
   {
     id: "rainy:gemini-3-flash-preview",
     name: "Gemini 3 Flash (Preview)",
-    provider: "rainy",
+    provider: "Rainy API",
     capabilities: {
       chat: true,
       streaming: true,
@@ -360,11 +349,112 @@ const MOCK_MODELS: UnifiedModel[] = [
     processing_mode: "rainy_api",
     thinkingLevel: "medium",
   },
-  // KIMI K2 SERIES - Via Groq for high-speed inference
   {
-    id: "rainy:kimi-k2-0905",
+    id: "rainy:gemini-3-pro-image-preview",
+    name: "Gemini 3 Pro Image (Preview)",
+    provider: "Rainy API",
+    capabilities: {
+      chat: true,
+      streaming: true,
+      function_calling: true,
+      vision: true,
+      web_search: true,
+      max_context: 2000000,
+      thinking: true,
+    },
+    enabled: true,
+    processing_mode: "rainy_api",
+    thinkingLevel: "high",
+  },
+  // GEMINI 2.5 SERIES - Stable models with thinking budget support
+  {
+    id: "rainy:gemini-2.5-pro",
+    name: "Gemini 2.5 Pro",
+    provider: "Rainy API",
+    capabilities: {
+      chat: true,
+      streaming: true,
+      function_calling: true,
+      vision: true,
+      web_search: true,
+      max_context: 2000000,
+      thinking: true,
+    },
+    enabled: true,
+    processing_mode: "rainy_api",
+    thinkingLevel: "high",
+  },
+  {
+    id: "rainy:gemini-2.5-flash",
+    name: "Gemini 2.5 Flash",
+    provider: "Rainy API",
+    capabilities: {
+      chat: true,
+      streaming: true,
+      function_calling: true,
+      vision: true,
+      web_search: true,
+      max_context: 1000000,
+      thinking: true,
+    },
+    enabled: true,
+    processing_mode: "rainy_api",
+    thinkingLevel: "medium",
+  },
+  {
+    id: "rainy:gemini-2.5-flash-lite",
+    name: "Gemini 2.5 Flash Lite",
+    provider: "Rainy API",
+    capabilities: {
+      chat: true,
+      streaming: true,
+      function_calling: true,
+      vision: true,
+      web_search: false,
+      max_context: 1000000,
+      thinking: false,
+    },
+    enabled: true,
+    processing_mode: "rainy_api",
+  },
+  // GROQ MODELS - High-speed inference
+  {
+    id: "rainy:llama-3.1-8b-instant",
+    name: "Llama 3.1 8B Instant (Groq)",
+    provider: "Rainy API",
+    capabilities: {
+      chat: true,
+      streaming: true,
+      function_calling: true,
+      vision: false,
+      web_search: false,
+      max_context: 128000,
+      thinking: false,
+    },
+    enabled: true,
+    processing_mode: "rainy_api",
+  },
+  {
+    id: "rainy:llama-3.3-70b-versatile",
+    name: "Llama 3.3 70B Versatile (Groq)",
+    provider: "Rainy API",
+    capabilities: {
+      chat: true,
+      streaming: true,
+      function_calling: true,
+      vision: false,
+      web_search: false,
+      max_context: 128000,
+      thinking: false,
+    },
+    enabled: true,
+    processing_mode: "rainy_api",
+  },
+  // KIMI K2 - Via Groq for high-speed inference
+  {
+    id: "rainy:moonshotai/kimi-k2-instruct-0905",
     name: "Kimi K2 (Groq)",
-    provider: "rainy",
+    provider: "Rainy API",
     capabilities: {
       chat: true,
       streaming: true,
@@ -378,79 +468,11 @@ const MOCK_MODELS: UnifiedModel[] = [
     processing_mode: "rainy_api",
     thinkingLevel: "high",
   },
-  // GEMINI 2.5 SERIES - Thinking budget support
+  // CEREBRAS MODELS
   {
-    id: "cowork:gemini-2.5-pro",
-    name: "Gemini 2.5 Pro",
-    provider: "cowork",
-    capabilities: {
-      chat: true,
-      streaming: true,
-      function_calling: true,
-      vision: true,
-      web_search: true,
-      max_context: 2000000,
-      thinking: true,
-    },
-    enabled: true,
-    processing_mode: "cowork",
-    thinkingLevel: "high",
-  },
-  {
-    id: "cowork:gemini-2.5-flash",
-    name: "Gemini 2.5 Flash",
-    provider: "cowork",
-    capabilities: {
-      chat: true,
-      streaming: true,
-      function_calling: true,
-      vision: true,
-      web_search: true,
-      max_context: 1000000,
-      thinking: true,
-    },
-    enabled: true,
-    processing_mode: "cowork",
-    thinkingLevel: "medium",
-  },
-  // CLAUDE SERIES
-  {
-    id: "cowork:claude-3-5-sonnet",
-    name: "Claude 3.5 Sonnet",
-    provider: "cowork",
-    capabilities: {
-      chat: true,
-      streaming: true,
-      function_calling: true,
-      vision: true,
-      web_search: false,
-      max_context: 200000,
-      thinking: true,
-    },
-    enabled: true,
-    processing_mode: "cowork",
-    thinkingLevel: "high",
-  },
-  // OPENAI SERIES - Fallback options
-  {
-    id: "rainy:gpt-4o",
-    name: "GPT-4o",
-    provider: "rainy",
-    capabilities: {
-      chat: true,
-      streaming: true,
-      function_calling: true,
-      vision: true,
-      web_search: false,
-      max_context: 128000,
-    },
-    enabled: true,
-    processing_mode: "rainy_api",
-  },
-  {
-    id: "rainy:gpt-4o-mini",
-    name: "GPT-4o Mini",
-    provider: "rainy",
+    id: "rainy:cerebras/llama3.1-8b",
+    name: "Llama 3.1 8B (Cerebras)",
+    provider: "Rainy API",
     capabilities: {
       chat: true,
       streaming: true,
@@ -458,6 +480,56 @@ const MOCK_MODELS: UnifiedModel[] = [
       vision: false,
       web_search: false,
       max_context: 128000,
+      thinking: false,
+    },
+    enabled: true,
+    processing_mode: "rainy_api",
+  },
+  // ENOSIS LABS MODELS - Proprietary models
+  {
+    id: "rainy:astronomer-2-pro",
+    name: "Astronomer 2 Pro",
+    provider: "Rainy API",
+    capabilities: {
+      chat: true,
+      streaming: true,
+      function_calling: true,
+      vision: false,
+      web_search: false,
+      max_context: 128000,
+      thinking: false,
+    },
+    enabled: true,
+    processing_mode: "rainy_api",
+  },
+  {
+    id: "rainy:astronomer-2",
+    name: "Astronomer 2",
+    provider: "Rainy API",
+    capabilities: {
+      chat: true,
+      streaming: true,
+      function_calling: true,
+      vision: false,
+      web_search: false,
+      max_context: 128000,
+      thinking: false,
+    },
+    enabled: true,
+    processing_mode: "rainy_api",
+  },
+  {
+    id: "rainy:astronomer-1-5",
+    name: "Astronomer 1.5",
+    provider: "Rainy API",
+    capabilities: {
+      chat: true,
+      streaming: true,
+      function_calling: true,
+      vision: false,
+      web_search: false,
+      max_context: 128000,
+      thinking: false,
     },
     enabled: true,
     processing_mode: "rainy_api",

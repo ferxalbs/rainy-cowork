@@ -575,7 +575,7 @@ impl CoworkAgent {
             println!("🔄 Trying Rainy API fallback");
             if let Ok(response) = self
                 .ai_provider
-                .execute_prompt(&ProviderType::RainyApi, "gpt-4o", prompt, |_, _| {}, None::<fn(String)>)
+                .execute_prompt(&ProviderType::RainyApi, "gemini-2.5-flash", prompt, |_, _| {}, None::<fn(String)>)
                 .await
             {
                 println!("✅ Rainy API fallback successful");
@@ -583,7 +583,7 @@ impl CoworkAgent {
                     response,
                     ModelInfo {
                         provider: "Rainy API (Fallback)".to_string(),
-                        model: "gpt-4o".to_string(),
+                        model: "gemini-2.5-flash".to_string(),
                         plan_tier: "Pay-As-You-Go".to_string(),
                     },
                 ));

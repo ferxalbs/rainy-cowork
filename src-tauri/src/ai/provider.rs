@@ -275,7 +275,7 @@ impl AIProviderManager {
             AIProviderConfig {
                 provider: ProviderType::RainyApi,
                 name: "Rainy API".to_string(),
-                model: "gpt-4o".to_string(),
+                model: "gemini-2.5-flash".to_string(),
                 is_available: true,
                 requires_api_key: true,
             },
@@ -310,16 +310,56 @@ impl AIProviderManager {
     }
 
     /// Get available models based on plan
+    /// Only returns models that actually exist in the Rainy SDK
     pub async fn get_models(&self, provider: &str) -> Result<Vec<String>, String> {
         match provider {
             "rainy_api" => {
-                // Standard Rainy API supports all models (subject to key permission/credits)
+                // Get models from API key if available, otherwise return default SDK models
+                // Note: OpenAI and Anthropic models are not currently available via Rainy API
+                if let Ok(api_key) = self.keychain.get_key("rainy_api") {
+                    if let Some(key) = api_key {
+                        let client = RainyClient::with_api_key(&key)
+                            .map_err(|e| format!("Failed to create client: {}", e))?;
+                        let available = client
+                            .list_available_models()
+                            .await
+                            .map_err(|e| format!("Failed to fetch models: {}", e))?;
+                        
+                        // Flatten all models from all providers
+                        let mut all_models: Vec<String> = Vec::new();
+                        for (_provider_name, models) in available.providers {
+                            all_models.extend(models);
+                        }
+                        
+                        if !all_models.is_empty() {
+                            return Ok(all_models);
+                        }
+                    }
+                }
+                
+                // Fallback: Return models that are confirmed to exist in the SDK
+                // These are the actual models available via the Rainy API
                 Ok(vec![
-                    "gpt-4o".to_string(),
-                    "gpt-4o-mini".to_string(),
-                    "gpt-4-turbo".to_string(),
-                    "claude-3.5-sonnet".to_string(),
-                    "claude-3-opus".to_string(),
+                    // Gemini 3 Series - Advanced reasoning
+                    "gemini-3-pro-preview".to_string(),
+                    "gemini-3-flash-preview".to_string(),
+                    "gemini-3-pro-image-preview".to_string(),
+                    // Gemini 2.5 Series - Stable production models
+                    "gemini-2.5-pro".to_string(),
+                    "gemini-2.5-flash".to_string(),
+                    "gemini-2.5-flash-lite".to_string(),
+                    // Groq Models - High-speed inference
+                    "llama-3.1-8b-instant".to_string(),
+                    "llama-3.3-70b-versatile".to_string(),
+                    "moonshotai/kimi-k2-instruct-0905".to_string(),
+                    // Cerebras Models
+                    "cerebras/llama3.1-8b".to_string(),
+                    // Enosis Labs Models
+                    "astronomer-2-pro".to_string(),
+                    "astronomer-2".to_string(),
+                    "astronomer-1-5".to_string(),
+                    "astronomer-1-max".to_string(),
+                    "astronomer-1".to_string(),
                 ])
             }
             "cowork_api" => {
