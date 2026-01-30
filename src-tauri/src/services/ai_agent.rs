@@ -333,8 +333,29 @@ impl CoworkAgent {
             available_models.iter().map(|m| &m.id).collect::<Vec<_>>()
         );
 
+        // Strip provider prefix from selected_model for lookup
+        // The settings store model IDs with prefixes like "rainy:gemini-3-flash-minimal"
+        // but available_models uses raw IDs without prefixes
+        let raw_model_id = if selected_model.starts_with("rainy:") {
+            selected_model
+                .strip_prefix("rainy:")
+                .unwrap_or(&selected_model)
+        } else if selected_model.starts_with("cowork:") {
+            selected_model
+                .strip_prefix("cowork:")
+                .unwrap_or(&selected_model)
+        } else if selected_model.starts_with("gemini:") {
+            selected_model
+                .strip_prefix("gemini:")
+                .unwrap_or(&selected_model)
+        } else {
+            &selected_model
+        };
+
+        println!("🔍 Raw model ID for lookup: '{}'", raw_model_id);
+
         // Find the selected model in available models to get its provider
-        let model_info = available_models.iter().find(|m| m.id == selected_model);
+        let model_info = available_models.iter().find(|m| m.id == raw_model_id);
 
         if let Some(model) = model_info {
             println!(
@@ -358,7 +379,8 @@ impl CoworkAgent {
                                 &ProviderType::CoworkApi,
                                 &model.name,
                                 prompt,
-                                |_, _| {}, None::<fn(String)>,
+                                |_, _| {},
+                                None::<fn(String)>,
                             )
                             .await
                         {
@@ -407,7 +429,13 @@ impl CoworkAgent {
                     {
                         match self
                             .ai_provider
-                            .execute_prompt(&ProviderType::RainyApi, &model.name, prompt, |_, _| {}, None::<fn(String)>)
+                            .execute_prompt(
+                                &ProviderType::RainyApi,
+                                &model.name,
+                                prompt,
+                                |_, _| {},
+                                None::<fn(String)>,
+                            )
                             .await
                         {
                             Ok(response) => {
@@ -444,7 +472,13 @@ impl CoworkAgent {
                     {
                         match self
                             .ai_provider
-                            .execute_prompt(&ProviderType::Gemini, &model.name, prompt, |_, _| {}, None::<fn(String)>)
+                            .execute_prompt(
+                                &ProviderType::Gemini,
+                                &model.name,
+                                prompt,
+                                |_, _| {},
+                                None::<fn(String)>,
+                            )
                             .await
                         {
                             Ok(response) => {
@@ -481,48 +515,123 @@ impl CoworkAgent {
             }
         } else {
             println!(
-                "⚠️ AI Agent: Selected model '{}' not found in available models",
-                selected_model
+                "⚠️ AI Agent: Selected model '{}' not found in available models (raw_id='{}')",
+                selected_model, raw_model_id
             );
-            println!("⚠️ Attempting to use as Gemini BYOK if it starts with 'gemini'");
 
-            // If model starts with "gemini", try it as BYOK (manually strip prefix)
-            if selected_model.starts_with("gemini")
-                && self
+            // Determine provider from prefix and route directly
+            if selected_model.starts_with("rainy:") {
+                println!("🔍 Detected Rainy API model from prefix, attempting direct execution");
+                if self
+                    .ai_provider
+                    .has_api_key("rainy_api")
+                    .await
+                    .unwrap_or(false)
+                {
+                    match self
+                        .ai_provider
+                        .execute_prompt(
+                            &ProviderType::RainyApi,
+                            raw_model_id,
+                            prompt,
+                            |_, _| {},
+                            None::<fn(String)>,
+                        )
+                        .await
+                    {
+                        Ok(response) => {
+                            println!(
+                                "✅ AI Agent: Successfully used Rainy API for model '{}'",
+                                raw_model_id
+                            );
+                            return Ok((
+                                response,
+                                ModelInfo {
+                                    provider: "Rainy API".to_string(),
+                                    model: raw_model_id.to_string(),
+                                    plan_tier: "Pay-As-You-Go".to_string(),
+                                },
+                            ));
+                        }
+                        Err(e) => {
+                            println!("❌ AI Agent: Rainy API direct execution failed: {}", e);
+                        }
+                    }
+                } else {
+                    println!("⚠️ AI Agent: No Rainy API key configured");
+                }
+            } else if selected_model.starts_with("cowork:") {
+                println!("🔍 Detected Cowork model from prefix, attempting direct execution");
+                if caps.can_make_request() {
+                    match self
+                        .ai_provider
+                        .execute_prompt(
+                            &ProviderType::CoworkApi,
+                            raw_model_id,
+                            prompt,
+                            |_, _| {},
+                            None::<fn(String)>,
+                        )
+                        .await
+                    {
+                        Ok(response) => {
+                            println!(
+                                "✅ AI Agent: Successfully used Cowork API for model '{}'",
+                                raw_model_id
+                            );
+                            return Ok((
+                                response,
+                                ModelInfo {
+                                    provider: "Cowork Subscription".to_string(),
+                                    model: raw_model_id.to_string(),
+                                    plan_tier: caps.profile.plan.name.clone(),
+                                },
+                            ));
+                        }
+                        Err(e) => {
+                            println!("❌ AI Agent: Cowork API direct execution failed: {}", e);
+                        }
+                    }
+                }
+            } else if selected_model.starts_with("gemini:") || raw_model_id.starts_with("gemini") {
+                println!("🔍 Detected Gemini BYOK model, attempting direct execution");
+                if self
                     .ai_provider
                     .has_api_key("gemini")
                     .await
                     .unwrap_or(false)
-            {
-                // Strip "gemini:" prefix if present
-                let raw_model_name = if let Some((_, name)) = selected_model.split_once(':') {
-                    name
-                } else {
-                    &selected_model
-                };
-
-                match self
-                    .ai_provider
-                    .execute_prompt(&ProviderType::Gemini, raw_model_name, prompt, |_, _| {}, None::<fn(String)>)
-                    .await
                 {
-                    Ok(response) => {
-                        println!(
-                            "✅ AI Agent: Successfully used Gemini BYOK for model '{}'",
-                            selected_model
-                        );
-                        return Ok((
-                            response,
-                            ModelInfo {
-                                provider: "Google Gemini".to_string(),
-                                model: raw_model_name.to_string(),
-                                plan_tier: "BYOK".to_string(),
-                            },
-                        ));
+                    match self
+                        .ai_provider
+                        .execute_prompt(
+                            &ProviderType::Gemini,
+                            raw_model_id,
+                            prompt,
+                            |_, _| {},
+                            None::<fn(String)>,
+                        )
+                        .await
+                    {
+                        Ok(response) => {
+                            println!(
+                                "✅ AI Agent: Successfully used Gemini BYOK for model '{}'",
+                                raw_model_id
+                            );
+                            return Ok((
+                                response,
+                                ModelInfo {
+                                    provider: "Google Gemini".to_string(),
+                                    model: raw_model_id.to_string(),
+                                    plan_tier: "BYOK".to_string(),
+                                },
+                            ));
+                        }
+                        Err(e) => {
+                            println!("❌ AI Agent: Gemini BYOK attempt failed: {}", e);
+                        }
                     }
-                    Err(e) => {
-                        println!("❌ AI Agent: Gemini BYOK attempt failed: {}", e);
-                    }
+                } else {
+                    println!("⚠️ AI Agent: No Gemini API key configured");
                 }
             }
         }
