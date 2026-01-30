@@ -153,8 +153,9 @@ impl SettingsManager {
 
         // Rainy API models (static list from rainy-sdk - pay-as-you-go)
         // These are ALL available models via Rainy API
-        let rainy_api_models = [
-            // OpenAI models
+
+        // OpenAI models
+        for (id, name, desc) in [
             ("gpt-4o", "GPT-4o", "OpenAI's flagship multimodal model"),
             ("gpt-5", "GPT-5", "OpenAI's most advanced reasoning model"),
             (
@@ -164,7 +165,20 @@ impl SettingsManager {
             ),
             ("o3", "O3", "OpenAI's reasoning-focused model"),
             ("o4-mini", "O4 Mini", "Fast and efficient reasoning"),
-            // Anthropic models
+        ] {
+            models.push(ModelOption {
+                id: id.to_string(),
+                name: name.to_string(),
+                description: desc.to_string(),
+                thinking_level: "n/a".to_string(),
+                is_premium: true,
+                is_available: true,
+                provider: "Rainy API".to_string(),
+            });
+        }
+
+        // Anthropic models
+        for (id, name, desc) in [
             (
                 "claude-sonnet-4",
                 "Claude Sonnet 4",
@@ -175,7 +189,20 @@ impl SettingsManager {
                 "Claude Opus 4.1",
                 "Anthropic's most capable model",
             ),
-            // Google Gemini 2.5 models
+        ] {
+            models.push(ModelOption {
+                id: id.to_string(),
+                name: name.to_string(),
+                description: desc.to_string(),
+                thinking_level: "n/a".to_string(),
+                is_premium: true,
+                is_available: true,
+                provider: "Rainy API".to_string(),
+            });
+        }
+
+        // Google Gemini 2.5 models
+        for (id, name, desc) in [
             (
                 "gemini-2.5-pro",
                 "Gemini 2.5 Pro",
@@ -191,23 +218,109 @@ impl SettingsManager {
                 "Gemini 2.5 Flash Lite",
                 "Lightweight cost-effective AI",
             ),
-            // Google Gemini 3 models (advanced reasoning)
+        ] {
+            models.push(ModelOption {
+                id: id.to_string(),
+                name: name.to_string(),
+                description: desc.to_string(),
+                thinking_level: "n/a".to_string(),
+                is_premium: true,
+                is_available: true,
+                provider: "Rainy API".to_string(),
+            });
+        }
+
+        // Google Gemini 3 Flash models with thinking levels (minimal, low, medium, high)
+        for (id, name, desc, thinking) in [
             (
-                "gemini-3-pro-preview",
-                "Gemini 3 Pro",
-                "Advanced reasoning model",
+                "gemini-3-flash-minimal",
+                "Gemini 3 Flash (Minimal)",
+                "Fastest responses with minimal thinking",
+                "minimal",
             ),
+            (
+                "gemini-3-flash-low",
+                "Gemini 3 Flash (Low)",
+                "Fast responses with light thinking",
+                "low",
+            ),
+            (
+                "gemini-3-flash-medium",
+                "Gemini 3 Flash (Medium)",
+                "Balanced speed and reasoning",
+                "medium",
+            ),
+            (
+                "gemini-3-flash-high",
+                "Gemini 3 Flash (High)",
+                "Deep reasoning for complex tasks",
+                "high",
+            ),
+            // Also add the base preview model
             (
                 "gemini-3-flash-preview",
                 "Gemini 3 Flash",
                 "Fast thinking with reasoning",
+                "medium",
+            ),
+        ] {
+            models.push(ModelOption {
+                id: id.to_string(),
+                name: name.to_string(),
+                description: desc.to_string(),
+                thinking_level: thinking.to_string(),
+                is_premium: true,
+                is_available: true,
+                provider: "Rainy API".to_string(),
+            });
+        }
+
+        // Google Gemini 3 Pro models with thinking levels (low, high)
+        for (id, name, desc, thinking) in [
+            (
+                "gemini-3-pro-low",
+                "Gemini 3 Pro (Low)",
+                "Advanced reasoning with faster responses",
+                "low",
             ),
             (
-                "gemini-3-pro-image-preview",
-                "Gemini 3 Pro Image",
-                "Multimodal reasoning",
+                "gemini-3-pro-high",
+                "Gemini 3 Pro (High)",
+                "Maximum reasoning capabilities",
+                "high",
             ),
-            // Groq models
+            // Also add the base preview model
+            (
+                "gemini-3-pro-preview",
+                "Gemini 3 Pro",
+                "Advanced reasoning model",
+                "medium",
+            ),
+        ] {
+            models.push(ModelOption {
+                id: id.to_string(),
+                name: name.to_string(),
+                description: desc.to_string(),
+                thinking_level: thinking.to_string(),
+                is_premium: true,
+                is_available: true,
+                provider: "Rainy API".to_string(),
+            });
+        }
+
+        // Other Gemini 3 models
+        models.push(ModelOption {
+            id: "gemini-3-pro-image-preview".to_string(),
+            name: "Gemini 3 Pro Image".to_string(),
+            description: "Multimodal reasoning".to_string(),
+            thinking_level: "n/a".to_string(),
+            is_premium: true,
+            is_available: true,
+            provider: "Rainy API".to_string(),
+        });
+
+        // Groq models
+        for (id, name, desc) in [
             (
                 "llama-3.1-8b-instant",
                 "Llama 3.1 8B Instant",
@@ -223,13 +336,31 @@ impl SettingsManager {
                 "Kimi K2",
                 "Moonshot AI's instruction model",
             ),
-            // Cerebras models
-            (
-                "cerebras/llama3.1-8b",
-                "Cerebras Llama 3.1 8B",
-                "Cerebras-accelerated Llama",
-            ),
-            // Enosis Labs models
+        ] {
+            models.push(ModelOption {
+                id: id.to_string(),
+                name: name.to_string(),
+                description: desc.to_string(),
+                thinking_level: "n/a".to_string(),
+                is_premium: true,
+                is_available: true,
+                provider: "Rainy API".to_string(),
+            });
+        }
+
+        // Cerebras models
+        models.push(ModelOption {
+            id: "cerebras/llama3.1-8b".to_string(),
+            name: "Cerebras Llama 3.1 8B".to_string(),
+            description: "Cerebras-accelerated Llama".to_string(),
+            thinking_level: "n/a".to_string(),
+            is_premium: true,
+            is_available: true,
+            provider: "Rainy API".to_string(),
+        });
+
+        // Enosis Labs models
+        for (id, name, desc) in [
             ("astronomer-1", "Astronomer 1", "Enosis Labs base model"),
             (
                 "astronomer-1-max",
@@ -243,16 +374,14 @@ impl SettingsManager {
                 "Astronomer 2 Pro",
                 "Enosis Labs flagship model",
             ),
-        ];
-
-        for (id, name, desc) in rainy_api_models {
+        ] {
             models.push(ModelOption {
                 id: id.to_string(),
                 name: name.to_string(),
                 description: desc.to_string(),
                 thinking_level: "n/a".to_string(),
-                is_premium: true,   // Rainy API models are pay-as-you-go
-                is_available: true, // Available if user has rainy_api key
+                is_premium: true,
+                is_available: true,
                 provider: "Rainy API".to_string(),
             });
         }

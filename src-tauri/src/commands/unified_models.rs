@@ -96,92 +96,98 @@ pub async fn get_unified_models(
     Ok(models)
 }
 
-/// Get models from Rainy SDK (static list - no API calls needed)
-/// Uses the same static model list as rainy-sdk/src/models.rs
+/// Get models from Rainy SDK
+/// - Cowork: fetches from API (dynamic based on plan)
+/// - Rainy API: static list (all available models)
 async fn get_rainy_sdk_models(_app: &AppHandle) -> Result<Vec<UnifiedModel>, String> {
     use crate::ai::keychain::KeychainManager;
+    use rainy_sdk::RainyClient;
+
     let mut models = Vec::new();
     let keychain = KeychainManager::new();
 
-    // Check which keys are available
-    let has_cowork = keychain
-        .get_key("cowork_api")
-        .map(|k| k.is_some())
-        .unwrap_or(false);
+    // Get Cowork API key and fetch models dynamically from API
+    if let Ok(Some(cowork_key)) = keychain.get_key("cowork_api") {
+        if let Ok(client) = RainyClient::with_api_key(&cowork_key) {
+            // Fetch models from Cowork API (dynamic based on plan)
+            if let Ok(available) = client.list_available_models().await {
+                for (_provider, model_list) in &available.providers {
+                    for model_name in model_list {
+                        models.push(UnifiedModel {
+                            id: format!("cowork:{}", model_name),
+                            name: model_name.clone(),
+                            provider: "Cowork".to_string(),
+                            capabilities: get_default_capabilities(),
+                            enabled: true,
+                            processing_mode: "cowork".to_string(),
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    // Check if user has Rainy API key
     let has_rainy = keychain
         .get_key("rainy_api")
         .map(|k| k.is_some())
         .unwrap_or(false);
 
-    // Static model list from rainy-sdk (no API calls needed)
-    let rainy_api_models = [
-        // OpenAI models
-        "gpt-4o",
-        "gpt-5",
-        "gpt-5-pro",
-        "o3",
-        "o4-mini",
-        // Anthropic models
-        "claude-sonnet-4",
-        "claude-opus-4-1",
-        // Google Gemini 2.5 models
-        "gemini-2.5-pro",
-        "gemini-2.5-flash",
-        "gemini-2.5-flash-lite",
-        // Google Gemini 3 models (advanced reasoning)
-        "gemini-3-pro-preview",
-        "gemini-3-flash-preview",
-        "gemini-3-pro-image-preview",
-        // Groq models
-        "llama-3.1-8b-instant",
-        "llama-3.3-70b-versatile",
-        "moonshotai/kimi-k2-instruct-0905",
-        // Cerebras models
-        "cerebras/llama3.1-8b",
-        // Enosis Labs models
-        "astronomer-1",
-        "astronomer-1-max",
-        "astronomer-1.5",
-        "astronomer-2",
-        "astronomer-2-pro",
-    ];
-
-    // Add Rainy API models if user has rainy_api key
+    // Static Rainy API model list (all available models from rainy-sdk)
+    // This includes Gemini 3 with thinking level variants
     if has_rainy {
-        for model_name in &rainy_api_models {
-            models.push(UnifiedModel {
-                id: format!("rainy:{}", model_name),
-                name: model_name.to_string(),
-                provider: "Rainy API".to_string(),
-                capabilities: get_default_capabilities(),
-                enabled: true,
-                processing_mode: "rainy_api".to_string(),
-            });
-        }
-    }
-
-    // Add Cowork models if user has cowork_api key
-    // Note: Cowork may have a subset of models based on plan
-    if has_cowork {
-        // Cowork typically has these models (subset of Rainy API)
-        let cowork_models = [
-            "gemini-2.5-flash-lite",
-            "llama-3.1-8b-instant",
-            "gemini-3-flash-preview",
+        let rainy_api_models = [
+            // OpenAI models
+            "gpt-4o",
+            "gpt-5",
+            "gpt-5-pro",
+            "o3",
+            "o4-mini",
+            // Anthropic models
+            "claude-sonnet-4",
+            "claude-opus-4-1",
+            // Google Gemini 2.5 models
+            "gemini-2.5-pro",
             "gemini-2.5-flash",
+            "gemini-2.5-flash-lite",
+            // Google Gemini 3 Flash with thinking levels
+            "gemini-3-flash-minimal",
+            "gemini-3-flash-low",
+            "gemini-3-flash-medium",
+            "gemini-3-flash-high",
+            "gemini-3-flash-preview",
+            // Google Gemini 3 Pro with thinking levels
+            "gemini-3-pro-low",
+            "gemini-3-pro-high",
+            "gemini-3-pro-preview",
+            // Gemini 3 Image
+            "gemini-3-pro-image-preview",
+            // Groq models
+            "llama-3.1-8b-instant",
+            "llama-3.3-70b-versatile",
+            "moonshotai/kimi-k2-instruct-0905",
+            // Cerebras models
+            "cerebras/llama3.1-8b",
+            // Enosis Labs models
+            "astronomer-1",
+            "astronomer-1-max",
+            "astronomer-1.5",
+            "astronomer-2",
+            "astronomer-2-pro",
         ];
-        for model_name in &cowork_models {
-            let model = UnifiedModel {
-                id: format!("cowork:{}", model_name),
-                name: model_name.to_string(),
-                provider: "Cowork".to_string(),
-                capabilities: get_default_capabilities(),
-                enabled: true,
-                processing_mode: "cowork".to_string(),
-            };
-            // Avoid duplicates
-            if !models.iter().any(|m: &UnifiedModel| m.id == model.id) {
-                models.push(model);
+
+        for model_name in &rainy_api_models {
+            // Avoid duplicates with Cowork models
+            let model_id = format!("rainy:{}", model_name);
+            if !models.iter().any(|m| m.id == model_id) {
+                models.push(UnifiedModel {
+                    id: model_id,
+                    name: model_name.to_string(),
+                    provider: "Rainy API".to_string(),
+                    capabilities: get_default_capabilities(),
+                    enabled: true,
+                    processing_mode: "rainy_api".to_string(),
+                });
             }
         }
     }
