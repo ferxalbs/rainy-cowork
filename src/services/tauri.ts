@@ -560,6 +560,28 @@ export async function agentAnalyzeWorkspace(
   return invoke<WorkspaceAnalysis>("agent_analyze_workspace", { path });
 }
 
+// ============ Unified Chat Commands ============
+
+export interface StreamEvent {
+  event: "token" | "error" | "done";
+  data: string;
+}
+
+export async function streamUnifiedChat(
+  message: string,
+  modelId: string,
+  onEvent: (event: StreamEvent) => void,
+): Promise<void> {
+  const channel = new Channel<StreamEvent>();
+  channel.onmessage = onEvent;
+
+  return invoke<void>("unified_chat_stream", {
+    message,
+    modelId,
+    onEvent: channel,
+  });
+}
+
 // ============ Settings Types ============
 
 export interface ModelOption {

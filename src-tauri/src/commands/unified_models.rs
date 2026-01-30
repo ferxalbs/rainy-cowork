@@ -406,6 +406,82 @@ pub async fn get_recommended_model(
     })
 }
 
+/// Event for streaming responses
+#[derive(Clone, Serialize)]
+pub struct StreamEvent {
+    pub event: String,
+    pub data: String,
+}
+
+/// Stream chat response (simulated for now)
+#[tauri::command]
+pub async fn unified_chat_stream(
+    _app: AppHandle,
+    provider_manager: tauri::State<'_, Arc<AIProviderManager>>,
+    message: String,
+    model_id: String,
+    on_event: tauri::ipc::Channel<StreamEvent>,
+) -> Result<(), String> {
+    // Parse model ID to get provider and model name
+    let parts: Vec<&str> = model_id.split(':').collect();
+    if parts.len() != 2 {
+        let _ = on_event.send(StreamEvent {
+            event: "error".to_string(),
+            data: "Invalid model ID format".to_string(),
+        });
+        return Err("Invalid model ID format".to_string());
+    }
+
+    let provider_name = parts[0];
+    let model_name = parts[1];
+
+    // Determine processing mode (simplified for stream)
+    let _processing_mode = ModeSelector::select_mode(
+        &"dummy_key", // We'll validate later
+        UseCase::StreamingResponse,
+        TaskComplexity::Low,
+    );
+
+    // Map string provider name to ProviderType
+    let provider_type = match provider_name {
+        "rainy_api" | "rainy" => ProviderType::RainyApi,
+        "cowork_api" | "cowork" => ProviderType::CoworkApi,
+        "gemini" => ProviderType::Gemini,
+        _ => ProviderType::RainyApi,
+    };
+
+    // Execute prompt (blocking for now)
+    let prompt = message; // In real chat, we'd process history
+
+    let result = provider_manager
+        .execute_prompt(&provider_type, model_name, &prompt, |_progress, _msg| {
+            // In future, if execute_prompt supports real streaming, we'd emit tokens here
+        })
+        .await;
+
+    match result {
+        Ok(response) => {
+            // Simulate streaming by sending the whole chunk
+            let _ = on_event.send(StreamEvent {
+                event: "token".to_string(),
+                data: response,
+            });
+            let _ = on_event.send(StreamEvent {
+                event: "done".to_string(),
+                data: "".to_string(),
+            });
+            Ok(())
+        }
+        Err(e) => {
+            let _ = on_event.send(StreamEvent {
+                event: "error".to_string(),
+                data: e.to_string(),
+            });
+            Err(e)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

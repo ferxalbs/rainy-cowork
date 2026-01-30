@@ -208,7 +208,7 @@ function App() {
   const isAIStudioSection =
     activeSection === "documents" ||
     activeSection === "research" ||
-    activeSection === "cowork";
+    activeSection === "agent-chat";
 
   // Check if we're in Settings section
   const isSettingsSection = activeSection.startsWith("settings-");
@@ -275,7 +275,7 @@ function App() {
             </div>
           )}
 
-          {activeSection === "cowork" && (
+          {activeSection === "agent-chat" && (
             <div className="animate-appear h-[calc(100vh-120px)]">
               {activeFolder ? (
                 <AgentChatPanel

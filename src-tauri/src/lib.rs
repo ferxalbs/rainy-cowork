@@ -322,6 +322,7 @@ pub fn run() {
             commands::get_user_preferences,
             commands::send_unified_message,
             commands::get_recommended_model,
+            commands::unified_chat_stream,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

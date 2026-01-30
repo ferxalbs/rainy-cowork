@@ -57,6 +57,7 @@ export function AgentChatPanel({
     isExecuting,
     currentPlan,
     sendInstruction,
+    streamChat,
     executePlan,
     cancelPlan,
     clearMessages,
@@ -75,11 +76,13 @@ export function AgentChatPanel({
     const instruction = input.trim();
     setInput("");
 
-    // Here we would ideally pass the currentModelId to sendInstruction
-    // dependent on how useCoworkAgent is refactored for the new system.
-    // For now, we assume the backend handles routing based on selected model
-    // or that useCoworkAgent reads the stored preference.
-    await sendInstruction(instruction, workspacePath);
+    if (isDeepProcessing) {
+      // Deep processing use legacy Cowork Agent (Plan -> Execute)
+      await sendInstruction(instruction, workspacePath);
+    } else {
+      // Fast chat uses Unified Streaming
+      await streamChat(instruction, currentModelId);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -315,5 +318,5 @@ function SuggestionCard({
 // Reuse MessageBubble from CoworkPanel or extract to shared component
 // For brevity, assuming MessageBubble is similar but imported or defined here.
 // Ideally should be a shared component.
-import { MessageBubble } from "../cowork/CoworkPanel";
+import { MessageBubble } from "./MessageBubble";
 // Note: You might need to export MessageBubble from CoworkPanel.tsx if not already exported.

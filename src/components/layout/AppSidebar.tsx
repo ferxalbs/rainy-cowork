@@ -241,8 +241,8 @@ export function AppSidebar({
             </div>
           )}
           <NavItem
-            id="cowork"
-            label="Cowork Chat"
+            id="agent-chat"
+            label="Agent Chat"
             icon={MessageSquare}
             colorClass="text-purple-500"
           />
