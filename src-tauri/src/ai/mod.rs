@@ -1,4 +1,5 @@
 // Rainy Cowork - AI Module
+#![allow(unused_imports)]
 // AI provider abstraction using rainy-sdk for premium features
 
 pub mod gemini;
@@ -13,6 +14,10 @@ pub mod provider_types;
 pub mod providers;
 pub mod router;
 
+// PHASE 4: Unified Model System
+pub mod mode_selector;
+pub mod unified_model_registry;
+
 // Legacy exports (deprecated)
 pub use provider::AIProviderManager;
 
@@ -26,7 +31,9 @@ pub use provider_types::{
 };
 pub use router::IntelligentRouter;
 
-// PHASE 3 items available via full path when needed:
-// - providers::{RainySDKProvider, OpenAIProvider, AnthropicProvider, XAIProvider}
-// - router::{LoadBalancer, CostOptimizer, CapabilityMatcher, FallbackChain, CircuitBreaker}
-// - features::{EmbeddingService, StreamingService, WebSearchService, UsageAnalytics}
+// PHASE 4 exports
+pub use mode_selector::{ModeSelector, ProcessingMode, TaskComplexity, UseCase};
+pub use unified_model_registry::{
+    ModelCapabilities, ModelCapability, ModelContext, ProviderSource, UnifiedModel,
+    UnifiedModelRegistry, UserModelPreferences,
+};

@@ -1,4 +1,7 @@
 // Rainy Cowork - Usage Analytics Feature (PHASE 3)
+// @TODO: Analytics integration pending Phase 3 completion
+#![allow(dead_code)]
+
 // Usage tracking and analytics for AI providers
 
 use crate::ai::provider_types::{ProviderId, TokenUsage};
@@ -24,7 +27,9 @@ impl UsageAnalytics {
     /// Record usage for a provider
     pub async fn record_usage(&self, provider_id: &ProviderId, usage: TokenUsage) {
         let mut data = self.usage_data.write().await;
-        let provider_usage = data.entry(provider_id.clone()).or_insert_with(ProviderUsage::default);
+        let provider_usage = data
+            .entry(provider_id.clone())
+            .or_insert_with(ProviderUsage::default);
 
         provider_usage.total_requests += 1;
         provider_usage.total_tokens += usage.total_tokens as u64;
@@ -231,10 +236,9 @@ mod tests {
 
         analytics.record_usage(&provider_id, usage).await;
 
-        let recorded = analytics.get_usage(&provider_id).await;
-        assert!(recorded.is_some());
-        assert_eq!(recorded.unwrap().total_requests, 1);
-        assert_eq!(recorded.unwrap().total_tokens, 150);
+        let recorded = analytics.get_usage(&provider_id).await.unwrap();
+        assert_eq!(recorded.total_requests, 1);
+        assert_eq!(recorded.total_tokens, 150);
     }
 
     #[tokio::test]
@@ -251,9 +255,8 @@ mod tests {
         analytics.record_usage(&provider_id, usage).await;
         analytics.reset_usage(&provider_id).await;
 
-        let recorded = analytics.get_usage(&provider_id).await;
-        assert!(recorded.is_some());
-        assert_eq!(recorded.unwrap().total_requests, 0);
-        assert_eq!(recorded.unwrap().total_tokens, 0);
+        let recorded = analytics.get_usage(&provider_id).await.unwrap();
+        assert_eq!(recorded.total_requests, 0);
+        assert_eq!(recorded.total_tokens, 0);
     }
 }

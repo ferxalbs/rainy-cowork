@@ -7,7 +7,7 @@ import {
   AIResearchPanel,
 } from "./components";
 import { SettingsPage } from "./components/settings";
-import { CoworkPanel } from "./components/cowork";
+import { AgentChatPanel } from "./components/agent-chat/AgentChatPanel";
 import { Button, Card } from "@heroui/react";
 import {
   Zap,
@@ -278,7 +278,7 @@ function App() {
           {activeSection === "cowork" && (
             <div className="animate-appear h-[calc(100vh-120px)]">
               {activeFolder ? (
-                <CoworkPanel
+                <AgentChatPanel
                   workspacePath={activeFolder.path}
                   onOpenSettings={() => setSettingsOpen(true)}
                 />
@@ -335,7 +335,7 @@ function App() {
                   ) : (
                     /* CoworkPanel - Central Default View */
                     <div className="animate-appear h-[calc(100vh-120px)]">
-                      <CoworkPanel
+                      <AgentChatPanel
                         workspacePath={activeFolder.path}
                         onOpenSettings={() => setSettingsOpen(true)}
                       />

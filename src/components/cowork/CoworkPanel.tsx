@@ -477,7 +477,7 @@ interface MessageBubbleProps {
   onCancel: (planId: string) => void;
 }
 
-function MessageBubble({
+export function MessageBubble({
   message,
   currentPlan,
   isExecuting,

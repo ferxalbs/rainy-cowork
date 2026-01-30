@@ -16,6 +16,7 @@ pub mod research;
 pub mod router;
 pub mod settings;
 pub mod task;
+pub mod unified_models;
 pub mod web;
 pub mod workspace;
 
@@ -33,5 +34,6 @@ pub use reflection::*;
 pub use router::*;
 pub use settings::*;
 pub use task::*;
+pub use unified_models::*;
 pub use web::*;
 pub use workspace::*;

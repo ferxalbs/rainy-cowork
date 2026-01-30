@@ -314,6 +314,14 @@ pub fn run() {
             commands::router_has_providers,
             // Research commands
             commands::research::perform_research,
+            // Unified Model commands (PHASE 4)
+            commands::get_unified_models,
+            commands::toggle_model,
+            commands::set_default_fast_model,
+            commands::set_default_deep_model,
+            commands::get_user_preferences,
+            commands::send_unified_message,
+            commands::get_recommended_model,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

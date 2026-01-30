@@ -52,6 +52,7 @@ pub async fn register_agent(
     model: String,
     settings: Option<serde_json::Value>,
 ) -> Result<String, String> {
+    let _ = name; // Suppress unused variable warning
     let agent_id = format!("{}_{}", agent_type.to_lowercase(), uuid::Uuid::new_v4());
 
     let config = AgentConfig {
@@ -196,6 +197,7 @@ pub async fn create_multi_agent_task(
     relevant_files: Vec<String>,
     priority: String,
 ) -> Result<String, String> {
+    let _ = registry; // Suppress unused variable warning
     let task_id = uuid::Uuid::new_v4().to_string();
 
     let priority = match priority.as_str() {
@@ -206,7 +208,7 @@ pub async fn create_multi_agent_task(
         _ => TaskPriority::Medium,
     };
 
-    let task = Task {
+    let _task = Task {
         id: task_id.clone(),
         description,
         priority,
@@ -435,6 +437,8 @@ mod tests {
         let ai_provider = Arc::new(AIProviderManager::new());
         let registry = Arc::new(AgentRegistry::new(ai_provider));
         let state = AgentRegistryState(registry);
+        // Suppress unused variable warning for tests where we just need the state to exist
+        let _state = state;
 
         // Test task ID generation (UUID format)
         let task_id = uuid::Uuid::new_v4().to_string();

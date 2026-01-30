@@ -6,6 +6,9 @@
 //
 // ## Agent Trait
 //
+// Rainy Agent Trait Definition
+// @TODO: Full agent implementation pending Phase 4 integration
+#![allow(dead_code)]
 // The Agent trait defines the following methods:
 // - info(): Get agent metadata
 // - process_task(): Execute a task and return the result
