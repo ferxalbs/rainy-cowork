@@ -72,11 +72,16 @@ export function AppSidebar({
     const content = (
       <Button
         variant={isActive ? "secondary" : "ghost"}
-        className={`w-full justify-start gap-3 h-10 px-3 text-sm font-normal group transition-all duration-200 ${
+        isIconOnly={isCollapsed}
+        className={`transition-all duration-200 group relative ${
+          isCollapsed
+            ? "w-10 h-10 justify-center mx-auto rounded-xl mb-1"
+            : "w-full justify-start gap-3 h-10 px-3"
+        } ${
           isActive
-            ? "bg-primary/10 text-primary font-medium"
+            ? "bg-primary/10 text-primary font-medium shadow-sm"
             : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-        } ${isCollapsed ? "px-0 justify-center h-12" : ""}`}
+        }`}
         onPress={() => onNavigate?.(id)}
       >
         <Icon
@@ -168,11 +173,16 @@ export function AppSidebar({
                   <Button
                     key={folder.id}
                     variant={isActive ? "secondary" : "ghost"}
-                    className={`w-full justify-start gap-3 h-10 px-3 text-sm font-normal group transition-all duration-200 ${
+                    isIconOnly={isCollapsed}
+                    className={`transition-all duration-200 group relative ${
+                      isCollapsed
+                        ? "w-10 h-10 justify-center mx-auto rounded-xl mb-1"
+                        : "w-full justify-start gap-3 h-10 px-3"
+                    } ${
                       isActive
-                        ? "bg-primary/10 text-primary font-medium"
+                        ? "bg-primary/10 text-primary font-medium shadow-sm"
                         : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                    } ${isCollapsed ? "px-0 justify-center h-12" : ""}`}
+                    }`}
                     onPress={() => onFolderSelect?.(folder)}
                   >
                     <div

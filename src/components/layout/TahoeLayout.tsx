@@ -3,8 +3,8 @@ import { BackgroundManager } from "../backgrounds/BackgroundManager";
 import { AppSidebar } from "./AppSidebar";
 import { InspectorPanel } from "./InspectorPanel";
 import { MacOSToggle } from "./MacOSToggle";
-import { Button, Tooltip } from "@heroui/react";
-import { Maximize2, Minus, X, FolderOpen, PanelRight } from "lucide-react";
+import { Button } from "@heroui/react";
+import { Maximize2, Minus, X, FolderOpen } from "lucide-react";
 import type { Folder } from "../../types";
 import { useTheme } from "../../hooks/useTheme";
 
@@ -115,22 +115,6 @@ export function TahoeLayout({
               onToggle={(checked) => toggleTheme(checked)}
             />
 
-            {/* Inspector Toggle */}
-            <Tooltip delay={500}>
-              <Button
-                variant={isInspectorOpen ? "secondary" : "ghost"}
-                size="sm"
-                isIconOnly
-                onPress={() => setIsInspectorOpen(!isInspectorOpen)}
-                className="rounded-full data-[hover=true]:bg-muted/30"
-              >
-                <PanelRight className="size-4 opacity-80" />
-              </Button>
-              <Tooltip.Content placement="bottom">
-                Toggle Inspector
-              </Tooltip.Content>
-            </Tooltip>
-
             {/* Windows Controls */}
             {isWindows && (
               <div className="windows-controls flex items-center gap-1">
@@ -176,6 +160,7 @@ export function TahoeLayout({
           {/* 3rd Column: Inspector */}
           <InspectorPanel
             isOpen={isInspectorOpen}
+            onOpen={() => setIsInspectorOpen(true)}
             onClose={() => setIsInspectorOpen(false)}
             title={inspectorTitle}
             type={inspectorType}

@@ -261,67 +261,82 @@ export function CoworkPanel({
               <Popover.Content
                 placement="bottom"
                 offset={10}
-                className="w-[240px] p-2 bg-background/90 backdrop-blur-xl border border-border/10 shadow-xl rounded-2xl"
+                className="w-[280px] p-0 bg-background/90 backdrop-blur-xl border border-border/10 shadow-xl rounded-2xl overflow-hidden"
               >
-                <div className="flex flex-col gap-1 w-full">
-                  <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center justify-between">
+                <div className="flex flex-col w-full">
+                  <div className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center justify-between shrink-0 border-b border-border/10">
                     <span>AI Models</span>
                     <span className="text-[10px] opacity-70">
                       {availableModels.length} available
                     </span>
                   </div>
 
-                  <div className="flex flex-col gap-1 max-h-[300px] overflow-y-auto scrollbar-thin scrollbar-thumb-border/20 py-1">
+                  <div className="flex flex-col gap-1 overflow-y-auto scrollbar-thin scrollbar-thumb-border/20 p-2 max-h-[280px]">
                     {availableModels.map((model) => (
                       <Button
                         key={model.id}
                         variant={
                           currentModel === model.id ? "secondary" : "ghost"
                         }
-                        size="sm"
-                        className={`justify-start h-9 px-3 text-sm font-normal w-full ${
+                        size="md"
+                        className={`justify-start h-auto py-2 px-3 text-sm font-normal w-full group transition-colors ${
                           currentModel === model.id
-                            ? "bg-secondary/50 text-foreground font-medium"
+                            ? "bg-secondary/80 text-foreground font-medium"
                             : "hover:bg-muted/40 text-muted-foreground hover:text-foreground"
                         }`}
                         onPress={() => handleModelSelect(model.id)}
                       >
-                        <div className="mr-2 p-1 rounded-full bg-background/50">
-                          {model.provider === "google" ? (
-                            <Sparkles className="size-3 text-blue-400" />
-                          ) : model.provider === "anthropic" ? (
-                            <Cpu className="size-3 text-orange-400" />
-                          ) : (
-                            <Cpu className="size-3 text-emerald-400" />
+                        <div className="flex items-center w-full gap-3">
+                          <div
+                            className={`p-1.5 rounded-lg border shrink-0 ${
+                              currentModel === model.id
+                                ? "bg-background border-border/10 shadow-sm"
+                                : "bg-background/50 border-transparent group-hover:border-border/10"
+                            }`}
+                          >
+                            {model.provider === "google" ? (
+                              <Sparkles className="size-3.5 text-blue-500" />
+                            ) : model.provider === "anthropic" ? (
+                              <Cpu className="size-3.5 text-orange-500" />
+                            ) : (
+                              <Cpu className="size-3.5 text-emerald-500" />
+                            )}
+                          </div>
+
+                          <div className="flex flex-col items-start min-w-0 flex-1">
+                            <span className="truncate w-full text-left leading-tight">
+                              {model.name}
+                            </span>
+                            {model.thinkingLevel &&
+                              model.thinkingLevel !== "none" && (
+                                <div className="flex items-center gap-1 mt-0.5">
+                                  <Sparkles className="size-2.5 opacity-50" />
+                                  <span className="text-[10px] opacity-60 font-medium">
+                                    Thinking
+                                  </span>
+                                </div>
+                              )}
+                          </div>
+
+                          {currentModel === model.id && (
+                            <Check className="size-4 ml-auto text-primary shrink-0" />
                           )}
                         </div>
-                        <div className="flex flex-col items-start gap-0.5 flex-1 min-w-0">
-                          <span className="truncate w-full">{model.name}</span>
-                          {model.thinkingLevel &&
-                            model.thinkingLevel !== "none" && (
-                              <span className="text-[10px] opacity-60 flex items-center gap-1">
-                                <Sparkles className="size-2" /> Thinking
-                              </span>
-                            )}
-                        </div>
-                        {currentModel === model.id && (
-                          <Check className="size-3.5 ml-auto text-primary" />
-                        )}
                       </Button>
                     ))}
                   </div>
 
-                  <div className="h-px bg-border/10 my-1" />
-
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="justify-start h-8 px-3 text-xs text-muted-foreground w-full hover:bg-muted/50"
-                    onPress={onOpenSettings}
-                  >
-                    <SlidersHorizontal className="size-3 mr-2" />
-                    Manage API Keys
-                  </Button>
+                  <div className="p-2 border-t border-border/10 shrink-0 bg-muted/5">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="justify-start h-9 px-3 text-xs text-muted-foreground w-full hover:bg-muted/50 font-medium"
+                      onPress={onOpenSettings}
+                    >
+                      <SlidersHorizontal className="size-3.5 mr-2" />
+                      Manage API Keys
+                    </Button>
+                  </div>
                 </div>
               </Popover.Content>
             </Popover>

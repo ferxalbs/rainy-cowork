@@ -14,6 +14,7 @@ import { MarkdownRenderer } from "../shared/MarkdownRenderer";
 
 interface InspectorPanelProps {
   isOpen: boolean;
+  onOpen?: () => void;
   onClose: () => void;
   title?: string;
   type?: "preview" | "info" | "process" | "links";
@@ -23,6 +24,7 @@ interface InspectorPanelProps {
 
 export function InspectorPanel({
   isOpen,
+  onOpen,
   onClose,
   title = "Inspector",
   type = "preview",
@@ -33,7 +35,7 @@ export function InspectorPanel({
     return (
       <div className="w-12 h-screen border-l border-border/50 bg-sidebar flex flex-col items-center py-4 shrink-0 transition-all">
         <Tooltip delay={0}>
-          <Button variant="ghost" size="sm" isIconOnly onPress={onClose}>
+          <Button variant="ghost" size="sm" isIconOnly onPress={onOpen}>
             <ChevronLeft className="size-4" />
           </Button>
           <Tooltip.Content placement="left">Open Inspector</Tooltip.Content>
