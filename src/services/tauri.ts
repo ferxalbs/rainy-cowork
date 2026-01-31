@@ -530,8 +530,16 @@ export async function listFileOperations(): Promise<
 export async function planTask(
   instruction: string,
   workspacePath: string,
+  onEvent: (event: StreamEvent) => void,
 ): Promise<TaskPlan> {
-  return invoke<TaskPlan>("plan_task", { instruction, workspacePath });
+  const channel = new Channel<StreamEvent>();
+  channel.onmessage = onEvent;
+
+  return invoke<TaskPlan>("plan_task", {
+    instruction,
+    workspacePath,
+    onEvent: channel,
+  });
 }
 
 export async function executeAgentTask(

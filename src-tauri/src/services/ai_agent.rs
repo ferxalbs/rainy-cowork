@@ -20,6 +20,13 @@ use uuid::Uuid;
 
 // ============ Agent Event Types ============
 
+/// Event for streaming tokens and thoughts
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StreamEvent {
+    pub event: String,
+    pub data: String,
+}
+
 /// Events emitted during agent task execution
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", tag = "event", content = "data")]
@@ -226,6 +233,7 @@ impl CoworkAgent {
         &self,
         instruction: &str,
         workspace_path: &str,
+        on_stream: Option<Channel<StreamEvent>>,
     ) -> Result<TaskPlan, String> {
         // Determine intent based on instruction (heuristic)
         // This allows us to choose the execution mode (Stream vs Non-Stream)
@@ -306,7 +314,7 @@ impl CoworkAgent {
 
         // Smart provider selection with fallback
         let (ai_response, model_info, thought) = self
-            .execute_with_best_provider(&prompt, should_stream)
+            .execute_with_best_provider(&prompt, should_stream, on_stream)
             .await?;
 
         // Parse AI response into TaskPlan
@@ -334,6 +342,7 @@ impl CoworkAgent {
         &self,
         prompt: &str,
         stream: bool,
+        on_stream: Option<Channel<StreamEvent>>,
     ) -> Result<(String, ModelInfo, Option<String>), String> {
         println!(
             "🤖 AI Agent: execute_with_best_provider called (stream={})",
@@ -428,6 +437,7 @@ impl CoworkAgent {
                         );
                         let thought_acc = std::sync::Arc::new(std::sync::Mutex::new(String::new()));
                         let thought_writer = thought_acc.clone();
+                        let stream_channel = on_stream.clone();
 
                         match if stream {
                             self.ai_provider
@@ -437,6 +447,23 @@ impl CoworkAgent {
                                     prompt,
                                     |_, _| {},
                                     Some(move |chunk: StreamingChunk| {
+                                        // Emit streaming events
+                                        if let Some(ref ch) = stream_channel {
+                                            if !chunk.content.is_empty() {
+                                                let _ = ch.send(StreamEvent {
+                                                    event: "token".to_string(),
+                                                    data: chunk.content.clone(),
+                                                });
+                                            }
+                                            if let Some(ref t) = chunk.thought {
+                                                let _ = ch.send(StreamEvent {
+                                                    event: "thinking".to_string(),
+                                                    data: t.clone(),
+                                                });
+                                            }
+                                        }
+
+                                        // Accumulate thought for final plan
                                         if let Some(t) = chunk.thought {
                                             if let Ok(mut g) = thought_writer.lock() {
                                                 g.push_str(&t);
@@ -511,6 +538,7 @@ impl CoworkAgent {
                     {
                         let thought_acc = std::sync::Arc::new(std::sync::Mutex::new(String::new()));
                         let thought_writer = thought_acc.clone();
+                        let stream_channel = on_stream.clone();
 
                         match if stream {
                             self.ai_provider
@@ -520,6 +548,22 @@ impl CoworkAgent {
                                     prompt,
                                     |_, _| {},
                                     Some(move |chunk: StreamingChunk| {
+                                        // Emit streaming events
+                                        if let Some(ref ch) = stream_channel {
+                                            if !chunk.content.is_empty() {
+                                                let _ = ch.send(StreamEvent {
+                                                    event: "token".to_string(),
+                                                    data: chunk.content.clone(),
+                                                });
+                                            }
+                                            if let Some(ref t) = chunk.thought {
+                                                let _ = ch.send(StreamEvent {
+                                                    event: "thinking".to_string(),
+                                                    data: t.clone(),
+                                                });
+                                            }
+                                        }
+
                                         if let Some(t) = chunk.thought {
                                             if let Ok(mut g) = thought_writer.lock() {
                                                 g.push_str(&t);
@@ -582,6 +626,7 @@ impl CoworkAgent {
                     {
                         let thought_acc = std::sync::Arc::new(std::sync::Mutex::new(String::new()));
                         let thought_writer = thought_acc.clone();
+                        let stream_channel = on_stream.clone();
 
                         match if stream {
                             self.ai_provider
@@ -591,6 +636,22 @@ impl CoworkAgent {
                                     prompt,
                                     |_, _| {},
                                     Some(move |chunk: StreamingChunk| {
+                                        // Emit streaming events
+                                        if let Some(ref ch) = stream_channel {
+                                            if !chunk.content.is_empty() {
+                                                let _ = ch.send(StreamEvent {
+                                                    event: "token".to_string(),
+                                                    data: chunk.content.clone(),
+                                                });
+                                            }
+                                            if let Some(ref t) = chunk.thought {
+                                                let _ = ch.send(StreamEvent {
+                                                    event: "thinking".to_string(),
+                                                    data: t.clone(),
+                                                });
+                                            }
+                                        }
+
                                         if let Some(t) = chunk.thought {
                                             if let Ok(mut g) = thought_writer.lock() {
                                                 g.push_str(&t);

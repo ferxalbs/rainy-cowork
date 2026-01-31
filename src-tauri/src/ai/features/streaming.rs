@@ -94,16 +94,19 @@ mod tests {
                 content: "Hello".to_string(),
                 is_final: false,
                 finish_reason: None,
+                thought: None,
             },
             StreamingChunk {
                 content: " world".to_string(),
                 is_final: false,
                 finish_reason: None,
+                thought: None,
             },
             StreamingChunk {
                 content: "!".to_string(),
                 is_final: true,
                 finish_reason: Some("stop".to_string()),
+                thought: None,
             },
         ];
 
@@ -118,11 +121,13 @@ mod tests {
                 content: "Hello".to_string(),
                 is_final: false,
                 finish_reason: None,
+                thought: None,
             },
             StreamingChunk {
                 content: " world".to_string(),
                 is_final: true,
                 finish_reason: Some("stop".to_string()),
+                thought: None,
             },
         ];
 
@@ -138,11 +143,13 @@ mod tests {
                 content: "Hello".to_string(),
                 is_final: false,
                 finish_reason: None,
+                thought: None,
             },
             StreamingChunk {
                 content: " world".to_string(),
                 is_final: false,
                 finish_reason: None,
+                thought: None,
             },
         ];
 

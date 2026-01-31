@@ -8,6 +8,7 @@ use crate::ai::provider_types::{
     ProviderResult, ProviderType, StreamingCallback,
 };
 use async_trait::async_trait;
+use futures::StreamExt;
 use rainy_sdk::RainyClient;
 use std::sync::Arc;
 
@@ -123,7 +124,7 @@ impl AIProvider for RainySDKProvider {
             ProviderCapabilities {
                 chat_completions: true,
                 embeddings: true,
-                streaming: false, // Not yet supported in rainy-sdk
+                streaming: true,
                 function_calling: true,
                 vision: caps.features.image_analysis,
                 web_search: caps.features.web_research,
@@ -136,7 +137,7 @@ impl AIProvider for RainySDKProvider {
             ProviderCapabilities {
                 chat_completions: true,
                 embeddings: true,
-                streaming: false, // Not yet supported in rainy-sdk
+                streaming: true,
                 function_calling: true,
                 vision: true,
                 web_search: true,
@@ -250,13 +251,72 @@ impl AIProvider for RainySDKProvider {
 
     async fn complete_stream(
         &self,
-        _request: ChatCompletionRequest,
-        _callback: StreamingCallback,
+        request: ChatCompletionRequest,
+        callback: StreamingCallback,
     ) -> ProviderResult<()> {
-        // Streaming not yet supported in rainy-sdk
-        Err(AIError::UnsupportedCapability(
-            "Streaming not yet supported in rainy-sdk".to_string(),
-        ))
+        let (model_id, thinking_config) = Self::map_model_id(&request.model);
+
+        // Convert strict ChatMessage to rainy-sdk ChatMessage
+        let messages = request
+            .messages
+            .iter()
+            .map(|msg| match msg.role.as_str() {
+                "system" => rainy_sdk::models::ChatMessage::system(&msg.content),
+                "user" => rainy_sdk::models::ChatMessage::user(&msg.content),
+                "assistant" => rainy_sdk::models::ChatMessage::assistant(&msg.content),
+                _ => rainy_sdk::models::ChatMessage::user(&msg.content),
+            })
+            .collect();
+
+        // Build request
+        let mut sdk_request =
+            rainy_sdk::models::ChatCompletionRequest::new(model_id.clone(), messages)
+                .with_stream(true);
+
+        if let Some(config) = thinking_config {
+            sdk_request = sdk_request.with_thinking_config(config);
+        }
+
+        if let Some(max_tokens) = request.max_tokens {
+            sdk_request = sdk_request.with_max_tokens(max_tokens);
+        }
+
+        if let Some(temperature) = request.temperature {
+            sdk_request = sdk_request.with_temperature(temperature);
+        }
+
+        let mut stream = self
+            .client
+            .chat_completion_stream(sdk_request)
+            .await
+            .map_err(|e| AIError::APIError(format!("Stream initialization failed: {}", e)))?;
+
+        while let Some(chunk_result) = stream.next().await {
+            match chunk_result {
+                Ok(chunk) => {
+                    if let Some(choice) = chunk.choices.first() {
+                        let content = choice.delta.content.clone().unwrap_or_default();
+                        let thought = choice.delta.thought.clone();
+                        let finish_reason = choice.finish_reason.clone();
+                        let is_final = finish_reason.is_some() || chunk.choices.is_empty();
+
+                        let streaming_chunk = crate::ai::provider_types::StreamingChunk {
+                            content,
+                            thought,
+                            is_final,
+                            finish_reason,
+                        };
+
+                        callback(streaming_chunk);
+                    }
+                }
+                Err(e) => {
+                    return Err(AIError::APIError(format!("Stream error: {}", e)));
+                }
+            }
+        }
+
+        Ok(())
     }
 
     async fn embed(&self, _request: EmbeddingRequest) -> ProviderResult<EmbeddingResponse> {
@@ -268,8 +328,8 @@ impl AIProvider for RainySDKProvider {
 
     fn supports_capability(&self, capability: &str) -> bool {
         match capability {
-            "chat_completions" | "function_calling" | "web_search" => true,
-            "streaming" | "embeddings" => false, // Not yet supported
+            "chat_completions" | "function_calling" | "web_search" | "streaming" => true,
+            "embeddings" => false, // Not yet supported
             _ => false,
         }
     }

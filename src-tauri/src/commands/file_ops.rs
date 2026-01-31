@@ -2,10 +2,11 @@
 // Tauri commands for advanced file operations and AI agent
 // Part of Phase 2: Enhanced Tauri Commands
 
-use crate::services::ai_agent::{AgentEvent, CoworkAgent, ExecutionResult, TaskPlan};
+use crate::services::ai_agent::{AgentEvent, CoworkAgent, ExecutionResult, StreamEvent, TaskPlan};
 use crate::services::file_operations::{
-    ConflictStrategy, FileOpChange, FileOperationEngine, FileVersion, FileVersionInfo, MoveOperation,
-    OrganizeResult, OrganizeStrategy, RenamePattern, RenamePreview, Transaction, WorkspaceAnalysis,
+    ConflictStrategy, FileOpChange, FileOperationEngine, FileVersion, FileVersionInfo,
+    MoveOperation, OrganizeResult, OrganizeStrategy, RenamePattern, RenamePreview, Transaction,
+    WorkspaceAnalysis,
 };
 use std::sync::Arc;
 use tauri::{ipc::Channel, State};
@@ -245,10 +246,7 @@ pub async fn undo_file_operation_enhanced(
 pub async fn redo_file_operation(
     state: State<'_, Arc<FileOperationEngine>>,
 ) -> Result<Vec<FileOpChange>, String> {
-    state
-        .redo_operation()
-        .await
-        .map_err(|e| e.to_string())
+    state.redo_operation().await.map_err(|e| e.to_string())
 }
 
 /// List enhanced operations
@@ -270,15 +268,18 @@ pub async fn set_file_ops_workspace(
     workspace_manager: State<'_, Arc<crate::services::WorkspaceManager>>,
     file_ops: State<'_, Arc<FileOperationEngine>>,
 ) -> Result<(), String> {
-    let uuid = uuid::Uuid::parse_str(&workspace_id)
-        .map_err(|e| format!("Invalid workspace ID: {}", e))?;
+    let uuid =
+        uuid::Uuid::parse_str(&workspace_id).map_err(|e| format!("Invalid workspace ID: {}", e))?;
 
     let workspace = workspace_manager
         .load_workspace(&uuid)
         .map_err(|e| format!("Failed to load workspace: {}", e))?;
 
     file_ops.set_workspace(workspace).await;
-    tracing::info!("Workspace context set for file operations: {}", workspace_id);
+    tracing::info!(
+        "Workspace context set for file operations: {}",
+        workspace_id
+    );
     Ok(())
 }
 
@@ -289,9 +290,12 @@ pub async fn set_file_ops_workspace(
 pub async fn plan_task(
     instruction: String,
     workspace_path: String,
+    on_event: Channel<StreamEvent>,
     state: State<'_, Arc<CoworkAgent>>,
 ) -> Result<TaskPlan, String> {
-    state.parse_instruction(&instruction, &workspace_path).await
+    state
+        .parse_instruction(&instruction, &workspace_path, Some(on_event))
+        .await
 }
 
 /// Execute a planned task

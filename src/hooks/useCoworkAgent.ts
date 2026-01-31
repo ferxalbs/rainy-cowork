@@ -92,8 +92,29 @@ export function useCoworkAgent(): UseCoworkAgentReturn {
 
       setIsPlanning(true);
 
+      let accumulatedContent = "";
+      let accumulatedThought = "";
+
       try {
-        const plan = await tauri.planTask(instruction, workspacePath);
+        const plan = await tauri.planTask(
+          instruction,
+          workspacePath,
+          (event) => {
+            if (event.event === "token") {
+              accumulatedContent += event.data;
+              updateMessage(thinkingId, {
+                content: accumulatedContent,
+                isLoading: true,
+              });
+            } else if (event.event === "thinking") {
+              accumulatedThought += event.data;
+              updateMessage(thinkingId, {
+                thought: accumulatedThought,
+                isLoading: true,
+              });
+            }
+          },
+        );
 
         // Build model attribution footer
         const modelFooter = plan.modelUsed
@@ -104,7 +125,7 @@ export function useCoworkAgent(): UseCoworkAgentReturn {
         if (plan.intent === "question" && plan.answer) {
           updateMessage(thinkingId, {
             content: plan.answer + modelFooter,
-            thought: plan.thought,
+            thought: plan.thought || accumulatedThought, // Use accumulated thought if plan doesn't have it (though it should)
             isLoading: false,
           });
           // Don't set currentPlan for questions
@@ -128,7 +149,7 @@ export function useCoworkAgent(): UseCoworkAgentReturn {
           updateMessage(thinkingId, {
             content: `I've created a plan with ${plan.steps.length} step(s):\n\n${planSummary}${plan.warnings.length > 0 ? `\n\n⚠️ Warnings:\n${plan.warnings.join("\n")}` : ""}${modelFooter}`,
             isLoading: false,
-            thought: plan.thought,
+            thought: plan.thought || accumulatedThought,
             plan,
           });
 
