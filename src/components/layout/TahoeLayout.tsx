@@ -1,7 +1,6 @@
 import { ReactNode, useState, useEffect } from "react";
 import { BackgroundManager } from "../backgrounds/BackgroundManager";
 import { AppSidebar } from "./AppSidebar";
-import { SystemStatusCard } from "./SystemStatusCard";
 import { MacOSToggle } from "./MacOSToggle";
 import { Button } from "@heroui/react";
 import { Maximize2, Minus, X, FolderOpen } from "lucide-react";
@@ -156,9 +155,6 @@ export function TahoeLayout({
               {children}
             </div>
           </main>
-
-          {/* System Status Card (Floating) */}
-          <SystemStatusCard />
         </div>
       </div>
     </div>
