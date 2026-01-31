@@ -241,7 +241,13 @@ export function AgentChatPanel({
       {/* Scrollable Content Area - Absolute Inset - Z-10 */}
       <div className="absolute inset-0 overflow-y-auto w-full h-full scrollbar-none z-10">
         {/* Padding to clear top bar and bottom input */}
-        <div className="min-h-full flex flex-col pt-32 pb-40 px-4 max-w-3xl mx-auto">
+        <div
+          className={`flex flex-col px-4 max-w-3xl mx-auto ${
+            messages.length === 0
+              ? "h-full justify-center pt-20"
+              : "min-h-full pt-32 pb-40"
+          }`}
+        >
           {messages.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center">
               <div className="mb-8 relative group">
