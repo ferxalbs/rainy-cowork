@@ -86,7 +86,7 @@ export function useCoworkAgent(): UseCoworkAgentReturn {
       // Add agent processing message
       const thinkingId = addMessage({
         type: "agent",
-        content: "Processing request...",
+        content: "",
         isLoading: true,
       });
 

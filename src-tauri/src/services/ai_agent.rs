@@ -309,8 +309,12 @@ impl CoworkAgent {
                 .collect(),
         };
 
-        // Build AI prompt for task planning
-        let prompt = self.build_planning_prompt(instruction, &context);
+        // Build AI prompt based on intent
+        let prompt = if should_stream {
+            self.build_chat_prompt(instruction, &context)
+        } else {
+            self.build_planning_prompt(instruction, &context)
+        };
 
         // Smart provider selection with fallback
         let (ai_response, model_info, thought) = self
@@ -1112,6 +1116,36 @@ Example of GOOD content for "Create a file about Lana Del Rey albums":
 - At minimum 3000+ words
 
 Respond ONLY with valid JSON, no other text."#,
+            context.path,
+            context.file_count,
+            context.folder_count,
+            context.file_types.join(", "),
+            context.recent_files.join(", "),
+            instruction
+        )
+    }
+
+    /// Build a natural language chat prompt for questions
+    fn build_chat_prompt(&self, instruction: &str, context: &WorkspaceContext) -> String {
+        format!(
+            r#"You are a helpful AI Cowork Agent assisting a developer in their workspace.
+
+Workspace Context:
+- Path: {}
+- Files: {}
+- Folders: {}
+- File Types: {}
+- Recent Files: {}
+
+User Question: "{}"
+
+Instructions:
+1. Answer the user's question directly and helpfully.
+2. Use the provided workspace context to give relevant answers if applicable.
+3. Be professional but conversational.
+4. Do NOT output a JSON intention block. Just provide the natural language response.
+5. If the user asks for code, provide it in markdown blocks.
+"#,
             context.path,
             context.file_count,
             context.folder_count,
