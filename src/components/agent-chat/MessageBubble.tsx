@@ -1,8 +1,6 @@
 import React from "react";
 import Markdown from "react-markdown";
 import {
-  User,
-  Bot,
   Loader2,
   Play,
   Ban,
@@ -60,26 +58,15 @@ export function MessageBubble({
     <div
       className={`flex w-full gap-4 ${isUser ? "flex-row-reverse" : "flex-row"}`}
     >
-      {/* Avatar */}
-      <div
-        className={`size-8 shrink-0 rounded-full flex items-center justify-center border shadow-sm ${
-          isUser
-            ? "bg-primary/20 border-primary/20 text-primary"
-            : "bg-purple-500/20 border-purple-500/20 text-purple-600"
-        }`}
-      >
-        {isUser ? <User className="size-4" /> : <Bot className="size-4" />}
-      </div>
-
       {/* Content */}
       <div
-        className={`flex flex-col gap-2 max-w-[85%] ${isUser ? "items-end" : "items-start"}`}
+        className={`flex flex-col gap-1 max-w-[85%] ${isUser ? "items-end" : "items-start"}`}
       >
         <div
-          className={`rounded-2xl px-5 py-3 shadow-sm border text-sm leading-relaxed ${
+          className={`rounded-[20px] px-5 py-3.5 shadow-sm text-[15px] leading-relaxed transition-all ${
             isUser
-              ? "bg-primary text-primary-foreground border-primary"
-              : "bg-card border-border/40 text-foreground"
+              ? "bg-primary text-primary-foreground rounded-br-sm"
+              : "bg-white/40 dark:bg-white/5 border border-white/10 text-foreground backdrop-blur-md rounded-bl-sm"
           }`}
         >
           {message.content ? (

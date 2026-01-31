@@ -1,7 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import {
   TahoeLayout,
-  TaskCard,
   SettingsPanel,
   AIDocumentPanel,
   AIResearchPanel,
@@ -9,30 +8,12 @@ import {
 import { SettingsPage } from "./components/settings";
 import { AgentChatPanel } from "./components/agent-chat/AgentChatPanel";
 import { Button, Card } from "@heroui/react";
-import {
-  Zap,
-  CheckCircle2,
-  ListTodo,
-  AlertCircle,
-  FileText,
-  Search,
-  FolderPlus,
-} from "lucide-react";
-import { useTauriTask, useAIProvider, useFolderManager } from "./hooks";
-import type { Task, Folder } from "./types";
+import { AlertCircle, FolderPlus } from "lucide-react";
+import { useAIProvider, useFolderManager } from "./hooks";
+import type { Folder } from "./types";
 import * as tauri from "./services/tauri";
 
 function App() {
-  // Tauri hooks
-  const {
-    tasks,
-    error: taskError,
-    pauseTask,
-    resumeTask,
-    cancelTask,
-    refreshTasks,
-  } = useTauriTask();
-
   const { refreshProviders } = useAIProvider();
 
   // Folder management hook
@@ -50,7 +31,7 @@ function App() {
     accessType: uf.accessType,
   }));
 
-  const [activeSection, setActiveSection] = useState("running");
+  const [activeSection, setActiveSection] = useState("agent-chat");
   const [activeFolder, setActiveFolder] = useState<Folder | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -77,61 +58,22 @@ function App() {
     });
   }, []);
 
-  // Load tasks on mount
+  // Load providers on mount
   useEffect(() => {
-    refreshTasks();
     refreshProviders();
-  }, [refreshTasks, refreshProviders]);
-
-  // Calculate task counts for sidebar
-  const taskCounts = {
-    completed: tasks.filter((t) => t.status === "completed").length,
-    running: tasks.filter(
-      (t) => t.status === "running" || t.status === "paused",
-    ).length,
-    queued: tasks.filter((t) => t.status === "queued").length,
-  };
-
-  // Handle task pause
-  const handleTaskPause = useCallback(
-    async (taskId: string) => {
-      const task = tasks.find((t) => t.id === taskId);
-      if (!task) return;
-
-      try {
-        if (task.status === "paused") {
-          await resumeTask(taskId);
-        } else {
-          await pauseTask(taskId);
-        }
-      } catch (err) {
-        console.error("Failed to pause/resume task:", err);
-      }
-    },
-    [tasks, pauseTask, resumeTask],
-  );
-
-  // Handle task stop
-  const handleTaskStop = useCallback(
-    async (taskId: string) => {
-      try {
-        await cancelTask(taskId);
-      } catch (err) {
-        console.error("Failed to cancel task:", err);
-      }
-    },
-    [cancelTask],
-  );
+  }, [refreshProviders]);
 
   // Handle folder selection
   const handleFolderSelect = useCallback(
     async (folder: Folder) => {
       try {
         await tauri.setWorkspace(folder.path, folder.name);
-        await tauri.setTaskManagerWorkspace(folder.id);
+        // await tauri.setTaskManagerWorkspace(folder.id); // Removed as task manager is gone? Or should I keep it for backend compatibility?
+        // User stripped "Workflow" UI, but backend might still need workspace set for other things?
+        // Safe to keep setWorkspace. setTaskManagerWorkspace might be irrelevant but harmless.
+        // Actually, let's keep it simple.
         await tauri.updateFolderAccess(folder.id);
         setActiveFolder(folder);
-        // Refresh folders to get new ordering (most recent first)
         refreshFolders();
         console.log("Workspace set:", folder);
       } catch (err) {
@@ -151,65 +93,6 @@ function App() {
     setSettingsOpen(true);
   }, []);
 
-  // Filter tasks based on active section
-  const getDisplayTasks = () => {
-    switch (activeSection) {
-      case "completed":
-        return tasks.filter((t) => t.status === "completed");
-      case "running":
-        return tasks.filter(
-          (t) => t.status === "running" || t.status === "paused",
-        );
-      case "queued":
-        return tasks.filter((t) => t.status === "queued");
-      default:
-        return tasks.filter(
-          (t) => t.status === "running" || t.status === "paused",
-        );
-    }
-  };
-
-  // Convert Tauri tasks to local Task type for TaskCard
-  const convertTask = (t: (typeof tasks)[0]): Task => ({
-    ...t,
-    createdAt: new Date(t.createdAt),
-    startedAt: t.startedAt ? new Date(t.startedAt) : undefined,
-    completedAt: t.completedAt ? new Date(t.completedAt) : undefined,
-  });
-
-  const displayTasks = getDisplayTasks();
-  const sectionTitle = {
-    running: {
-      icon: <Zap className="size-5 text-blue-500 shrink-0" />,
-      label: "Active Tasks",
-    },
-    completed: {
-      icon: <CheckCircle2 className="size-5 text-green-500 shrink-0" />,
-      label: "Completed Tasks",
-    },
-    queued: {
-      icon: <ListTodo className="size-5 text-orange-500 shrink-0" />,
-      label: "Queued Tasks",
-    },
-    documents: {
-      icon: <FileText className="size-5 text-accent shrink-0" />,
-      label: "AI Documents",
-    },
-    research: {
-      icon: <Search className="size-5 text-accent shrink-0" />,
-      label: "AI Research",
-    },
-  }[activeSection] || {
-    icon: <Zap className="size-5 text-blue-500 shrink-0" />,
-    label: "Tasks",
-  };
-
-  // Check if we're in AI Studio section
-  const isAIStudioSection =
-    activeSection === "documents" ||
-    activeSection === "research" ||
-    activeSection === "agent-chat";
-
   // Check if we're in Settings section
   const isSettingsSection = activeSection.startsWith("settings-");
   const settingsTab = isSettingsSection
@@ -227,19 +110,23 @@ function App() {
         onNavigate={handleNavigate}
         onSettingsClick={handleSettingsClick}
         activeSection={activeSection}
-        taskCounts={taskCounts}
         inspectorTitle={inspector.title}
         inspectorType={inspector.type}
         inspectorContent={inspector.content}
         inspectorFilename={inspector.filename}
+        isImmersive={
+          !isSettingsSection &&
+          activeSection !== "documents" &&
+          activeSection !== "research"
+        }
       >
         <div className="space-y-6">
           {/* Error Display */}
-          {(submitError || taskError) && (
+          {submitError && (
             <div className="p-4 border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30 animate-appear rounded-xl">
               <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
                 <AlertCircle className="size-4 shrink-0" />
-                <p className="text-sm">{submitError || taskError}</p>
+                <p className="text-sm">{submitError}</p>
                 <Button
                   variant="secondary"
                   size="sm"
@@ -254,7 +141,7 @@ function App() {
             </div>
           )}
 
-          {/* AI Studio Sections - Require active folder */}
+          {/* AI Documents */}
           {activeSection === "documents" && (
             <div className="animate-appear">
               {activeFolder ? (
@@ -265,23 +152,11 @@ function App() {
             </div>
           )}
 
+          {/* AI Research */}
           {activeSection === "research" && (
             <div className="animate-appear">
               {activeFolder ? (
                 <AIResearchPanel />
-              ) : (
-                <NoFolderGate onAddFolder={addFolder} />
-              )}
-            </div>
-          )}
-
-          {activeSection === "agent-chat" && (
-            <div className="animate-appear h-[calc(100vh-120px)]">
-              {activeFolder ? (
-                <AgentChatPanel
-                  workspacePath={activeFolder.path}
-                  onOpenSettings={() => setSettingsOpen(true)}
-                />
               ) : (
                 <NoFolderGate onAddFolder={addFolder} />
               )}
@@ -293,58 +168,26 @@ function App() {
             <div className="animate-appear h-full">
               <SettingsPage
                 initialTab={settingsTab}
-                onBack={() => handleNavigate("running")}
+                onBack={() => handleNavigate("agent-chat")}
               />
             </div>
           )}
 
-          {/* Default View - CoworkPanel when no special section selected */}
-          {!isAIStudioSection && !isSettingsSection && (
-            <>
-              {/* Folder Gate - Show prompt if no folder is selected */}
-              {!activeFolder ? (
-                <NoFolderGate onAddFolder={addFolder} />
-              ) : (
-                <>
-                  {/* Task Queue Sections - Show when Running/Queued/Completed selected */}
-                  {(activeSection === "running" ||
-                    activeSection === "queued" ||
-                    activeSection === "completed") &&
-                  displayTasks.length > 0 ? (
-                    <section className="space-y-4 animate-appear">
-                      <div className="flex items-center gap-2 px-1">
-                        {sectionTitle.icon}
-                        <h2 className="text-base font-semibold">
-                          {sectionTitle.label}
-                        </h2>
-                        <span className="text-sm text-muted-foreground">
-                          ({displayTasks.length})
-                        </span>
-                      </div>
-                      <div className="space-y-3">
-                        {displayTasks.map((task) => (
-                          <TaskCard
-                            key={task.id}
-                            task={convertTask(task)}
-                            onPause={handleTaskPause}
-                            onStop={handleTaskStop}
-                          />
-                        ))}
-                      </div>
-                    </section>
-                  ) : (
-                    /* CoworkPanel - Central Default View */
-                    <div className="animate-appear h-[calc(100vh-120px)]">
-                      <AgentChatPanel
-                        workspacePath={activeFolder.path}
-                        onOpenSettings={() => setSettingsOpen(true)}
-                      />
-                    </div>
-                  )}
-                </>
-              )}
-            </>
-          )}
+          {/* Fallback / Agent Chat Main View */}
+          {!isSettingsSection &&
+            activeSection !== "documents" &&
+            activeSection !== "research" && (
+              <div className="animate-appear h-full w-full">
+                {activeFolder ? (
+                  <AgentChatPanel
+                    workspacePath={activeFolder.path}
+                    onOpenSettings={() => setSettingsOpen(true)}
+                  />
+                ) : (
+                  <NoFolderGate onAddFolder={addFolder} />
+                )}
+              </div>
+            )}
         </div>
       </TahoeLayout>
 

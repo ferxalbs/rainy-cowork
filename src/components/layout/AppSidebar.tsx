@@ -3,10 +3,6 @@ import {
   FolderOpen,
   Download,
   FileCode,
-  CheckCircle2,
-  Timer,
-  ListTodo,
-  Clock,
   Sparkles,
   Palette,
   ChevronLeft,
@@ -17,6 +13,8 @@ import {
   Plus,
   LayoutGrid,
 } from "lucide-react";
+import { MacOSToggle } from "./MacOSToggle";
+import { useTheme } from "../../hooks/useTheme";
 import type { Folder } from "../../types";
 
 interface AppSidebarProps {
@@ -26,11 +24,7 @@ interface AppSidebarProps {
   onNavigate?: (section: string) => void;
   activeSection?: string;
   activeFolderId?: string;
-  taskCounts?: {
-    completed: number;
-    running: number;
-    queued: number;
-  };
+
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
   onSettingsClick?: () => void;
@@ -49,11 +43,12 @@ export function AppSidebar({
   onNavigate,
   activeSection = "running",
   activeFolderId,
-  taskCounts = { completed: 0, running: 0, queued: 0 },
   isCollapsed = false,
   onToggleCollapse,
   onSettingsClick,
 }: AppSidebarProps) {
+  const { mode, setMode } = useTheme();
+
   const NavItem = ({
     id,
     label,
@@ -259,46 +254,6 @@ export function AppSidebar({
             colorClass="text-green-500"
           />
         </div>
-
-        <Separator className="bg-border/30" />
-
-        {/* Tasks */}
-        <div className="space-y-1">
-          {!isCollapsed && (
-            <div className="px-3 py-2 mb-1">
-              <span className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest">
-                Workflow
-              </span>
-            </div>
-          )}
-          <NavItem
-            id="running"
-            label="Running"
-            icon={Timer}
-            colorClass="text-blue-500"
-            badge={taskCounts.running}
-          />
-          <NavItem
-            id="queued"
-            label="Queued"
-            icon={ListTodo}
-            colorClass="text-orange-500"
-            badge={taskCounts.queued}
-          />
-          <NavItem
-            id="completed"
-            label="Completed"
-            icon={CheckCircle2}
-            colorClass="text-green-500"
-            badge={taskCounts.completed}
-          />
-          <NavItem
-            id="history-7d"
-            label="History"
-            icon={Clock}
-            colorClass="text-slate-400"
-          />
-        </div>
       </div>
 
       <div className="mt-auto p-3 space-y-2">
@@ -325,6 +280,14 @@ export function AppSidebar({
               </span>
             </div>
           )}
+
+          <div className="flex items-center gap-1">
+            <MacOSToggle
+              isDark={mode === "dark"}
+              onToggle={(checked) => setMode(checked ? "dark" : "light")}
+            />
+          </div>
+
           <Tooltip delay={0}>
             <Button
               variant="ghost"

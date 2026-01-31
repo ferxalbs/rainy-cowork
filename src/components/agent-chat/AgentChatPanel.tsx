@@ -7,8 +7,10 @@ import {
   TooltipTrigger,
 } from "@heroui/react";
 import * as tauri from "../../services/tauri";
-import { Paperclip, ArrowUp, Sparkles, Info, Trash2, Zap } from "lucide-react";
+import { Paperclip, ArrowUp, Sparkles, Trash2, Zap, Info } from "lucide-react";
 import { useCoworkAgent } from "../../hooks/useCoworkAgent";
+import { useTheme } from "../../hooks/useTheme";
+import { MacOSToggle } from "../layout/MacOSToggle";
 
 import { UnifiedModelSelector } from "../ai/UnifiedModelSelector";
 
@@ -24,6 +26,7 @@ export function AgentChatPanel({
   onClose,
   // onOpenSettings,
 }: AgentChatPanelProps) {
+  const { mode, setMode } = useTheme();
   const [input, setInput] = useState("");
   const [currentModelId, setCurrentModelId] = useState<string>("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -104,10 +107,10 @@ export function AgentChatPanel({
       }`}
     >
       <div
-        className={`relative group rounded-3xl border transition-all ${
+        className={`relative group rounded-[28px] border transition-all duration-300 ${
           isDeepProcessing
-            ? "bg-purple-500/5 border-purple-500/10 focus-within:bg-purple-500/10"
-            : "bg-muted/20 border-border/10 focus-within:bg-muted/30"
+            ? "bg-background/40 backdrop-blur-xl border-white/10 shadow-xl shadow-purple-500/5"
+            : "bg-background/40 backdrop-blur-xl border-white/10 shadow-lg"
         }`}
       >
         <TextArea
@@ -115,23 +118,25 @@ export function AgentChatPanel({
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={"Message Agent..."}
-          rows={centered ? 3 : 1}
-          className={`w-full bg-transparent border-none shadow-none text-foreground placeholder:text-muted-foreground/50 focus:ring-0 px-4 py-3 resize-none ${
-            centered ? "text-base min-h-[80px]" : "text-sm min-h-[44px]"
+          rows={centered ? 2 : 1}
+          className={`w-full bg-transparent border-none shadow-none text-foreground placeholder:text-muted-foreground/40 focus:ring-0 px-5 py-4 resize-none ${
+            centered
+              ? "text-lg tracking-tight min-h-[90px]"
+              : "text-sm min-h-[50px]"
           }`}
           disabled={isProcessing}
         />
 
         {/* Input Footer Controls */}
-        <div className="flex items-center justify-between px-2 pb-2 mt-1">
-          <div className="flex items-center gap-1">
+        <div className="flex items-center justify-between px-3 pb-3 mt-2">
+          <div className="flex items-center gap-2">
             <Tooltip delay={0}>
               <TooltipTrigger>
                 <Button
                   size="sm"
                   variant="ghost"
                   isIconOnly
-                  className="text-muted-foreground hover:text-foreground rounded-full"
+                  className="text-muted-foreground/50 hover:text-foreground hover:bg-muted/50 rounded-full w-8 h-8"
                 >
                   <Paperclip className="size-4" />
                 </Button>
@@ -141,40 +146,26 @@ export function AgentChatPanel({
               </TooltipContent>
             </Tooltip>
             {isDeepProcessing && (
-              <Tooltip delay={500}>
-                <TooltipTrigger>
-                  <div className="flex items-center gap-1.5 px-2 py-1 bg-purple-500/10 rounded text-[10px] text-purple-400 border border-purple-500/20 cursor-help">
-                    <Sparkles className="size-3 text-purple-500" />
-                    <span className="text-[10px] font-medium text-purple-400">
-                      Deep Processing
-                    </span>
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <span className="text-xs">Detailed reasoning & planning</span>
-                </TooltipContent>
-              </Tooltip>
+              <div className="flex items-center gap-1.5 px-2 py-1 bg-purple-500/5 rounded-full border border-purple-500/10 cursor-help select-none">
+                <Sparkles className="size-3 text-purple-400" />
+                <span className="text-[10px] font-medium text-purple-400/80">
+                  Deep Think
+                </span>
+              </div>
             )}
           </div>
 
           <div className="flex items-center gap-2">
-            <UnifiedModelSelector
-              selectedModelId={currentModelId}
-              onSelect={handleModelSelect}
-            />
-
             <Button
               size="sm"
               isIconOnly
               onPress={handleSubmit}
               isDisabled={!input.trim() || isProcessing}
               isPending={isProcessing}
-              className={`rounded-full transition-all duration-200 ${
+              className={`rounded-full transition-all duration-300 shadow-sm ${
                 input.trim()
-                  ? isDeepProcessing
-                    ? "bg-purple-600 text-white"
-                    : "bg-foreground text-background"
-                  : "bg-muted text-muted-foreground"
+                  ? "bg-foreground text-background scale-100 opacity-100 translate-y-0"
+                  : "bg-muted text-muted-foreground scale-90 opacity-0 translate-y-2 pointer-events-none"
               }`}
             >
               {!isProcessing && <ArrowUp className="size-4" />}
@@ -194,89 +185,122 @@ export function AgentChatPanel({
   );
 
   return (
-    <div className="flex flex-col h-full w-full relative bg-background/50">
-      <div className="absolute inset-0 bg-gradient-to-tr from-primary/5 via-transparent to-secondary/5 pointer-events-none -z-10 opacity-30" />
+    <div className="flex flex-col h-full w-full relative bg-background">
+      {/* Background Ambience */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/5 via-background to-background pointer-events-none -z-10" />
 
-      {/* Header/Toolbar */}
-      <div className="h-14 shrink-0 border-b border-border/40 flex items-center justify-between px-4 bg-background/60 backdrop-blur-md sticky top-0 z-10">
-        <div className="flex items-center gap-2">
-          <div className="size-8 rounded-lg bg-primary/10 flex items-center justify-center">
-            <Sparkles className="size-4 text-primary" />
-          </div>
-          <div>
-            <h2 className="text-sm font-semibold">Agent Chat</h2>
-            <p className="text-[10px] text-muted-foreground">
-              AI-powered workspace assistant
-            </p>
+      {/* Floating Topbar - Detached & Premium */}
+      <div className="absolute top-0 left-0 right-0 z-50 flex justify-center pt-4 pointer-events-none">
+        {/* Drag Region for Window Selection */}
+        <div
+          data-tauri-drag-region
+          className="absolute inset-x-0 top-0 h-16 pointer-events-auto z-0"
+        />
+
+        <div className="relative z-10 flex items-center gap-3 p-1.5 pl-3 rounded-full bg-background/60 backdrop-blur-2xl border border-white/10 shadow-lg pointer-events-auto transition-all hover:bg-background/80 hover:scale-[1.01] animate-in fade-in slide-in-from-top-4 duration-500">
+          <UnifiedModelSelector
+            selectedModelId={currentModelId}
+            onSelect={handleModelSelect}
+          />
+
+          <div className="w-px h-4 bg-border/20 mx-1" />
+
+          <MacOSToggle
+            isDark={mode === "dark"}
+            onToggle={(checked) => setMode(checked ? "dark" : "light")}
+          />
+
+          <div className="w-px h-4 bg-border/20 mx-1" />
+
+          <div className="flex items-center gap-1 pr-1">
+            <Button
+              size="sm"
+              variant="ghost"
+              isIconOnly
+              onPress={clearMessages}
+              className="rounded-full w-8 h-8 text-muted-foreground hover:text-red-400 hover:bg-red-400/10"
+            >
+              <Trash2 className="size-3.5" />
+            </Button>
+            {onClose && (
+              <Button
+                size="sm"
+                variant="ghost"
+                isIconOnly
+                onPress={onClose}
+                className="rounded-full w-8 h-8 text-muted-foreground hover:text-foreground"
+              >
+                <Zap className="size-3.5" />
+              </Button>
+            )}
           </div>
         </div>
-        <div className="flex items-center gap-1">
-          <Button size="sm" variant="ghost" isIconOnly onPress={clearMessages}>
-            <Trash2 className="size-4 text-muted-foreground" />
-          </Button>
-          {onClose && (
-            <Button size="sm" variant="ghost" isIconOnly onPress={onClose}>
-              <Zap className="size-4 text-muted-foreground" />
-            </Button>
+      </div>
+
+      {/* Messages Area - Full Height & Immersive */}
+      <div className="flex-1 overflow-y-auto w-full h-full scrollbar-none pt-24 pb-32">
+        <div className="max-w-3xl mx-auto px-4 w-full h-full flex flex-col">
+          {messages.length === 0 ? (
+            <div className="flex-1 flex flex-col items-center justify-center animate-in fade-in zoom-in duration-700 slide-in-from-bottom-4 -mt-20">
+              <div className="mb-8 relative group">
+                <div className="absolute inset-0 bg-primary/20 blur-3xl rounded-full opacity-0 group-hover:opacity-50 transition-opacity duration-1000" />
+                <Sparkles className="size-16 text-foreground/20 relative z-10" />
+              </div>
+
+              <h1 className="text-3xl font-medium text-foreground mb-3 tracking-tight text-center">
+                How can I help you?
+              </h1>
+              <p className="text-muted-foreground text-sm mb-10 text-center max-w-sm font-light">
+                Rainy Agent is ready to assist with your workspace tasks.
+              </p>
+
+              {renderInputArea(true)}
+
+              <div className="mt-12 grid grid-cols-2 gap-4 max-w-lg w-full px-4">
+                <SuggestionCard
+                  icon={<Zap className="text-amber-400" />}
+                  title="Quick Question"
+                  desc="Fast answers using lightweight models"
+                  onClick={() => {
+                    const fastModel = "rainy:gemini-2.0-flash";
+                    handleModelSelect(fastModel);
+                    setInput("How do I...");
+                  }}
+                />
+                <SuggestionCard
+                  icon={<Sparkles className="text-indigo-400" />}
+                  title="Deep Analysis"
+                  desc="Complex tasks using reasoning models"
+                  onClick={() => {
+                    const deepModel = "cowork:gemini-2.5-pro";
+                    handleModelSelect(deepModel);
+                    setInput("Analyze this project and...");
+                  }}
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-8 pb-4">
+              {messages.map((message) => (
+                <MessageBubble
+                  key={message.id}
+                  message={message}
+                  currentPlan={currentPlan}
+                  isExecuting={isExecuting}
+                  onExecute={executePlan}
+                  onCancel={cancelPlan}
+                />
+              ))}
+              <div ref={messagesEndRef} className="h-4" />
+            </div>
           )}
         </div>
       </div>
 
-      {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto px-4 py-6 scrollbar-thin">
-        {messages.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center -mt-20 animate-in fade-in zoom-in duration-500">
-            <h1 className="text-2xl font-medium text-foreground mb-8 tracking-tight text-center">
-              How can I help you today?
-            </h1>
-            {renderInputArea(true)}
-
-            <div className="mt-8 grid grid-cols-2 gap-3 max-w-lg w-full">
-              <SuggestionCard
-                icon={<Zap className="text-yellow-500" />}
-                title="Quick Question"
-                desc="Fast answers using lightweight models"
-                onClick={() => {
-                  // Switch to fast model if needed
-                  const fastModel = "rainy:gemini-2.0-flash";
-                  handleModelSelect(fastModel);
-                  setInput("How do I...");
-                }}
-              />
-              <SuggestionCard
-                icon={<Sparkles className="text-purple-500" />}
-                title="Deep Analysis"
-                desc="Complex tasks using reasoning models"
-                onClick={() => {
-                  // Switch to deep model
-                  const deepModel = "cowork:gemini-2.5-pro";
-                  handleModelSelect(deepModel);
-                  setInput("Analyze this project and...");
-                }}
-              />
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-6 max-w-3xl mx-auto pb-4">
-            {messages.map((message) => (
-              <MessageBubble
-                key={message.id}
-                message={message}
-                currentPlan={currentPlan}
-                isExecuting={isExecuting}
-                onExecute={executePlan}
-                onCancel={cancelPlan}
-              />
-            ))}
-            <div ref={messagesEndRef} />
-          </div>
-        )}
-      </div>
-
       {/* Bottom Input Area (Visible when messages exist) */}
       {messages.length > 0 && (
-        <div className="relative z-20 shrink-0 bg-background/80 backdrop-blur-xl border-t border-border/10 p-4">
-          {renderInputArea(false)}
+        <div className="relative z-20 shrink-0 p-4 pointer-events-none">
+          <div className="pointer-events-auto">{renderInputArea(false)}</div>
         </div>
       )}
     </div>
@@ -297,18 +321,22 @@ function SuggestionCard({
   return (
     <button
       onClick={onClick}
-      className="flex flex-col gap-1 p-4 rounded-2xl bg-muted/40 hover:bg-muted/60 border border-transparent hover:border-border/20 transition-all text-left group"
+      className="flex flex-col gap-2 p-5 rounded-2xl bg-white/5 hover:bg-white/10 hover:scale-[1.02] border border-white/5 hover:border-white/10 transition-all text-left group backdrop-blur-sm"
     >
-      <div className="size-8 rounded-full bg-background flex items-center justify-center mb-1 group-hover:scale-110 transition-transform">
+      <div className="size-10 rounded-xl bg-background/50 flex items-center justify-center mb-1 group-hover:bg-background transition-colors shadow-sm">
         {React.cloneElement(
           icon as React.ReactElement<{ className?: string }>,
           {
-            className: "size-4",
+            className: "size-5",
           },
         )}
       </div>
-      <span className="text-sm font-medium">{title}</span>
-      <span className="text-xs text-muted-foreground">{desc}</span>
+      <div>
+        <span className="block text-sm font-medium mb-0.5">{title}</span>
+        <span className="text-xs text-muted-foreground/80 font-light leading-relaxed">
+          {desc}
+        </span>
+      </div>
     </button>
   );
 }

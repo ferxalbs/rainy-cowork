@@ -141,29 +141,9 @@ export function UnifiedModelSelector({
     }
   };
 
-  const getProcessingModeBadge = (mode: string) => {
-    switch (mode) {
-      case "rainy_api":
-        return (
-          <span className="text-[10px] bg-yellow-500/10 text-yellow-600 px-1.5 py-0.5 rounded font-medium ml-2">
-            FAST
-          </span>
-        );
-      case "cowork":
-        return (
-          <span className="text-[10px] bg-purple-500/10 text-purple-600 px-1.5 py-0.5 rounded font-medium ml-2">
-            DEEP
-          </span>
-        );
-      default:
-        return null;
-    }
-  };
-
   // Helper to check if model supports thinking/reasoning
   const supportsThinking = (modelId: string): boolean => {
-    return modelId.includes("gemini-3") || 
-           modelId.includes("gemini-2.5");
+    return modelId.includes("gemini-3") || modelId.includes("gemini-2.5");
   };
 
   // Get thinking level for a model
@@ -180,39 +160,52 @@ export function UnifiedModelSelector({
       <PopoverTrigger>
         <Button
           variant="ghost"
-          className={`h-8 px-3 gap-2 font-normal ${className}`}
+          className={`h-auto py-1.5 px-3 gap-2 font-normal rounded-full transition-all duration-300
+            shadow-sm hover:shadow-md
+            ${
+              selectedModel?.provider === "Cowork"
+                ? "bg-purple-100/60 dark:bg-purple-900/30 border-purple-200/50 dark:border-purple-700/30 text-purple-900 dark:text-purple-100"
+                : selectedModel?.provider === "Rainy API" ||
+                    selectedModel?.provider === "Rainy"
+                  ? "bg-amber-100/60 dark:bg-amber-900/30 border-amber-200/50 dark:border-amber-700/30 text-amber-900 dark:text-amber-100"
+                  : selectedModel?.provider === "OpenAI"
+                    ? "bg-green-100/60 dark:bg-green-900/30 border-green-200/50 dark:border-green-700/30 text-green-900 dark:text-green-100"
+                    : selectedModel?.provider === "Anthropic"
+                      ? "bg-orange-100/60 dark:bg-orange-900/30 border-orange-200/50 dark:border-orange-700/30 text-orange-900 dark:text-orange-100"
+                      : "bg-white/60 dark:bg-black/30 border-black/5 dark:border-white/5"
+            }
+            backdrop-blur-2xl
+            ${className}`}
         >
           {selectedModel ? (
             <>
               <div className="flex items-center gap-2">
                 <div
-                  className={`size-6 rounded-md flex items-center justify-center ${
+                  className={`size-5 rounded-full flex items-center justify-center ${
                     selectedModel.provider === "Cowork"
-                      ? "bg-purple-500/10"
-                      : "bg-yellow-500/10"
+                      ? "bg-purple-500/10 text-purple-600"
+                      : "bg-amber-500/10 text-amber-600"
                   }`}
                 >
                   {getProviderIcon(selectedModel.provider)}
                 </div>
                 <div className="flex flex-col items-start">
-                  <span className="text-sm font-medium leading-tight">
+                  <span className="text-xs font-medium leading-tight text-foreground/90">
                     {selectedModel.name}
-                  </span>
-                  <span className="text-[10px] text-muted-foreground leading-tight">
-                    {selectedModel.provider}
-                    {getProcessingModeBadge(selectedModel.processing_mode)}
                   </span>
                 </div>
               </div>
             </>
           ) : (
-            <span className="text-muted-foreground">Select model...</span>
+            <span className="text-muted-foreground text-xs">
+              Select model...
+            </span>
           )}
-          <ChevronDown className="size-4 text-muted-foreground" />
+          <ChevronDown className="size-3 text-muted-foreground/70" />
         </Button>
       </PopoverTrigger>
 
-      <PopoverContent className="w-80 p-0">
+      <PopoverContent className="w-80 p-0 bg-background/80 backdrop-blur-2xl border border-white/10 shadow-2xl rounded-2xl overflow-hidden">
         <div className="flex flex-col">
           {/* Search */}
           <div className="p-3 border-b border-border/10">
@@ -267,7 +260,8 @@ export function UnifiedModelSelector({
                       </div>
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className="text-[10px] text-muted-foreground truncate">
-                          {(model.capabilities.max_context / 1000).toString()}k context
+                          {(model.capabilities.max_context / 1000).toString()}k
+                          context
                         </span>
                         {model.capabilities.web_search && (
                           <span className="flex items-center gap-0.5 text-[10px] text-blue-500 bg-blue-500/5 px-1 rounded">
@@ -276,7 +270,8 @@ export function UnifiedModelSelector({
                         )}
                         {supportsThinking(model.id) && (
                           <span className="flex items-center gap-0.5 text-[10px] text-amber-500 bg-amber-500/10 px-1 rounded font-medium">
-                            <Brain className="size-2.5" /> {getThinkingLevel(model.id)}
+                            <Brain className="size-2.5" />{" "}
+                            {getThinkingLevel(model.id)}
                           </span>
                         )}
                       </div>
