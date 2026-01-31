@@ -2,7 +2,7 @@
 // Orchestrates AI-driven file operations with natural language understanding
 // Part of Phase 1: Core AI File Operations Engine
 
-use crate::ai::provider_types::StreamingChunk;
+use crate::ai::provider_types::{ChatMessage, StreamingChunk};
 use crate::ai::AIProviderManager;
 use crate::models::ProviderType;
 use crate::services::file_operations::{
@@ -233,6 +233,7 @@ impl CoworkAgent {
         &self,
         instruction: &str,
         workspace_path: &str,
+        history: Vec<ChatMessage>,
         on_stream: Option<Channel<StreamEvent>>,
     ) -> Result<TaskPlan, String> {
         // Determine intent based on instruction (heuristic)
@@ -311,7 +312,7 @@ impl CoworkAgent {
 
         // Build AI prompt based on intent
         let prompt = if should_stream {
-            self.build_chat_prompt(instruction, &context)
+            self.build_chat_prompt(instruction, &context, history)
         } else {
             self.build_planning_prompt(instruction, &context)
         };
@@ -1125,8 +1126,24 @@ Respond ONLY with valid JSON, no other text."#,
         )
     }
 
-    /// Build a natural language chat prompt for questions
-    fn build_chat_prompt(&self, instruction: &str, context: &WorkspaceContext) -> String {
+    /// Build natural conversation prompt for questions
+    fn build_chat_prompt(
+        &self,
+        instruction: &str,
+        context: &WorkspaceContext,
+        history: Vec<ChatMessage>,
+    ) -> String {
+        // Format history into a conversation string
+        let history_text = if history.is_empty() {
+            "No previous context.".to_string()
+        } else {
+            history
+                .iter()
+                .map(|msg| format!("{}: {}", msg.role.to_uppercase(), msg.content))
+                .collect::<Vec<String>>()
+                .join("\n\n")
+        };
+
         format!(
             r#"You are a helpful AI Cowork Agent assisting a developer in their workspace.
 
@@ -1136,6 +1153,9 @@ Workspace Context:
 - Folders: {}
 - File Types: {}
 - Recent Files: {}
+
+Conversation History:
+{}
 
 User Question: "{}"
 
@@ -1151,6 +1171,7 @@ Instructions:
             context.folder_count,
             context.file_types.join(", "),
             context.recent_files.join(", "),
+            history_text,
             instruction
         )
     }

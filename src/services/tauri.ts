@@ -461,6 +461,12 @@ export type AgentEvent =
       data: { taskId: string; message: string; affectedFiles: string[] };
     };
 
+export interface ChatMessage {
+  role: string;
+  content: string;
+  name?: string;
+}
+
 // ============ File Operations Commands ============
 
 export async function moveFiles(
@@ -530,6 +536,7 @@ export async function listFileOperations(): Promise<
 export async function planTask(
   instruction: string,
   workspacePath: string,
+  history: ChatMessage[],
   onEvent: (event: StreamEvent) => void,
 ): Promise<TaskPlan> {
   const channel = new Channel<StreamEvent>();
@@ -538,6 +545,7 @@ export async function planTask(
   return invoke<TaskPlan>("plan_task", {
     instruction,
     workspacePath,
+    history,
     onEvent: channel,
   });
 }

@@ -2,6 +2,7 @@
 // Tauri commands for advanced file operations and AI agent
 // Part of Phase 2: Enhanced Tauri Commands
 
+use crate::ai::provider_types::ChatMessage;
 use crate::services::ai_agent::{AgentEvent, CoworkAgent, ExecutionResult, StreamEvent, TaskPlan};
 use crate::services::file_operations::{
     ConflictStrategy, FileOpChange, FileOperationEngine, FileVersion, FileVersionInfo,
@@ -290,11 +291,12 @@ pub async fn set_file_ops_workspace(
 pub async fn plan_task(
     instruction: String,
     workspace_path: String,
+    history: Vec<ChatMessage>,
     on_event: Channel<StreamEvent>,
     state: State<'_, Arc<CoworkAgent>>,
 ) -> Result<TaskPlan, String> {
     state
-        .parse_instruction(&instruction, &workspace_path, Some(on_event))
+        .parse_instruction(&instruction, &workspace_path, history, Some(on_event))
         .await
 }
 

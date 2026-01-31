@@ -95,10 +95,19 @@ export function useCoworkAgent(): UseCoworkAgentReturn {
       let accumulatedContent = "";
       let accumulatedThought = "";
 
+      // Map history (excluding current/loading messages)
+      const history = messages
+        .filter((m) => !m.isLoading && m.content)
+        .map((m) => ({
+          role: m.type === "agent" ? "assistant" : m.type,
+          content: m.content,
+        }));
+
       try {
         const plan = await tauri.planTask(
           instruction,
           workspacePath,
+          history,
           (event) => {
             if (event.event === "token") {
               accumulatedContent += event.data;
