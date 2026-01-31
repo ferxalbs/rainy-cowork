@@ -1,7 +1,7 @@
 import { ReactNode, useState, useEffect } from "react";
 import { BackgroundManager } from "../backgrounds/BackgroundManager";
 import { AppSidebar } from "./AppSidebar";
-import { InspectorPanel } from "./InspectorPanel";
+import { SystemStatusCard } from "./SystemStatusCard";
 import { MacOSToggle } from "./MacOSToggle";
 import { Button } from "@heroui/react";
 import { Maximize2, Minus, X, FolderOpen } from "lucide-react";
@@ -23,11 +23,6 @@ interface TahoeLayoutProps {
     running: number;
     queued: number;
   };
-  // Inspector Props
-  inspectorTitle?: string;
-  inspectorType?: "preview" | "info" | "process" | "links";
-  inspectorContent?: string;
-  inspectorFilename?: string;
 }
 
 export function TahoeLayout({
@@ -40,16 +35,11 @@ export function TahoeLayout({
   onNavigate,
   onSettingsClick,
   activeSection,
-  inspectorTitle,
-  inspectorType,
-  inspectorContent,
-  inspectorFilename,
   isImmersive,
 }: TahoeLayoutProps & { isImmersive?: boolean }) {
   const { mode, setMode } = useTheme();
   const [isWindows, setIsWindows] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [isInspectorOpen, setIsInspectorOpen] = useState(false);
 
   useEffect(() => {
     // Detect OS
@@ -82,7 +72,7 @@ export function TahoeLayout({
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
       />
 
-      {/* 2nd & 3rd Column Wrapper */}
+      {/* 2nd Column Wrapper (Inspector Removed) */}
       <div className="flex flex-col flex-1 min-w-0 h-full relative z-10 transition-all duration-300">
         {/* Universal Header - Glass Effect with Mode Specifics */}
         {!shouldBeImmersive && (
@@ -154,7 +144,7 @@ export function TahoeLayout({
           </header>
         )}
 
-        {/* Content Area + 3rd Column (Inspector) */}
+        {/* Content Area */}
         <div className="flex flex-1 min-w-0 overflow-hidden relative">
           {/* Main Content */}
           <main
@@ -167,16 +157,8 @@ export function TahoeLayout({
             </div>
           </main>
 
-          {/* 3rd Column: Inspector */}
-          <InspectorPanel
-            isOpen={isInspectorOpen}
-            onOpen={() => setIsInspectorOpen(true)}
-            onClose={() => setIsInspectorOpen(false)}
-            title={inspectorTitle}
-            type={inspectorType}
-            content={inspectorContent}
-            filename={inspectorFilename}
-          />
+          {/* System Status Card (Floating) */}
+          <SystemStatusCard />
         </div>
       </div>
     </div>

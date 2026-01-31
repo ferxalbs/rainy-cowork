@@ -1,10 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
-import {
-  TahoeLayout,
-  SettingsPanel,
-  AIDocumentPanel,
-  AIResearchPanel,
-} from "./components";
+import { TahoeLayout, AIDocumentPanel, AIResearchPanel } from "./components";
 import { SettingsPage } from "./components/settings";
 import { AgentChatPanel } from "./components/agent-chat/AgentChatPanel";
 import { Button, Card } from "@heroui/react";
@@ -33,30 +28,10 @@ function App() {
 
   const [activeSection, setActiveSection] = useState("agent-chat");
   const [activeFolder, setActiveFolder] = useState<Folder | null>(null);
-  const [settingsOpen, setSettingsOpen] = useState(false);
+
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // Inspector State
-  const [inspector, setInspector] = useState<{
-    title?: string;
-    type?: "preview" | "info" | "process" | "links";
-    content?: string;
-    filename?: string;
-  }>({
-    title: "System Status",
-    type: "info",
-  });
-
-  // @ts-ignore - Reserved for future file preview implementation
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const showPreview = useCallback((filename: string, content: string) => {
-    setInspector({
-      title: "File Preview",
-      type: "preview",
-      content,
-      filename,
-    });
-  }, []);
+  // Inspector State Removed
 
   // Load providers on mount
   useEffect(() => {
@@ -91,10 +66,12 @@ function App() {
     setActiveSection(section);
   }, []);
 
-  // Handle settings click from sidebar
+  // Handle settings click from sidebar - Redundant now loop logic if needed or remove
   const handleSettingsClick = useCallback(() => {
-    setSettingsOpen(true);
-  }, []);
+    // setSettingsOpen(true); Removed modal trigger
+    // Maybe navigate to settings page instead?
+    handleNavigate("settings-models");
+  }, [handleNavigate]);
 
   // Check if we're in Settings section
   const isSettingsSection = activeSection.startsWith("settings-");
@@ -113,10 +90,6 @@ function App() {
         onNavigate={handleNavigate}
         onSettingsClick={handleSettingsClick}
         activeSection={activeSection}
-        inspectorTitle={inspector.title}
-        inspectorType={inspector.type}
-        inspectorContent={inspector.content}
-        inspectorFilename={inspector.filename}
         isImmersive={
           !isSettingsSection &&
           activeSection !== "documents" &&
@@ -183,7 +156,7 @@ function App() {
               {activeFolder ? (
                 <AgentChatPanel
                   workspacePath={activeFolder.path}
-                  onOpenSettings={() => setSettingsOpen(true)}
+                  onOpenSettings={handleSettingsClick}
                 />
               ) : (
                 <div className="flex items-center justify-center h-full">
@@ -195,11 +168,7 @@ function App() {
         </div>
       </TahoeLayout>
 
-      {/* Settings Modal */}
-      <SettingsPanel
-        isOpen={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-      />
+      {/* Settings Modal Removed */}
     </>
   );
 }
