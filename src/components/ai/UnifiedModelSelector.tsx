@@ -12,7 +12,6 @@ import {
   Search,
   Sparkles,
   Zap,
-  Cpu,
   Globe,
   Brain,
   Filter,
@@ -123,22 +122,93 @@ export function UnifiedModelSelector({
     return groups;
   }, [filteredModels]);
 
-  const getProviderIcon = (provider: string) => {
-    switch (provider.toLowerCase()) {
-      case "rainy":
-      case "rainy_api":
-        return <Zap className="size-3.5 text-yellow-500" />;
-      case "cowork":
-        return <Brain className="size-3.5 text-purple-500" />;
-      case "openai":
-        return <Sparkles className="size-3.5 text-green-500" />;
-      case "anthropic":
-        return <Cpu className="size-3.5 text-orange-500" />;
-      case "xai":
-        return <Globe className="size-3.5 text-blue-500" />;
-      default:
-        return <Zap className="size-3.5 text-muted-foreground" />;
+  const getProviderIcon = (model: UnifiedModel, className = "size-3.5") => {
+    const normalizedProvider = model.provider.toLowerCase();
+    const normalizedId = model.id.toLowerCase();
+    const normalizedName = model.name.toLowerCase();
+
+    // Helper for tinted SVG icons
+    const RenderTintedIcon = ({
+      src,
+      colorClass,
+    }: {
+      src: string;
+      colorClass: string;
+    }) => (
+      <div
+        className={`${className} ${colorClass}`}
+        style={{
+          maskImage: `url(${src})`,
+          WebkitMaskImage: `url(${src})`,
+          maskSize: "contain",
+          WebkitMaskSize: "contain",
+          maskRepeat: "no-repeat",
+          WebkitMaskRepeat: "no-repeat",
+          maskPosition: "center",
+          WebkitMaskPosition: "center",
+          backgroundColor: "currentColor",
+        }}
+      />
+    );
+
+    if (
+      normalizedProvider.includes("openai") ||
+      normalizedId.includes("gpt") ||
+      normalizedName.includes("gpt") ||
+      normalizedId.includes("o1") ||
+      normalizedId.includes("o3")
+    ) {
+      return (
+        <RenderTintedIcon
+          src="/openai.svg"
+          colorClass="text-[#10a37f] dark:text-[#10a37f]"
+        />
+      );
     }
+
+    if (
+      normalizedProvider.includes("anthropic") ||
+      normalizedId.includes("claude") ||
+      normalizedName.includes("claude")
+    ) {
+      return (
+        <RenderTintedIcon
+          src="/antro.svg"
+          colorClass="text-[#d97757] dark:text-[#cc785c]"
+        />
+      );
+    }
+
+    if (
+      normalizedProvider.includes("google") ||
+      normalizedProvider.includes("gemini") ||
+      normalizedId.includes("gemini") ||
+      normalizedName.includes("gemini")
+    ) {
+      return (
+        <RenderTintedIcon
+          src="/google.svg"
+          colorClass="text-[#4285F4] dark:text-[#4285F4]"
+        />
+      );
+    }
+
+    if (
+      normalizedProvider.includes("rainy") ||
+      normalizedProvider === "rainy_api"
+    ) {
+      return <Zap className={`${className} text-yellow-500`} />;
+    }
+
+    if (normalizedProvider.includes("cowork")) {
+      return <Brain className={`${className} text-purple-500`} />;
+    }
+
+    if (normalizedProvider.includes("xai") || normalizedId.includes("grok")) {
+      return <Globe className={`${className} text-blue-500`} />;
+    }
+
+    return <Zap className={`${className} text-muted-foreground`} />;
   };
 
   // Helper to check if model supports thinking/reasoning
@@ -161,32 +231,17 @@ export function UnifiedModelSelector({
         <Button
           variant="ghost"
           className={`h-auto py-1.5 px-3 gap-2 font-normal rounded-full transition-all duration-300
-            ${
-              selectedModel?.provider === "Cowork"
-                ? "bg-purple-100/60 dark:bg-primary/30 border-primary/50 dark:border-primary/30 text-purple-900 dark:text-purple-100"
-                : selectedModel?.provider === "Rainy API" ||
-                    selectedModel?.provider === "Rainy"
-                  ? "bg-amber-900/60 dark:bg-primary/30 border-primary/50 dark:border-primary/30 text-amber-900 dark:text-amber-100"
-                  : selectedModel?.provider === "OpenAI"
-                    ? "bg-green-100/60 dark:bg-primary/30 border-primary/50 dark:border-primary/30 text-green-900 dark:text-green-100"
-                    : selectedModel?.provider === "Anthropic"
-                      ? "bg-orange-100/60 dark:bg-primary/30 border-primary/50 dark:border-primary/30 text-orange-900 dark:text-orange-100"
-                      : "bg-white/60 dark:bg-black/30 border-black/5 dark:border-white/5"
-            }
-            backdrop-blur-2xl
+            bg-white/50 dark:bg-black/20 
+            border border-black/5 dark:border-white/5
+            hover:bg-black/5 dark:hover:bg-white/5
+            backdrop-blur-md
             ${className}`}
         >
           {selectedModel ? (
             <>
               <div className="flex items-center gap-2">
-                <div
-                  className={`size-5 rounded-full flex items-center justify-center ${
-                    selectedModel.provider === "Cowork"
-                      ? "bg-purple-500/10 text-purple-600"
-                      : "bg-amber-500/10 text-amber-600"
-                  }`}
-                >
-                  {getProviderIcon(selectedModel.provider)}
+                <div className="flex items-center justify-center">
+                  {getProviderIcon(selectedModel, "size-4")}
                 </div>
                 <div className="flex flex-col items-start">
                   <span className="text-xs font-medium leading-tight text-foreground/90">
@@ -204,7 +259,7 @@ export function UnifiedModelSelector({
         </Button>
       </PopoverTrigger>
 
-      <PopoverContent className="w-80 p-0 bg-background/30 backdrop-blur-2xl border border-white/10 shadow-2xl rounded-2xl overflow-hidden">
+      <PopoverContent className="w-80 p-0 bg-background/80 backdrop-blur-3xl border border-white/10 shadow-2xl rounded-2xl overflow-hidden">
         <div className="flex flex-col">
           {/* Search */}
           <div className="p-3 border-b border-border/10">
@@ -214,16 +269,16 @@ export function UnifiedModelSelector({
                 placeholder="Search models..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="bg-background/30 w-full pl-9 text-sm"
+                className="bg-muted/30 w-full pl-9 text-sm h-9 rounded-lg border-transparent focus:border-primary/20 transition-all font-medium"
               />
             </div>
           </div>
 
           {/* Model List */}
-          <div className="max-h-[300px] overflow-y-auto py-2">
+          <div className="max-h-[300px] overflow-y-auto py-2 custom-scrollbar">
             {Object.entries(groupedModels).map(([provider, providerModels]) => (
               <div key={provider} className="px-2 py-1">
-                <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                <div className="px-2 py-1.5 text-[10px] font-bold text-muted-foreground/60 uppercase tracking-wider">
                   {provider}
                 </div>
                 {providerModels.map((model) => (
@@ -233,20 +288,14 @@ export function UnifiedModelSelector({
                       onSelect(model.id);
                       setIsPopoverOpen(false);
                     }}
-                    className={`w-full flex items-center gap-3 px-2 py-2 rounded-lg text-left transition-colors ${
+                    className={`w-full flex items-center gap-3 px-2 py-2 rounded-lg text-left transition-all duration-200 group ${
                       selectedModelId === model.id
-                        ? "bg-accent"
-                        : "hover:bg-accent/50"
+                        ? "bg-accent/80 text-accent-foreground"
+                        : "hover:bg-muted/50 text-foreground/80 hover:text-foreground"
                     }`}
                   >
-                    <div
-                      className={`size-8 rounded-lg flex items-center justify-center shrink-0 ${
-                        model.processing_mode === "cowork"
-                          ? "bg-purple-500/10"
-                          : "bg-yellow-500/10"
-                      }`}
-                    >
-                      {getProviderIcon(model.provider)}
+                    <div className="flex items-center justify-center shrink-0 w-5 h-5">
+                      {getProviderIcon(model, "size-4")}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
@@ -258,17 +307,17 @@ export function UnifiedModelSelector({
                         )}
                       </div>
                       <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-[10px] text-muted-foreground truncate">
+                        <span className="text-[10px] text-muted-foreground/80 truncate font-medium">
                           {(model.capabilities.max_context / 1000).toString()}k
                           context
                         </span>
                         {model.capabilities.web_search && (
-                          <span className="flex items-center gap-0.5 text-[10px] text-blue-500 bg-blue-500/5 px-1 rounded">
+                          <span className="flex items-center gap-0.5 text-[10px] text-blue-500 bg-blue-500/10 px-1.5 py-px rounded-md font-medium">
                             <Globe className="size-2.5" /> web
                           </span>
                         )}
                         {supportsThinking(model.id) && (
-                          <span className="flex items-center gap-0.5 text-[10px] text-amber-500 bg-amber-500/10 px-1 rounded font-medium">
+                          <span className="flex items-center gap-0.5 text-[10px] text-amber-500 bg-amber-500/10 px-1.5 py-px rounded-md font-medium">
                             <Brain className="size-2.5" />{" "}
                             {getThinkingLevel(model.id)}
                           </span>
@@ -276,7 +325,7 @@ export function UnifiedModelSelector({
                       </div>
                     </div>
                     {selectedModelId === model.id && (
-                      <Check className="size-4 shrink-0" />
+                      <Check className="size-3.5 shrink-0 text-primary" />
                     )}
                   </button>
                 ))}
@@ -308,6 +357,58 @@ export function UnifiedModelSelector({
 // Fallback data for development
 // Models that actually exist in the Rainy SDK and are available via the API
 const MOCK_MODELS: UnifiedModel[] = [
+  // OPENAI MODELS
+  {
+    id: "openai:gpt-4o",
+    name: "GPT-4o",
+    provider: "OpenAI",
+    capabilities: {
+      chat: true,
+      streaming: true,
+      function_calling: true,
+      vision: true,
+      web_search: true,
+      max_context: 128000,
+      thinking: false,
+    },
+    enabled: true,
+    processing_mode: "rainy_api",
+  },
+  {
+    id: "openai:o1-preview",
+    name: "o1 Preview",
+    provider: "OpenAI",
+    capabilities: {
+      chat: true,
+      streaming: true,
+      function_calling: false,
+      vision: false,
+      web_search: false,
+      max_context: 128000,
+      thinking: true,
+    },
+    enabled: true,
+    processing_mode: "rainy_api",
+    thinkingLevel: "high",
+  },
+  // ANTHROPIC MODELS
+  {
+    id: "anthropic:claude-3-5-sonnet-latest",
+    name: "Claude 3.5 Sonnet",
+    provider: "Anthropic",
+    capabilities: {
+      chat: true,
+      streaming: true,
+      function_calling: true,
+      vision: true,
+      web_search: true,
+      max_context: 200000,
+      thinking: true,
+    },
+    enabled: true,
+    processing_mode: "rainy_api",
+    thinkingLevel: "high",
+  },
   // GEMINI 3 SERIES - Advanced reasoning models with thinking capabilities
   {
     id: "rainy:gemini-3-pro-preview",
