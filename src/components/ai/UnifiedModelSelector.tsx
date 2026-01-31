@@ -161,7 +161,6 @@ export function UnifiedModelSelector({
         <Button
           variant="ghost"
           className={`h-auto py-1.5 px-3 gap-2 font-normal rounded-full transition-all duration-300
-            shadow-sm hover:shadow-md
             ${
               selectedModel?.provider === "Cowork"
                 ? "bg-purple-100/60 dark:bg-primary/30 border-primary/50 dark:border-primary/30 text-purple-900 dark:text-purple-100"
