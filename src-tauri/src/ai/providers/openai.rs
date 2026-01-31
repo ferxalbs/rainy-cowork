@@ -58,6 +58,7 @@ struct OpenAIMessage {
 
 /// OpenAI API response
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct OpenAIChatResponse {
     id: String,
     object: String,
@@ -69,6 +70,7 @@ struct OpenAIChatResponse {
 
 /// OpenAI choice
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct OpenAIChoice {
     index: u32,
     message: OpenAIMessage,
@@ -92,6 +94,7 @@ struct OpenAIEmbeddingRequest {
 
 /// OpenAI embedding response
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct OpenAIEmbeddingResponse {
     object: String,
     data: Vec<OpenAIEmbeddingData>,
@@ -101,6 +104,7 @@ struct OpenAIEmbeddingResponse {
 
 /// OpenAI embedding data
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct OpenAIEmbeddingData {
     object: String,
     embedding: Vec<f32>,
@@ -109,6 +113,7 @@ struct OpenAIEmbeddingData {
 
 /// OpenAI streaming chunk
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct OpenAIStreamChunk {
     id: String,
     object: String,
@@ -119,6 +124,7 @@ struct OpenAIStreamChunk {
 
 /// OpenAI streaming choice
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct OpenAIStreamChoice {
     index: u32,
     delta: OpenAIDelta,
@@ -127,6 +133,7 @@ struct OpenAIStreamChoice {
 
 /// OpenAI delta message
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct OpenAIDelta {
     #[serde(default)]
     role: Option<String>,
@@ -142,6 +149,7 @@ struct OpenAIError {
 
 /// OpenAI error detail
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct OpenAIErrorDetail {
     message: String,
     #[serde(rename = "type")]

@@ -93,6 +93,7 @@ struct AnthropicStreamEvent {
 
 /// Anthropic error response
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct AnthropicError {
     #[serde(rename = "type")]
     error_type: String,
@@ -101,6 +102,7 @@ struct AnthropicError {
 
 /// Anthropic error detail
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct AnthropicErrorDetail {
     #[serde(rename = "type")]
     error_type: String,
@@ -109,6 +111,7 @@ struct AnthropicErrorDetail {
 
 /// Content block delta for streaming
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct ContentBlockDelta {
     #[serde(rename = "type")]
     delta_type: String,

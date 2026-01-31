@@ -227,6 +227,29 @@ impl CoworkAgent {
         instruction: &str,
         workspace_path: &str,
     ) -> Result<TaskPlan, String> {
+        // Determine intent based on instruction (heuristic)
+        // This allows us to choose the execution mode (Stream vs Non-Stream)
+        let intent = if instruction.trim().ends_with('?')
+            || instruction.to_lowercase().starts_with("what")
+            || instruction.to_lowercase().starts_with("how")
+            || instruction.to_lowercase().starts_with("why")
+            || instruction.to_lowercase().starts_with("explain")
+        {
+            TaskIntent::Question
+        } else {
+            TaskIntent::Command
+        };
+
+        // Dual Mode Logic:
+        // - Questions -> Stream: true (Fast response)
+        // - Commands (Tasks) -> Stream: false (Reliable JSON parsing)
+        let should_stream = matches!(intent, TaskIntent::Question);
+
+        println!(
+            "🧠 AI Agent: Intent='{:?}', Streaming={}",
+            intent, should_stream
+        );
+
         // Create and set workspace context for file operations
         // This is an ad-hoc workspace based on the user's selected folder
         let adhoc_workspace = crate::services::workspace::Workspace {
@@ -282,7 +305,9 @@ impl CoworkAgent {
         let prompt = self.build_planning_prompt(instruction, &context);
 
         // Smart provider selection with fallback
-        let (ai_response, model_info, thought) = self.execute_with_best_provider(&prompt).await?;
+        let (ai_response, model_info, thought) = self
+            .execute_with_best_provider(&prompt, should_stream)
+            .await?;
 
         // Parse AI response into TaskPlan
         let mut plan = self.parse_ai_response(&ai_response, instruction)?;
@@ -301,11 +326,19 @@ impl CoworkAgent {
     }
 
     /// Execute prompt with the best available provider, respecting user preference
+    ///
+    /// # Arguments
+    /// * `prompt` - The prompt to send
+    /// * `stream` - Whether to use streaming (true for chat/questions, false for robust tasks)
     async fn execute_with_best_provider(
         &self,
         prompt: &str,
+        stream: bool,
     ) -> Result<(String, ModelInfo, Option<String>), String> {
-        println!("🤖 AI Agent: execute_with_best_provider called");
+        println!(
+            "🤖 AI Agent: execute_with_best_provider called (stream={})",
+            stream
+        );
 
         let selected_model = {
             let settings = self.settings.lock().await;
@@ -396,23 +429,34 @@ impl CoworkAgent {
                         let thought_acc = std::sync::Arc::new(std::sync::Mutex::new(String::new()));
                         let thought_writer = thought_acc.clone();
 
-                        match self
-                            .ai_provider
-                            .execute_prompt(
-                                &ProviderType::CoworkApi,
-                                &model.name,
-                                prompt,
-                                |_, _| {},
-                                Some(move |chunk: StreamingChunk| {
-                                    if let Some(t) = chunk.thought {
-                                        if let Ok(mut g) = thought_writer.lock() {
-                                            g.push_str(&t);
+                        match if stream {
+                            self.ai_provider
+                                .execute_prompt(
+                                    &ProviderType::CoworkApi,
+                                    &model.name,
+                                    prompt,
+                                    |_, _| {},
+                                    Some(move |chunk: StreamingChunk| {
+                                        if let Some(t) = chunk.thought {
+                                            if let Ok(mut g) = thought_writer.lock() {
+                                                g.push_str(&t);
+                                            }
                                         }
-                                    }
-                                }),
-                            )
-                            .await
-                        {
+                                    }),
+                                )
+                                .await
+                        } else {
+                            // Non-streaming fallback for tasks
+                            self.ai_provider
+                                .execute_prompt(
+                                    &ProviderType::CoworkApi,
+                                    &model.name,
+                                    prompt,
+                                    |_, _| {},
+                                    None::<fn(StreamingChunk)>, // No streaming callback
+                                )
+                                .await
+                        } {
                             Ok(response) => {
                                 println!(
                                     "✅ AI Agent: Successfully used Cowork API for model '{}'",
@@ -468,23 +512,33 @@ impl CoworkAgent {
                         let thought_acc = std::sync::Arc::new(std::sync::Mutex::new(String::new()));
                         let thought_writer = thought_acc.clone();
 
-                        match self
-                            .ai_provider
-                            .execute_prompt(
-                                &ProviderType::RainyApi,
-                                raw_model_id, // Use raw model ID, NOT model.name (display name)!
-                                prompt,
-                                |_, _| {},
-                                Some(move |chunk: StreamingChunk| {
-                                    if let Some(t) = chunk.thought {
-                                        if let Ok(mut g) = thought_writer.lock() {
-                                            g.push_str(&t);
+                        match if stream {
+                            self.ai_provider
+                                .execute_prompt(
+                                    &ProviderType::RainyApi,
+                                    raw_model_id,
+                                    prompt,
+                                    |_, _| {},
+                                    Some(move |chunk: StreamingChunk| {
+                                        if let Some(t) = chunk.thought {
+                                            if let Ok(mut g) = thought_writer.lock() {
+                                                g.push_str(&t);
+                                            }
                                         }
-                                    }
-                                }),
-                            )
-                            .await
-                        {
+                                    }),
+                                )
+                                .await
+                        } else {
+                            self.ai_provider
+                                .execute_prompt(
+                                    &ProviderType::RainyApi,
+                                    raw_model_id,
+                                    prompt,
+                                    |_, _| {},
+                                    None::<fn(StreamingChunk)>,
+                                )
+                                .await
+                        } {
                             Ok(response) => {
                                 println!(
                                     "✅ AI Agent: Successfully used Rainy API for model '{}'",
@@ -529,23 +583,33 @@ impl CoworkAgent {
                         let thought_acc = std::sync::Arc::new(std::sync::Mutex::new(String::new()));
                         let thought_writer = thought_acc.clone();
 
-                        match self
-                            .ai_provider
-                            .execute_prompt(
-                                &ProviderType::Gemini,
-                                &model.name,
-                                prompt,
-                                |_, _| {},
-                                Some(move |chunk: StreamingChunk| {
-                                    if let Some(t) = chunk.thought {
-                                        if let Ok(mut g) = thought_writer.lock() {
-                                            g.push_str(&t);
+                        match if stream {
+                            self.ai_provider
+                                .execute_prompt(
+                                    &ProviderType::Gemini,
+                                    &model.name,
+                                    prompt,
+                                    |_, _| {},
+                                    Some(move |chunk: StreamingChunk| {
+                                        if let Some(t) = chunk.thought {
+                                            if let Ok(mut g) = thought_writer.lock() {
+                                                g.push_str(&t);
+                                            }
                                         }
-                                    }
-                                }),
-                            )
-                            .await
-                        {
+                                    }),
+                                )
+                                .await
+                        } else {
+                            self.ai_provider
+                                .execute_prompt(
+                                    &ProviderType::Gemini,
+                                    &model.name,
+                                    prompt,
+                                    |_, _| {},
+                                    None::<fn(StreamingChunk)>,
+                                )
+                                .await
+                        } {
                             Ok(response) => {
                                 println!(
                                     "✅ AI Agent: Successfully used Gemini BYOK for model '{}'",
@@ -725,23 +789,33 @@ impl CoworkAgent {
             let thought_acc = std::sync::Arc::new(std::sync::Mutex::new(String::new()));
             let thought_writer = thought_acc.clone();
 
-            if let Ok(response) = self
-                .ai_provider
-                .execute_prompt(
-                    &ProviderType::CoworkApi,
-                    preferred_model,
-                    prompt,
-                    |_, _| {},
-                    Some(move |chunk: StreamingChunk| {
-                        if let Some(t) = chunk.thought {
-                            if let Ok(mut g) = thought_writer.lock() {
-                                g.push_str(&t);
+            if let Ok(response) = if stream {
+                self.ai_provider
+                    .execute_prompt(
+                        &ProviderType::CoworkApi,
+                        preferred_model,
+                        prompt,
+                        |_, _| {},
+                        Some(move |chunk: StreamingChunk| {
+                            if let Some(t) = chunk.thought {
+                                if let Ok(mut g) = thought_writer.lock() {
+                                    g.push_str(&t);
+                                }
                             }
-                        }
-                    }),
-                )
-                .await
-            {
+                        }),
+                    )
+                    .await
+            } else {
+                self.ai_provider
+                    .execute_prompt(
+                        &ProviderType::CoworkApi,
+                        preferred_model,
+                        prompt,
+                        |_, _| {},
+                        None::<fn(StreamingChunk)>,
+                    )
+                    .await
+            } {
                 println!("✅ Cowork fallback successful");
                 let thought = {
                     let g = thought_acc.lock().unwrap();
