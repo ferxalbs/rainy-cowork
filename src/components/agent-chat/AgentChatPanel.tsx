@@ -13,6 +13,7 @@ import { useTheme } from "../../hooks/useTheme";
 import { MacOSToggle } from "../layout/MacOSToggle";
 
 import { UnifiedModelSelector } from "../ai/UnifiedModelSelector";
+import { MessageBubble } from "./MessageBubble";
 
 interface AgentChatPanelProps {
   workspacePath: string;
@@ -55,7 +56,7 @@ export function AgentChatPanel({
   };
 
   const {
-    messages,
+    messages = [],
     isPlanning,
     isExecuting,
     currentPlan,
@@ -64,7 +65,7 @@ export function AgentChatPanel({
     executePlan,
     cancelPlan,
     clearMessages,
-  } = useCoworkAgent();
+  } = useCoworkAgent() || {};
 
   const isProcessing = isPlanning || isExecuting;
 
@@ -185,19 +186,19 @@ export function AgentChatPanel({
   );
 
   return (
-    <div className="flex flex-col h-full w-full relative bg-background">
-      {/* Background Ambience */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/5 via-background to-background pointer-events-none -z-10" />
+    <div className="h-full w-full relative bg-transparent overflow-hidden text-foreground">
+      {/* Background Ambience / Base Layer */}
+      <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-background/50 to-background/80 pointer-events-none z-0" />
 
-      {/* Floating Topbar - Detached & Premium */}
-      <div className="absolute top-0 left-0 right-0 z-50 flex justify-center pt-4 pointer-events-none">
-        {/* Drag Region for Window Selection */}
+      {/* Top Bar - Absolute & Layered - Z-50 */}
+      <div className="absolute top-0 left-0 right-0 z-50 flex justify-center pt-6 pointer-events-none">
+        {/* Drag Region */}
         <div
           data-tauri-drag-region
-          className="absolute inset-x-0 top-0 h-16 pointer-events-auto z-0"
+          className="absolute inset-x-0 top-0 h-20 pointer-events-auto z-0"
         />
 
-        <div className="relative z-10 flex items-center gap-3 p-1.5 pl-3 rounded-full bg-background/60 backdrop-blur-2xl border border-white/10 shadow-lg pointer-events-auto transition-all hover:bg-background/80 hover:scale-[1.01] animate-in fade-in slide-in-from-top-4 duration-500">
+        <div className="relative z-10 flex items-center gap-3 p-1.5 pl-3 rounded-full bg-background/60 backdrop-blur-2xl border border-white/10 shadow-lg pointer-events-auto transition-all hover:bg-background/80">
           <UnifiedModelSelector
             selectedModelId={currentModelId}
             onSelect={handleModelSelect}
@@ -237,13 +238,14 @@ export function AgentChatPanel({
         </div>
       </div>
 
-      {/* Messages Area - Full Height & Immersive */}
-      <div className="flex-1 overflow-y-auto w-full h-full scrollbar-none pt-24 pb-32">
-        <div className="max-w-3xl mx-auto px-4 w-full h-full flex flex-col">
+      {/* Scrollable Content Area - Absolute Inset - Z-10 */}
+      <div className="absolute inset-0 overflow-y-auto w-full h-full scrollbar-none z-10">
+        {/* Padding to clear top bar and bottom input */}
+        <div className="min-h-full flex flex-col pt-32 pb-40 px-4 max-w-3xl mx-auto">
           {messages.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center animate-in fade-in zoom-in duration-700 slide-in-from-bottom-4 -mt-20">
+            <div className="flex-1 flex flex-col items-center justify-center">
               <div className="mb-8 relative group">
-                <div className="absolute inset-0 bg-primary/20 blur-3xl rounded-full opacity-0 group-hover:opacity-50 transition-opacity duration-1000" />
+                <div className="absolute inset-0 bg-primary/20 blur-3xl rounded-full opacity-50" />
                 <Sparkles className="size-16 text-foreground/20 relative z-10" />
               </div>
 
@@ -256,7 +258,8 @@ export function AgentChatPanel({
 
               {renderInputArea(true)}
 
-              <div className="mt-12 grid grid-cols-2 gap-4 max-w-lg w-full px-4">
+              {/* Suggestions */}
+              <div className="mt-12 grid grid-cols-2 gap-4 max-w-lg w-full px-4 mb-20">
                 <SuggestionCard
                   icon={<Zap className="text-amber-400" />}
                   title="Quick Question"
@@ -280,7 +283,7 @@ export function AgentChatPanel({
               </div>
             </div>
           ) : (
-            <div className="space-y-8 pb-4">
+            <div className="space-y-8">
               {messages.map((message) => (
                 <MessageBubble
                   key={message.id}
@@ -291,16 +294,18 @@ export function AgentChatPanel({
                   onCancel={cancelPlan}
                 />
               ))}
-              <div ref={messagesEndRef} className="h-4" />
+              <div ref={messagesEndRef} />
             </div>
           )}
         </div>
       </div>
 
-      {/* Bottom Input Area (Visible when messages exist) */}
+      {/* Floating Input Area - Absolute Bottom - ONLY SHOW WHEN MESSAGES EXIST */}
       {messages.length > 0 && (
-        <div className="relative z-20 shrink-0 p-4 pointer-events-none">
-          <div className="pointer-events-auto">{renderInputArea(false)}</div>
+        <div className="absolute bottom-6 left-0 right-0 z-40 px-4 pointer-events-none flex justify-center">
+          <div className="w-full max-w-2xl pointer-events-auto">
+            {renderInputArea(false)}
+          </div>
         </div>
       )}
     </div>
@@ -340,9 +345,3 @@ function SuggestionCard({
     </button>
   );
 }
-
-// Reuse MessageBubble from CoworkPanel or extract to shared component
-// For brevity, assuming MessageBubble is similar but imported or defined here.
-// Ideally should be a shared component.
-import { MessageBubble } from "./MessageBubble";
-// Note: You might need to export MessageBubble from CoworkPanel.tsx if not already exported.

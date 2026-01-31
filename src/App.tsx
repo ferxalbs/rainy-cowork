@@ -68,10 +68,6 @@ function App() {
     async (folder: Folder) => {
       try {
         await tauri.setWorkspace(folder.path, folder.name);
-        // await tauri.setTaskManagerWorkspace(folder.id); // Removed as task manager is gone? Or should I keep it for backend compatibility?
-        // User stripped "Workflow" UI, but backend might still need workspace set for other things?
-        // Safe to keep setWorkspace. setTaskManagerWorkspace might be irrelevant but harmless.
-        // Actually, let's keep it simple.
         await tauri.updateFolderAccess(folder.id);
         setActiveFolder(folder);
         refreshFolders();
@@ -82,6 +78,13 @@ function App() {
     },
     [refreshFolders],
   );
+
+  // Auto-select first folder when folders are loaded
+  useEffect(() => {
+    if (folders.length > 0 && !activeFolder) {
+      handleFolderSelect(folders[0]);
+    }
+  }, [folders, activeFolder, handleFolderSelect]);
 
   // Handle navigation
   const handleNavigate = useCallback((section: string) => {
@@ -120,10 +123,11 @@ function App() {
           activeSection !== "research"
         }
       >
-        <div className="space-y-6">
+        {/* Main Content Area - Dynamic based on section */}
+        <div className="h-full w-full flex flex-col">
           {/* Error Display */}
           {submitError && (
-            <div className="p-4 border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30 animate-appear rounded-xl">
+            <div className="p-4 border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30 rounded-xl m-4">
               <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
                 <AlertCircle className="size-4 shrink-0" />
                 <p className="text-sm">{submitError}</p>
@@ -143,7 +147,7 @@ function App() {
 
           {/* AI Documents */}
           {activeSection === "documents" && (
-            <div className="animate-appear">
+            <div className="flex-1 p-6">
               {activeFolder ? (
                 <AIDocumentPanel />
               ) : (
@@ -154,7 +158,7 @@ function App() {
 
           {/* AI Research */}
           {activeSection === "research" && (
-            <div className="animate-appear">
+            <div className="flex-1 p-6">
               {activeFolder ? (
                 <AIResearchPanel />
               ) : (
@@ -165,7 +169,7 @@ function App() {
 
           {/* Settings Section */}
           {isSettingsSection && (
-            <div className="animate-appear h-full">
+            <div className="flex-1 overflow-auto">
               <SettingsPage
                 initialTab={settingsTab}
                 onBack={() => handleNavigate("agent-chat")}
@@ -173,21 +177,21 @@ function App() {
             </div>
           )}
 
-          {/* Fallback / Agent Chat Main View */}
-          {!isSettingsSection &&
-            activeSection !== "documents" &&
-            activeSection !== "research" && (
-              <div className="animate-appear h-full w-full">
-                {activeFolder ? (
-                  <AgentChatPanel
-                    workspacePath={activeFolder.path}
-                    onOpenSettings={() => setSettingsOpen(true)}
-                  />
-                ) : (
+          {/* Agent Chat Main View - Full Height */}
+          {activeSection === "agent-chat" && (
+            <div className="flex-1 h-full min-h-0">
+              {activeFolder ? (
+                <AgentChatPanel
+                  workspacePath={activeFolder.path}
+                  onOpenSettings={() => setSettingsOpen(true)}
+                />
+              ) : (
+                <div className="flex items-center justify-center h-full">
                   <NoFolderGate onAddFolder={addFolder} />
-                )}
-              </div>
-            )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </TahoeLayout>
 
