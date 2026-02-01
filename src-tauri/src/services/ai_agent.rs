@@ -152,6 +152,10 @@ pub enum PlannedStep {
         instruction: String,
         description: String,
     },
+    /// Read file content
+    ReadFile { path: String, description: String },
+    /// List files in directory
+    ListFiles { path: String, description: String },
 }
 
 impl PlannedStep {
@@ -164,6 +168,8 @@ impl PlannedStep {
             PlannedStep::OrganizeFolder { description, .. } => description,
             PlannedStep::BatchRename { description, .. } => description,
             PlannedStep::AnalyzeContent { description, .. } => description,
+            PlannedStep::ReadFile { description, .. } => description,
+            PlannedStep::ListFiles { description, .. } => description,
         }
     }
 
@@ -1059,14 +1065,15 @@ For COMMANDS:
   "answer": null,
   "steps": [
     {{
-      "type": "organize_folder" | "move_file" | "delete_file" | "create_file" | "batch_rename",
+      "type": "organize_folder" | "move_file" | "delete_file" | "create_file" | "modify_file" | "read_file" | "list_files" | "batch_rename",
       "path": "target path",
       "strategy": "by_type" | "by_date" | "by_extension" (for organize),
       "source": "source path" (for move),
       "destination": "dest path" (for move),
       "pattern": "rename pattern" (for batch_rename),
       "files": ["file1", "file2"] (for batch_rename),
-      "content": "COMPREHENSIVE file content - see CONTENT QUALITY RULES below" (for create),
+      "content": "COMPREHENSIVE file content for create" (for create),
+      "instruction": "Detailed instruction for modification" (for modify_file),
       "description": "Human readable description of this step"
     }}
   ],
@@ -1382,6 +1389,32 @@ Instructions:
                     description,
                 })
             }
+            "modify_file" => {
+                let path = value.get("path")?.as_str()?.to_string();
+                let instruction = value.get("instruction")?.as_str()?.to_string();
+                Some(PlannedStep::ModifyFile {
+                    path,
+                    instruction,
+                    description,
+                })
+            }
+            "read_file" => {
+                let path = value.get("path")?.as_str()?.to_string();
+                Some(PlannedStep::ReadFile { path, description })
+            }
+            "list_files" => {
+                let path = value.get("path")?.as_str()?.to_string();
+                Some(PlannedStep::ListFiles { path, description })
+            }
+            "analyze_content" => {
+                let path = value.get("path")?.as_str()?.to_string();
+                let instruction = value.get("instruction")?.as_str()?.to_string();
+                Some(PlannedStep::AnalyzeContent {
+                    path,
+                    instruction,
+                    description,
+                })
+            }
             _ => None,
         }
     }
@@ -1596,16 +1629,100 @@ Instructions:
 
                 Ok(vec![FileOpChange {
                     id: change.id,
-                    operation: FileOpType::Move, // Using Move as "Modify" equivalent
+                    operation: FileOpType::Modify,
                     source_path: path.clone(),
                     dest_path: None,
                     timestamp: Utc::now(),
                     reversible: true,
                 }])
             }
-            PlannedStep::AnalyzeContent { .. } => {
-                // Analysis doesn't produce file changes
-                Ok(Vec::new())
+            PlannedStep::ReadFile { path, .. } => {
+                let content = self
+                    .file_manager
+                    .read_file(path)
+                    .await
+                    .map_err(|e| e.to_string())?;
+
+                // Log the read operation outcome (Using the variable)
+                println!(
+                    "📖 Agent ReadFile: {} ({} bytes). Preview: {:.50}...",
+                    path,
+                    content.len(),
+                    content.replace('\n', " ")
+                );
+
+                Ok(vec![FileOpChange {
+                    id: Uuid::new_v4().to_string(),
+                    operation: FileOpType::Read,
+                    source_path: path.clone(),
+                    dest_path: Some("READ_ONLY".to_string()),
+                    timestamp: Utc::now(),
+                    reversible: false,
+                }])
+            }
+            PlannedStep::ListFiles { path, .. } => {
+                // accessing file_ops internal logic might be needed, or use std::fs
+                let path_buf = std::path::PathBuf::from(path);
+                if !path_buf.exists() {
+                    return Err(format!("Path not found: {}", path));
+                }
+
+                // We'll just list it to verify access
+                let entries = std::fs::read_dir(&path_buf).map_err(|e| e.to_string())?;
+                let count = entries.count();
+
+                println!("📂 Agent ListFiles: {} ({} items)", path, count);
+
+                Ok(vec![FileOpChange {
+                    id: Uuid::new_v4().to_string(),
+                    operation: FileOpType::List,
+                    source_path: path.clone(),
+                    dest_path: Some(format!("Count: {}", count)),
+                    timestamp: Utc::now(),
+                    reversible: false,
+                }])
+            }
+            PlannedStep::AnalyzeContent {
+                path, instruction, ..
+            } => {
+                let content = self
+                    .file_manager
+                    .read_file(path)
+                    .await
+                    .map_err(|e| e.to_string())?;
+
+                // Actually perform the analysis using the AI provider
+                let prompt = format!(
+                    "Analyze the following file content based on this instruction: '{}'\n\nFILE CONTENT:\n{}",
+                    instruction, content
+                );
+
+                println!("🧠 Agent Analyzing: {}", path);
+
+                // Use a fast model for analysis
+                let analysis = self
+                    .ai_provider
+                    .execute_prompt(
+                        &ProviderType::Gemini,
+                        "gemini-2.5-flash",
+                        &prompt,
+                        |_, _| {},
+                        None::<fn(StreamingChunk)>,
+                    )
+                    .await
+                    .map_err(|e| e.to_string())?;
+
+                println!("🔍 Analysis Result: {:.100}...", analysis);
+
+                // Store result in "dest_path" for now as a way to return it
+                Ok(vec![FileOpChange {
+                    id: Uuid::new_v4().to_string(),
+                    operation: FileOpType::Analyze,
+                    source_path: path.clone(),
+                    dest_path: Some(format!("Result: {:.50}...", analysis.replace('\n', " "))),
+                    timestamp: Utc::now(),
+                    reversible: false,
+                }])
             }
         }
     }

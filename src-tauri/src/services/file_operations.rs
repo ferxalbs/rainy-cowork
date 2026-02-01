@@ -140,6 +140,10 @@ pub enum FileOpType {
     Delete,
     Create,
     CreateFolder,
+    Modify,
+    Read,
+    List,
+    Analyze,
 }
 
 /// Workspace analysis result
@@ -405,11 +409,16 @@ impl FileOperationEngine {
             .clone();
 
         let permitted = match operation {
-            FileOpType::Create | FileOpType::CreateFolder => workspace.permissions.can_write,
+            FileOpType::Create | FileOpType::CreateFolder | FileOpType::Modify => {
+                workspace.permissions.can_write
+            }
             FileOpType::Move | FileOpType::Copy | FileOpType::Rename => {
                 workspace.permissions.can_write && workspace.permissions.can_read
             }
             FileOpType::Delete => workspace.permissions.can_delete,
+            FileOpType::Read | FileOpType::List | FileOpType::Analyze => {
+                workspace.permissions.can_read
+            }
         };
 
         if !permitted {
