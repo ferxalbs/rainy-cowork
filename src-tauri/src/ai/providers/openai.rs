@@ -58,11 +58,7 @@ struct OpenAIMessage {
 
 /// OpenAI API response
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 struct OpenAIChatResponse {
-    id: String,
-    object: String,
-    created: u64,
     model: String,
     choices: Vec<OpenAIChoice>,
     usage: OpenAIUsage,
@@ -70,9 +66,7 @@ struct OpenAIChatResponse {
 
 /// OpenAI choice
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 struct OpenAIChoice {
-    index: u32,
     message: OpenAIMessage,
     finish_reason: String,
 }
@@ -94,9 +88,7 @@ struct OpenAIEmbeddingRequest {
 
 /// OpenAI embedding response
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 struct OpenAIEmbeddingResponse {
-    object: String,
     data: Vec<OpenAIEmbeddingData>,
     model: String,
     usage: OpenAIUsage,
@@ -104,39 +96,26 @@ struct OpenAIEmbeddingResponse {
 
 /// OpenAI embedding data
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 struct OpenAIEmbeddingData {
-    object: String,
     embedding: Vec<f32>,
-    index: u32,
 }
 
 /// OpenAI streaming chunk
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 struct OpenAIStreamChunk {
-    id: String,
-    object: String,
-    created: u64,
-    model: String,
     choices: Vec<OpenAIStreamChoice>,
 }
 
 /// OpenAI streaming choice
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 struct OpenAIStreamChoice {
-    index: u32,
     delta: OpenAIDelta,
     finish_reason: Option<String>,
 }
 
 /// OpenAI delta message
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 struct OpenAIDelta {
-    #[serde(default)]
-    role: Option<String>,
     #[serde(default)]
     content: Option<String>,
 }
@@ -149,12 +128,8 @@ struct OpenAIError {
 
 /// OpenAI error detail
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 struct OpenAIErrorDetail {
     message: String,
-    #[serde(rename = "type")]
-    error_type: String,
-    code: Option<String>,
 }
 
 impl OpenAIProvider {
@@ -184,9 +159,6 @@ impl OpenAIProvider {
     }
 
     /// Get the HTTP client
-    pub fn client(&self) -> &reqwest::Client {
-        &self.client
-    }
 
     /// Convert chat messages to OpenAI format
     fn convert_messages(messages: &[ChatMessage]) -> Vec<OpenAIMessage> {
@@ -458,13 +430,6 @@ impl AIProvider for OpenAIProvider {
         })
     }
 
-    fn supports_capability(&self, capability: &str) -> bool {
-        match capability {
-            "chat_completions" | "streaming" | "embeddings" | "function_calling" | "vision" => true,
-            _ => false,
-        }
-    }
-
     fn default_model(&self) -> &str {
         &self.config.model
     }
@@ -508,9 +473,17 @@ mod tests {
     #[test]
     fn test_convert_messages() {
         let messages = vec![
-            ChatMessage::system("You are a helpful assistant"),
+            ChatMessage {
+                role: "system".to_string(),
+                content: "You are a helpful assistant".to_string(),
+                name: None,
+            },
             ChatMessage::user("Hello"),
-            ChatMessage::assistant("Hi there!"),
+            ChatMessage {
+                role: "assistant".to_string(),
+                content: "Hi there!".to_string(),
+                name: None,
+            },
         ];
 
         let openai_messages = OpenAIProvider::convert_messages(&messages);
@@ -533,8 +506,6 @@ mod tests {
         let openai_error = OpenAIError {
             error: OpenAIErrorDetail {
                 message: "Invalid API key".to_string(),
-                error_type: "authentication".to_string(),
-                code: None,
             },
         };
 

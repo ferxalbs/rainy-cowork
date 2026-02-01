@@ -40,12 +40,6 @@ pub trait AIProvider: Send + Sync {
     /// Generate embeddings
     async fn embed(&self, request: EmbeddingRequest) -> ProviderResult<EmbeddingResponse>;
 
-    /// Check if the provider supports a specific capability
-    fn supports_capability(&self, _capability: &str) -> bool {
-        // Default implementation - can be overridden
-        false
-    }
-
     /// Get the default model for this provider
     fn default_model(&self) -> &str;
 

@@ -3,40 +3,37 @@
 //! The GovernorAgent enforces security policies, approves operations, and ensures
 //! compliance with safety guidelines across the multi-agent system.
 
-use std::sync::Arc;
 use async_trait::async_trait;
+use std::sync::Arc;
 
 use crate::agents::{
-    Agent, AgentConfig, AgentError, AgentInfo, AgentMessage,
-    AgentStatus, AgentType, Task, TaskResult,
-    BaseAgent, AgentRegistry,
+    Agent, AgentConfig, AgentError, AgentInfo, AgentMessage, AgentRegistry, AgentStatus, AgentType,
+    BaseAgent, Task, TaskResult,
 };
 
 /// GovernorAgent enforces security policies and compliance
 pub struct GovernorAgent {
     base: BaseAgent,
-    registry: Arc<AgentRegistry>,
+
+    // Registry removed (unused)
     policies: Arc<tokio::sync::RwLock<Vec<SecurityPolicy>>>,
 }
 
 impl GovernorAgent {
     /// Create a new GovernorAgent instance
-    pub fn new(
-        config: AgentConfig,
-        registry: Arc<AgentRegistry>,
-    ) -> Self {
+    pub fn new(config: AgentConfig, registry: Arc<AgentRegistry>) -> Self {
         let ai_provider = registry.ai_provider();
         let message_bus = registry.message_bus();
         let base = BaseAgent::new(config, ai_provider, message_bus);
 
         Self {
             base,
-            registry,
             policies: Arc::new(tokio::sync::RwLock::new(vec![
                 SecurityPolicy {
                     id: "no_file_deletion".to_string(),
                     name: "Prevent file deletion".to_string(),
-                    description: "Block operations that delete files without explicit approval".to_string(),
+                    description: "Block operations that delete files without explicit approval"
+                        .to_string(),
                     enabled: true,
                 },
                 SecurityPolicy {
@@ -65,12 +62,8 @@ impl GovernorAgent {
     /// Check if operation matches a security policy
     fn matches_policy(&self, operation: &str, policy: &SecurityPolicy) -> bool {
         match policy.id.as_str() {
-            "no_file_deletion" => {
-                operation.contains("delete") || operation.contains("remove")
-            }
-            "no_system_commands" => {
-                operation.contains("exec") || operation.contains("system")
-            }
+            "no_file_deletion" => operation.contains("delete") || operation.contains("remove"),
+            "no_system_commands" => operation.contains("exec") || operation.contains("system"),
             _ => false,
         }
     }
@@ -89,38 +82,11 @@ impl GovernorAgent {
 
         let response = self.base.query_ai(&prompt).await?;
 
-        let decision: ApprovalDecision = serde_json::from_str(&response)
-            .map_err(|e| AgentError::TaskExecutionFailed(
-                format!("Failed to parse decision: {}", e)
-            ))?;
+        let decision: ApprovalDecision = serde_json::from_str(&response).map_err(|e| {
+            AgentError::TaskExecutionFailed(format!("Failed to parse decision: {}", e))
+        })?;
 
         Ok(decision)
-    }
-
-    /// Add a new security policy
-    pub async fn add_policy(&self, policy: SecurityPolicy) {
-        let mut policies = self.policies.write().await;
-        policies.push(policy);
-    }
-
-    /// Remove a security policy by ID
-    pub async fn remove_policy(&self, policy_id: &str) {
-        let mut policies = self.policies.write().await;
-        policies.retain(|p| p.id != policy_id);
-    }
-
-    /// Enable or disable a policy
-    pub async fn set_policy_enabled(&self, policy_id: &str, enabled: bool) {
-        let mut policies = self.policies.write().await;
-        if let Some(policy) = policies.iter_mut().find(|p| p.id == policy_id) {
-            policy.enabled = enabled;
-        }
-    }
-
-    /// List all security policies
-    pub async fn list_policies(&self) -> Vec<SecurityPolicy> {
-        let policies = self.policies.read().await;
-        policies.clone()
     }
 }
 
@@ -227,10 +193,10 @@ impl Agent for GovernorAgent {
     }
 
     fn can_handle(&self, task: &Task) -> bool {
-        task.description.contains("delete") ||
-        task.description.contains("exec") ||
-        task.description.contains("system") ||
-        task.description.contains("approve")
+        task.description.contains("delete")
+            || task.description.contains("exec")
+            || task.description.contains("system")
+            || task.description.contains("approve")
     }
 
     async fn initialize(&mut self, config: AgentConfig) -> Result<(), AgentError> {

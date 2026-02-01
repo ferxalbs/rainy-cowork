@@ -29,12 +29,11 @@
 // let agent = DeveloperAgent::new(config, registry);
 // ```
 
-use std::sync::Arc;
 use crate::agents::{
-    Agent, AgentConfig, AgentError, AgentInfo, AgentMessage,
-    AgentStatus, AgentType, Task, TaskResult,
-    BaseAgent, AgentRegistry
+    Agent, AgentConfig, AgentError, AgentInfo, AgentMessage, AgentRegistry, AgentStatus, AgentType,
+    BaseAgent, Task, TaskResult,
 };
+use std::sync::Arc;
 
 /// DeveloperAgent specializes in code development and maintenance
 ///
@@ -46,8 +45,7 @@ use crate::agents::{
 pub struct DeveloperAgent {
     /// Base agent providing common functionality
     base: BaseAgent,
-    /// Agent registry for accessing other agents and services
-    registry: Arc<AgentRegistry>,
+    // Registry removed (unused)
 }
 
 impl DeveloperAgent {
@@ -61,15 +59,12 @@ impl DeveloperAgent {
     /// # Returns
     ///
     /// A new DeveloperAgent instance
-    pub fn new(
-        config: AgentConfig,
-        registry: Arc<AgentRegistry>,
-    ) -> Self {
+    pub fn new(config: AgentConfig, registry: Arc<AgentRegistry>) -> Self {
         let ai_provider = registry.ai_provider();
         let message_bus = registry.message_bus();
         let base = BaseAgent::new(config, ai_provider, message_bus);
 
-        Self { base, registry }
+        Self { base }
     }
 
     /// Generate code based on specifications
@@ -153,11 +148,7 @@ impl DeveloperAgent {
     /// # Returns
     ///
     /// Debugging analysis and fixes
-    async fn debug_code(
-        &self,
-        code: &str,
-        error_message: &str,
-    ) -> Result<String, AgentError> {
+    async fn debug_code(&self, code: &str, error_message: &str) -> Result<String, AgentError> {
         let prompt = format!(
             "Debug the following code:\n\n\
              Code:\n{}\n\n\
@@ -190,11 +181,7 @@ impl DeveloperAgent {
     /// # Returns
     ///
     /// Generated tests
-    async fn generate_tests(
-        &self,
-        code: &str,
-        test_framework: &str,
-    ) -> Result<String, AgentError> {
+    async fn generate_tests(&self, code: &str, test_framework: &str) -> Result<String, AgentError> {
         let prompt = format!(
             "Generate comprehensive tests for the following code using {}:\n\n\
              Code:\n{}\n\n\
@@ -233,24 +220,28 @@ impl Agent for DeveloperAgent {
         self.base.update_status(AgentStatus::Busy).await;
         self.base.set_current_task(Some(task.id.clone())).await;
 
-        let result = if task.description.contains("generate") ||
-                       task.description.contains("write") ||
-                       task.description.contains("implement") {
+        let result = if task.description.contains("generate")
+            || task.description.contains("write")
+            || task.description.contains("implement")
+        {
             // Code generation
-            let language = task.context.relevant_files
+            let language = task
+                .context
+                .relevant_files
                 .first()
                 .cloned()
                 .unwrap_or_else(|| "unknown".to_string());
 
-            self.generate_code(
-                &language,
-                &task.context.user_instruction,
-            ).await?
-        } else if task.description.contains("refactor") ||
-                   task.description.contains("optimize") ||
-                   task.description.contains("improve") {
+            self.generate_code(&language, &task.context.user_instruction)
+                .await?
+        } else if task.description.contains("refactor")
+            || task.description.contains("optimize")
+            || task.description.contains("improve")
+        {
             // Code refactoring
-            let code = task.context.relevant_files
+            let code = task
+                .context
+                .relevant_files
                 .first()
                 .cloned()
                 .unwrap_or_else(|| "No code provided".to_string());
@@ -263,31 +254,32 @@ impl Agent for DeveloperAgent {
                 "general improvement"
             };
 
-            self.refactor_code(
-                &code,
-                refactoring_goals,
-            ).await?
-        } else if task.description.contains("debug") ||
-                   task.description.contains("fix") ||
-                   task.description.contains("error") {
+            self.refactor_code(&code, refactoring_goals).await?
+        } else if task.description.contains("debug")
+            || task.description.contains("fix")
+            || task.description.contains("error")
+        {
             // Debugging
-            let code = task.context.relevant_files
+            let code = task
+                .context
+                .relevant_files
                 .first()
                 .cloned()
                 .unwrap_or_else(|| "No code provided".to_string());
 
-            let error_message = task.context.memory_context
+            let error_message = task
+                .context
+                .memory_context
                 .first()
                 .map(|m| m.content.as_str())
                 .unwrap_or_else(|| task.context.user_instruction.as_str());
 
-            self.debug_code(
-                &code,
-                error_message,
-            ).await?
+            self.debug_code(&code, error_message).await?
         } else if task.description.contains("test") {
             // Test generation
-            let code = task.context.relevant_files
+            let code = task
+                .context
+                .relevant_files
                 .first()
                 .cloned()
                 .unwrap_or_else(|| "No code provided".to_string());
@@ -302,17 +294,13 @@ impl Agent for DeveloperAgent {
                 "appropriate testing framework"
             };
 
-            self.generate_tests(
-                &code,
-                test_framework,
-            ).await?
+            self.generate_tests(&code, test_framework).await?
         } else {
             // Use AI to process general development task
             let prompt = format!(
                 "Development Task: {}\n\nContext: {}\n\n\
                  Please complete this development task and provide high-quality code.",
-                task.description,
-                task.context.user_instruction
+                task.description, task.context.user_instruction
             );
             self.base.query_ai(&prompt).await?
         };
@@ -356,17 +344,17 @@ impl Agent for DeveloperAgent {
 
     fn can_handle(&self, task: &Task) -> bool {
         let desc = task.description.to_lowercase();
-        desc.contains("code") ||
-        desc.contains("function") ||
-        desc.contains("class") ||
-        desc.contains("implement") ||
-        desc.contains("generate") ||
-        desc.contains("write") ||
-        desc.contains("refactor") ||
-        desc.contains("debug") ||
-        desc.contains("fix") ||
-        desc.contains("test") ||
-        desc.contains("optimize")
+        desc.contains("code")
+            || desc.contains("function")
+            || desc.contains("class")
+            || desc.contains("implement")
+            || desc.contains("generate")
+            || desc.contains("write")
+            || desc.contains("refactor")
+            || desc.contains("debug")
+            || desc.contains("fix")
+            || desc.contains("test")
+            || desc.contains("optimize")
     }
 
     async fn initialize(&mut self, config: AgentConfig) -> Result<(), AgentError> {

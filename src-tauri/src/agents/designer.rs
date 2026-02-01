@@ -29,12 +29,11 @@
 // let agent = DesignerAgent::new(config, registry);
 // ```
 
-use std::sync::Arc;
 use crate::agents::{
-    Agent, AgentConfig, AgentError, AgentInfo, AgentMessage,
-    AgentStatus, AgentType, Task, TaskResult,
-    BaseAgent, AgentRegistry
+    Agent, AgentConfig, AgentError, AgentInfo, AgentMessage, AgentRegistry, AgentStatus, AgentType,
+    BaseAgent, Task, TaskResult,
 };
+use std::sync::Arc;
 
 /// DesignerAgent specializes in UI/UX design and visual elements
 ///
@@ -46,8 +45,7 @@ use crate::agents::{
 pub struct DesignerAgent {
     /// Base agent providing common functionality
     base: BaseAgent,
-    /// Agent registry for accessing other agents and services
-    registry: Arc<AgentRegistry>,
+    // Registry removed (unused)
 }
 
 impl DesignerAgent {
@@ -61,15 +59,12 @@ impl DesignerAgent {
     /// # Returns
     ///
     /// A new DesignerAgent instance
-    pub fn new(
-        config: AgentConfig,
-        registry: Arc<AgentRegistry>,
-    ) -> Self {
+    pub fn new(config: AgentConfig, registry: Arc<AgentRegistry>) -> Self {
         let ai_provider = registry.ai_provider();
         let message_bus = registry.message_bus();
         let base = BaseAgent::new(config, ai_provider, message_bus);
 
-        Self { base, registry }
+        Self { base }
     }
 
     /// Generate a UI mockup
@@ -229,82 +224,79 @@ impl Agent for DesignerAgent {
         self.base.update_status(AgentStatus::Busy).await;
         self.base.set_current_task(Some(task.id.clone())).await;
 
-        let result = if task.description.contains("mockup") ||
-                       task.description.contains("wireframe") {
-            // UI mockup generation
-            let default_component = "component".to_string();
-            let component_type = task.context.relevant_files
-                .first()
-                .unwrap_or(&default_component);
+        let result =
+            if task.description.contains("mockup") || task.description.contains("wireframe") {
+                // UI mockup generation
+                let default_component = "component".to_string();
+                let component_type = task
+                    .context
+                    .relevant_files
+                    .first()
+                    .unwrap_or(&default_component);
 
-            self.generate_ui_mockup(
-                component_type,
-                &task.context.user_instruction,
-            ).await?
-        } else if task.description.contains("diagram") ||
-                   task.description.contains("flowchart") ||
-                   task.description.contains("sequence") {
-            // Diagram creation
-            let diagram_type = if task.description.contains("flowchart") {
-                "flowchart"
-            } else if task.description.contains("sequence") {
-                "sequence"
-            } else if task.description.contains("architecture") {
-                "architecture"
+                self.generate_ui_mockup(component_type, &task.context.user_instruction)
+                    .await?
+            } else if task.description.contains("diagram")
+                || task.description.contains("flowchart")
+                || task.description.contains("sequence")
+            {
+                // Diagram creation
+                let diagram_type = if task.description.contains("flowchart") {
+                    "flowchart"
+                } else if task.description.contains("sequence") {
+                    "sequence"
+                } else if task.description.contains("architecture") {
+                    "architecture"
+                } else {
+                    "diagram"
+                };
+
+                let default_content = "No content provided".to_string();
+                let content = task
+                    .context
+                    .relevant_files
+                    .first()
+                    .unwrap_or(&default_content);
+
+                self.create_diagram(diagram_type, content).await?
+            } else if task.description.contains("format") || task.description.contains("style") {
+                // Visual formatting
+                let formatting_style = if task.description.contains("markdown") {
+                    "markdown"
+                } else if task.description.contains("html") {
+                    "HTML"
+                } else {
+                    "formatted"
+                };
+
+                let content = task
+                    .context
+                    .relevant_files
+                    .first()
+                    .unwrap_or(&task.context.user_instruction);
+
+                self.apply_visual_formatting(content, formatting_style)
+                    .await?
+            } else if task.description.contains("suggest") || task.description.contains("design") {
+                // Design suggestions
+                let default_context = "No context provided".to_string();
+                let context = task
+                    .context
+                    .relevant_files
+                    .first()
+                    .unwrap_or(&default_context);
+
+                self.provide_design_suggestions(context, &task.context.user_instruction)
+                    .await?
             } else {
-                "diagram"
-            };
-
-            let default_content = "No content provided".to_string();
-            let content = task.context.relevant_files
-                .first()
-                .unwrap_or(&default_content);
-
-            self.create_diagram(
-                diagram_type,
-                content,
-            ).await?
-        } else if task.description.contains("format") ||
-                   task.description.contains("style") {
-            // Visual formatting
-            let formatting_style = if task.description.contains("markdown") {
-                "markdown"
-            } else if task.description.contains("html") {
-                "HTML"
-            } else {
-                "formatted"
-            };
-
-            let content = task.context.relevant_files
-                .first()
-                .unwrap_or(&task.context.user_instruction);
-
-            self.apply_visual_formatting(
-                content,
-                formatting_style,
-            ).await?
-        } else if task.description.contains("suggest") ||
-                   task.description.contains("design") {
-            // Design suggestions
-            let default_context = "No context provided".to_string();
-            let context = task.context.relevant_files
-                .first()
-                .unwrap_or(&default_context);
-
-            self.provide_design_suggestions(
-                context,
-                &task.context.user_instruction,
-            ).await?
-        } else {
-            // Use AI to process general design task
-            let prompt = format!(
-                "Design Task: {}\n\nContext: {}\n\n\
+                // Use AI to process general design task
+                let prompt = format!(
+                    "Design Task: {}\n\nContext: {}\n\n\
                  Please complete this design task and provide detailed visual specifications.",
-                task.description,
-                task.context.user_instruction
-            );
-            self.base.query_ai(&prompt).await?
-        };
+                    task.description, task.context.user_instruction
+                );
+                self.base.query_ai(&prompt).await?
+            };
 
         self.base.update_status(AgentStatus::Idle).await;
         self.base.set_current_task(None).await;
@@ -345,14 +337,14 @@ impl Agent for DesignerAgent {
 
     fn can_handle(&self, task: &Task) -> bool {
         let desc = task.description.to_lowercase();
-        desc.contains("mockup") ||
-        desc.contains("wireframe") ||
-        desc.contains("diagram") ||
-        desc.contains("flowchart") ||
-        desc.contains("design") ||
-        desc.contains("format") ||
-        desc.contains("style") ||
-        desc.contains("suggest")
+        desc.contains("mockup")
+            || desc.contains("wireframe")
+            || desc.contains("diagram")
+            || desc.contains("flowchart")
+            || desc.contains("design")
+            || desc.contains("format")
+            || desc.contains("style")
+            || desc.contains("suggest")
     }
 
     async fn initialize(&mut self, config: AgentConfig) -> Result<(), AgentError> {

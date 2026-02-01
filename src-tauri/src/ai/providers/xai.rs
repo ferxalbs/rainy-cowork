@@ -169,7 +169,7 @@ impl AIProvider for XAIProvider {
             .json(&request_body);
 
         match self.execute_request(request_builder).await {
-            Ok(response) => Ok(response.to_completion_response(request.model)),
+            Ok(response) => Ok(response.to_completion_response()),
             Err(e) => Err(e),
         }
     }
@@ -202,19 +202,6 @@ impl AIProvider for XAIProvider {
     /// Get the provider configuration
     fn config(&self) -> &ProviderConfig {
         &self.config
-    }
-
-    /// Check if a capability is supported
-    fn supports_capability(&self, capability: &str) -> bool {
-        match capability {
-            "chat" | "completions" => true,
-            "streaming" => true,
-            "embeddings" => false,
-            "tools" | "function_calling" => true,
-            "vision" => true,
-            "system_prompt" => true,
-            _ => false,
-        }
     }
 }
 
@@ -338,9 +325,6 @@ impl From<ChatMessage> for XAIChatMessage {
 /// xAI Chat Response structure (OpenAI-compatible)
 #[derive(Debug, Clone, Deserialize)]
 pub struct XAIChatResponse {
-    pub id: String,
-    pub object: String,
-    pub created: u64,
     pub model: String,
     pub choices: Vec<XAIChoice>,
     pub usage: Option<XAITokenUsage>,
@@ -348,7 +332,7 @@ pub struct XAIChatResponse {
 
 impl XAIChatResponse {
     /// Convert to standard ChatCompletionResponse
-    pub fn to_completion_response(&self, model: String) -> ChatCompletionResponse {
+    pub fn to_completion_response(&self) -> ChatCompletionResponse {
         let content = self
             .choices
             .first()
@@ -383,10 +367,8 @@ impl XAIChatResponse {
 /// xAI Choice structure
 #[derive(Debug, Clone, Deserialize)]
 pub struct XAIChoice {
-    pub index: u32,
     pub message: XAIChatMessage,
     pub finish_reason: Option<String>,
-    pub logprobs: Option<XAILogprobs>,
 }
 
 /// xAI Token Usage structure
@@ -398,39 +380,23 @@ pub struct XAITokenUsage {
 }
 
 /// xAI Logprobs structure
-#[derive(Debug, Clone, Deserialize)]
-pub struct XAILogprobs {
-    pub content: Option<Vec<XAILogprobContent>>,
-}
 
 /// xAI Logprob Content structure
-#[derive(Debug, Clone, Deserialize)]
-pub struct XAILogprobContent {
-    pub token: String,
-    pub logprob: f32,
-    pub bytes: Option<Vec<u8>>,
-}
 
 /// xAI Streaming Chunk structure
 #[derive(Debug, Clone, Deserialize)]
 pub struct XAIStreamingChunk {
-    pub id: String,
-    pub object: String,
-    pub created: u64,
-    pub model: String,
     pub choices: Vec<XAIStreamingChoice>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct XAIStreamingChoice {
-    pub index: u32,
     pub delta: XAIDelta,
     pub finish_reason: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct XAIDelta {
-    pub role: Option<String>,
     pub content: Option<String>,
 }
 
@@ -496,29 +462,6 @@ mod tests {
         assert_eq!(xai_request.temperature, Some(0.7));
         assert_eq!(xai_request.max_tokens, Some(100));
         assert!(!xai_request.stream);
-    }
-
-    #[test]
-    fn test_xai_provider_supports_capability() {
-        let config = ProviderConfig {
-            id: ProviderId::new("xai-test"),
-            provider_type: crate::ai::ProviderType::XAI,
-            api_key: Some("test-key".to_string()),
-            base_url: Some("https://api.x.ai/v1".to_string()),
-            model: "grok-3".to_string(),
-            params: std::collections::HashMap::new(),
-            enabled: true,
-            priority: 5,
-            rate_limit: Some(60),
-            timeout: 300,
-        };
-
-        let provider = XAIProvider::new(Client::new(), config);
-
-        assert!(provider.supports_capability("chat"));
-        assert!(provider.supports_capability("streaming"));
-        assert!(!provider.supports_capability("embeddings"));
-        assert!(provider.supports_capability("tools"));
     }
 
     #[test]

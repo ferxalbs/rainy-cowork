@@ -52,12 +52,8 @@ pub struct BaseAgent {
     info: Arc<RwLock<AgentInfo>>,
     /// Agent configuration
     config: AgentConfig,
-    /// AI provider manager for generating responses
+    /// AI provider manager
     ai_provider: Arc<AIProviderManager>,
-    /// Message bus for inter-agent communication
-    message_bus: Arc<MessageBus>,
-    /// Whether the agent has been initialized
-    initialized: Arc<RwLock<bool>>,
 }
 
 impl BaseAgent {
@@ -75,7 +71,7 @@ impl BaseAgent {
     pub fn new(
         config: AgentConfig,
         ai_provider: Arc<AIProviderManager>,
-        message_bus: Arc<MessageBus>,
+        _message_bus: Arc<MessageBus>,
     ) -> Self {
         let info = AgentInfo {
             id: config.agent_id.clone(),
@@ -89,73 +85,22 @@ impl BaseAgent {
             info: Arc::new(RwLock::new(info)),
             config,
             ai_provider,
-            message_bus,
-            initialized: Arc::new(RwLock::new(false)),
         }
     }
 
     /// Update the agent's status
-    ///
-    /// # Arguments
-    ///
-    /// * `status` - New status to set
     pub async fn update_status(&self, status: AgentStatus) {
         let mut info = self.info.write().await;
         info.status = status;
     }
 
     /// Set the current task being processed
-    ///
-    /// # Arguments
-    ///
-    /// * `task_id` - ID of the task, or None if no task
     pub async fn set_current_task(&self, task_id: Option<String>) {
         let mut info = self.info.write().await;
         info.current_task = task_id;
     }
 
-    /// Send a message to another agent
-    ///
-    /// # Arguments
-    ///
-    /// * `target_agent` - ID of the agent to send to
-    /// * `message` - Message to send
-    ///
-    /// # Returns
-    ///
-    /// Result indicating success or failure
-    pub async fn send_message(
-        &self,
-        target_agent: &str,
-        message: AgentMessage,
-    ) -> Result<(), AgentError> {
-        self.message_bus
-            .send(
-                self.config.agent_id.clone(),
-                target_agent.to_string(),
-                message,
-            )
-            .await
-    }
-
-    /// Receive all pending messages for this agent
-    ///
-    /// # Returns
-    ///
-    /// Vector of pending messages
-    pub async fn receive_messages(&self) -> Vec<AgentMessage> {
-        self.message_bus.receive(&self.config.agent_id).await
-    }
-
     /// Query the AI provider with a prompt
-    ///
-    /// # Arguments
-    ///
-    /// * `prompt` - The prompt to send to the AI
-    ///
-    /// # Returns
-    ///
-    /// The AI's response as a string
     pub async fn query_ai(&self, prompt: &str) -> Result<String, AgentError> {
         // Map provider name to ProviderType
         let provider_type = match self.config.ai_provider.as_str() {
@@ -186,51 +131,16 @@ impl BaseAgent {
         Ok(response)
     }
 
-    /// Check if the agent is initialized
-    ///
-    /// # Returns
-    ///
-    /// true if initialized, false otherwise
-    pub async fn is_initialized(&self) -> bool {
-        *self.initialized.read().await
-    }
-
     /// Get the agent's configuration
-    ///
-    /// # Returns
-    ///
-    /// Reference to the agent's configuration
     pub fn config(&self) -> &AgentConfig {
         &self.config
-    }
-
-    /// Get the AI provider manager
-    ///
-    /// # Returns
-    ///
-    /// Reference to the AI provider manager
-    pub fn ai_provider(&self) -> &Arc<AIProviderManager> {
-        &self.ai_provider
-    }
-
-    /// Get the message bus
-    ///
-    /// # Returns
-    ///
-    /// Reference to the message bus
-    pub fn message_bus(&self) -> &Arc<MessageBus> {
-        &self.message_bus
     }
 }
 
 #[async_trait::async_trait]
 impl Agent for BaseAgent {
     fn info(&self) -> AgentInfo {
-        // Note: This is a synchronous method, so we can't use async here
-        // In a real implementation, this might need to be refactored
-        // For now, we'll clone the Arc and return a copy
-        // This is a limitation of the trait design
-        // In practice, specialized agents should override this
+        // synchronous clone
         AgentInfo {
             id: self.config.agent_id.clone(),
             name: self.config.agent_id.clone(),
@@ -265,14 +175,6 @@ impl Agent for BaseAgent {
             AgentMessage::TaskAssign { task, .. } => {
                 self.process_task(task).await?;
             }
-            AgentMessage::QueryMemory { .. } => {
-                // Base implementation doesn't handle memory queries
-                // Specialized agents should override this
-            }
-            AgentMessage::RequestApproval { .. } => {
-                // Base implementation auto-approves
-                // Specialized agents should override this
-            }
             _ => {}
         }
         Ok(())
@@ -286,20 +188,16 @@ impl Agent for BaseAgent {
         ]
     }
 
-    fn can_handle(&self, task: &Task) -> bool {
-        // Base implementation can handle any task
-        // Specialized agents should override this with specific logic
+    fn can_handle(&self, _task: &Task) -> bool {
         true
     }
 
     async fn initialize(&mut self, config: AgentConfig) -> Result<(), AgentError> {
         self.config = config;
-        *self.initialized.write().await = true;
         Ok(())
     }
 
     async fn shutdown(&mut self) -> Result<(), AgentError> {
-        *self.initialized.write().await = false;
         Ok(())
     }
 

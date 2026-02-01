@@ -1,14 +1,12 @@
 // Provider Registry
 // Manages registration and retrieval of AI providers
 
-use crate::ai::provider_types::{
-    ProviderId, ProviderType, ProviderCapabilities, ProviderHealth,
-    ChatCompletionRequest, ChatCompletionResponse,
-    EmbeddingRequest, EmbeddingResponse,
-    StreamingCallback,
-    ProviderResult, AIError,
-};
 use crate::ai::provider_trait::{AIProvider, ProviderWithStats};
+use crate::ai::provider_types::{
+    AIError, ChatCompletionRequest, ChatCompletionResponse, EmbeddingRequest, EmbeddingResponse,
+    ProviderCapabilities, ProviderHealth, ProviderId, ProviderResult, ProviderType,
+    StreamingCallback,
+};
 use dashmap::DashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -40,43 +38,23 @@ impl ProviderRegistry {
 
     /// Unregister a provider
     pub fn unregister(&self, id: &ProviderId) -> ProviderResult<()> {
-        self.providers.remove(id)
+        self.providers
+            .remove(id)
             .ok_or_else(|| AIError::ProviderNotFound(id.to_string()))?;
         Ok(())
     }
 
     /// Get a provider by ID
     pub fn get(&self, id: &ProviderId) -> ProviderResult<Arc<ProviderWithStats>> {
-        self.providers.get(id)
+        self.providers
+            .get(id)
             .map(|p| Arc::new(p.clone()))
             .ok_or_else(|| AIError::ProviderNotFound(id.to_string()))
     }
 
     /// Get all providers
     pub fn get_all(&self) -> Vec<Arc<ProviderWithStats>> {
-        self.providers.iter()
-            .map(|p| Arc::new(p.clone()))
-            .collect()
-    }
-
-    /// Get providers by type
-    pub fn get_by_type(&self, provider_type: ProviderType) -> Vec<Arc<ProviderWithStats>> {
-        self.providers.iter()
-            .filter(|p| p.provider().provider_type() == provider_type)
-            .map(|p| Arc::new(p.clone()))
-            .collect()
-    }
-
-    /// Get healthy providers
-    pub async fn get_healthy(&self) -> ProviderResult<Vec<Arc<ProviderWithStats>>> {
-        let mut healthy_providers = Vec::new();
-        for provider in self.providers.iter() {
-            let health = provider.provider().health_check().await?;
-            if health == ProviderHealth::Healthy {
-                healthy_providers.push(Arc::new(provider.clone()));
-            }
-        }
-        Ok(healthy_providers)
+        self.providers.iter().map(|p| Arc::new(p.clone())).collect()
     }
 
     /// Set the default provider
@@ -95,7 +73,8 @@ impl ProviderRegistry {
             Some(id) => self.get(id),
             None => {
                 // If no default is set, return the first available provider
-                self.providers.iter()
+                self.providers
+                    .iter()
                     .next()
                     .map(|p| Arc::new(p.clone()))
                     .ok_or_else(|| AIError::Internal("No providers registered".to_string()))
@@ -128,29 +107,11 @@ impl ProviderRegistry {
 
         // Update stats
         let mut provider_mut = self.providers.get_mut(id).unwrap();
-        let tokens = result.as_ref()
+        let tokens = result
+            .as_ref()
             .map(|r| r.usage.total_tokens as u64)
             .unwrap_or(0);
         provider_mut.update_stats(result.is_ok(), latency, tokens);
-
-        result
-    }
-
-    /// Complete a chat request with streaming
-    pub async fn complete_stream(
-        &self,
-        id: &ProviderId,
-        request: ChatCompletionRequest,
-        callback: StreamingCallback,
-    ) -> ProviderResult<()> {
-        let provider = self.get(id)?;
-        let start = std::time::Instant::now();
-        let result = provider.provider().complete_stream(request, callback).await;
-        let latency = start.elapsed().as_millis() as u64;
-
-        // Update stats
-        let mut provider_mut = self.providers.get_mut(id).unwrap();
-        provider_mut.update_stats(result.is_ok(), latency, 0);
 
         result
     }
@@ -168,7 +129,8 @@ impl ProviderRegistry {
 
         // Update stats
         let mut provider_mut = self.providers.get_mut(id).unwrap();
-        let tokens = result.as_ref()
+        let tokens = result
+            .as_ref()
             .map(|r| r.usage.total_tokens as u64)
             .unwrap_or(0);
         provider_mut.update_stats(result.is_ok(), latency, tokens);
@@ -177,15 +139,21 @@ impl ProviderRegistry {
     }
 
     /// Get provider statistics
-    pub fn get_stats(&self, id: &ProviderId) -> ProviderResult<crate::ai::provider_trait::ProviderStats> {
-        let provider = self.providers.get(id)
+    pub fn get_stats(
+        &self,
+        id: &ProviderId,
+    ) -> ProviderResult<crate::ai::provider_trait::ProviderStats> {
+        let provider = self
+            .providers
+            .get(id)
             .ok_or_else(|| AIError::ProviderNotFound(id.to_string()))?;
         Ok(provider.stats().clone())
     }
 
     /// Get all provider statistics
     pub fn get_all_stats(&self) -> Vec<(ProviderId, crate::ai::provider_trait::ProviderStats)> {
-        self.providers.iter()
+        self.providers
+            .iter()
             .map(|p| (p.key().clone(), p.value().stats().clone()))
             .collect()
     }

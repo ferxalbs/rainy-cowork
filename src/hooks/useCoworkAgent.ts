@@ -274,9 +274,11 @@ export function useCoworkAgent(): UseCoworkAgentReturn {
                 // Could add individual step completion messages
                 break;
               case "stepFailed":
+                console.log("Step Failed Event:", event.data);
                 addMessage({
                   type: "system",
-                  content: `⚠️ Step ${event.data.stepIndex + 1} failed: ${event.data.error}`,
+                  // Use stepIndex if available, otherwise fallback or check for camelCase mismatch
+                  content: `⚠️ Step ${(event.data.stepIndex ?? (event.data as any).step_index ?? -1) + 1} failed: ${event.data.error}`,
                 });
                 break;
             }

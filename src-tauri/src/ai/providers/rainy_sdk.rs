@@ -326,14 +326,6 @@ impl AIProvider for RainySDKProvider {
         ))
     }
 
-    fn supports_capability(&self, capability: &str) -> bool {
-        match capability {
-            "chat_completions" | "function_calling" | "web_search" | "streaming" => true,
-            "embeddings" => false, // Not yet supported
-            _ => false,
-        }
-    }
-
     fn default_model(&self) -> &str {
         &self.config.model
     }

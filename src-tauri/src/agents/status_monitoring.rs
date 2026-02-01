@@ -35,21 +35,6 @@ impl StatusMonitor {
         Self { agents }
     }
 
-    /// Get agent status
-    ///
-    /// # Arguments
-    ///
-    /// * `agent_id` - ID of the agent
-    ///
-    /// # Returns
-    ///
-    /// Option containing the agent status if found
-    pub fn get_agent_status(&self, agent_id: &str) -> Option<AgentStatus> {
-        self.agents
-            .get(agent_id)
-            .map(|agent| agent.value().info().status)
-    }
-
     /// Get all busy agents
     ///
     /// # Returns
@@ -158,34 +143,6 @@ mod tests {
     use crate::agents::base_agent::BaseAgent;
     use crate::agents::message_bus::MessageBus;
     use crate::ai::provider::AIProviderManager;
-
-    #[tokio::test]
-    async fn test_get_agent_status() {
-        let agents: Arc<DashMap<String, Arc<dyn Agent>>> = Arc::new(DashMap::new());
-        let ai_provider = Arc::new(AIProviderManager::new());
-        let message_bus = Arc::new(MessageBus::new());
-
-        let config = AgentConfig {
-            agent_id: "test-agent".to_string(),
-            workspace_id: "workspace-1".to_string(),
-            ai_provider: "gemini".to_string(),
-            model: "gemini-2.0-flash".to_string(),
-            settings: serde_json::json!({}),
-        };
-
-        let agent: Arc<dyn Agent> =
-            Arc::new(BaseAgent::new(config.clone(), ai_provider, message_bus));
-        agents.insert(config.agent_id.clone(), agent);
-
-        let monitor = StatusMonitor::new(agents);
-
-        let status = monitor.get_agent_status("test-agent");
-        assert!(status.is_some());
-        assert!(matches!(status.unwrap(), AgentStatus::Idle));
-
-        let not_found = monitor.get_agent_status("non-existent");
-        assert!(not_found.is_none());
-    }
 
     #[tokio::test]
     async fn test_get_idle_agents() {

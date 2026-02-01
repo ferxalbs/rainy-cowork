@@ -66,12 +66,8 @@ pub struct TaskAssignment {
 pub enum AssignmentStatus {
     /// Task is pending execution
     Pending,
-    /// Task is currently being executed
-    InProgress,
     /// Task completed successfully
     Completed,
-    /// Task failed
-    Failed,
 }
 
 /// Director agent for orchestrating the multi-agent system

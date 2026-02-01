@@ -25,7 +25,7 @@ use crate::agents::agent_trait::{Agent, AgentConfig, AgentError};
 use crate::agents::message_bus::MessageBus;
 use crate::agents::status_monitoring::StatusMonitor;
 use crate::agents::task_management::TaskManager;
-use crate::agents::types::{AgentInfo, AgentMessage, Task};
+use crate::agents::types::{AgentInfo, Task};
 use crate::ai::provider::AIProviderManager;
 use dashmap::DashMap;
 use std::sync::Arc;
@@ -230,37 +230,6 @@ impl AgentRegistry {
         Ok(agent_id)
     }
 
-    /// Get agent status
-    ///
-    /// # Arguments
-    ///
-    /// * `agent_id` - ID of the agent
-    ///
-    /// # Returns
-    ///
-    /// Option containing the agent status if found
-    pub fn get_agent_status(&self, agent_id: &str) -> Option<crate::agents::types::AgentStatus> {
-        self.status_monitor.get_agent_status(agent_id)
-    }
-
-    /// Get all busy agents
-    ///
-    /// # Returns
-    ///
-    /// Vector of agent information for busy agents
-    pub async fn get_busy_agents(&self) -> Vec<AgentInfo> {
-        self.status_monitor.get_busy_agents()
-    }
-
-    /// Get all idle agents
-    ///
-    /// # Returns
-    ///
-    /// Vector of agent information for idle agents
-    pub async fn get_idle_agents(&self) -> Vec<AgentInfo> {
-        self.status_monitor.get_idle_agents()
-    }
-
     /// Get agent assigned to a task
     ///
     /// # Arguments
@@ -285,57 +254,6 @@ impl AgentRegistry {
     /// Result indicating success or failure
     pub async fn cancel_task(&self, task_id: &str) -> Result<(), AgentError> {
         self.task_manager.cancel_task(task_id).await
-    }
-
-    /// Coordinate multiple agents for a task
-    ///
-    /// # Arguments
-    ///
-    /// * `task` - The task to coordinate
-    ///
-    /// # Returns
-    ///
-    /// Vector of agent IDs participating in the task
-    pub async fn coordinate_agents(&self, task: Task) -> Result<Vec<String>, AgentError> {
-        let mut participating_agents = Vec::new();
-
-        // Find all agents that can handle this task
-        for entry in self.agents.iter() {
-            let agent = entry.value();
-            if agent.can_handle(&task) {
-                let info = agent.info();
-                if matches!(info.status, crate::agents::types::AgentStatus::Idle) {
-                    participating_agents.push(info.id.clone());
-                }
-            }
-        }
-
-        if participating_agents.is_empty() {
-            return Err(AgentError::TaskExecutionFailed(
-                "No available agents for coordination".to_string(),
-            ));
-        }
-
-        // Assign task to the first available agent
-        let _primary_agent = &participating_agents[0];
-        self.assign_task(task).await?;
-
-        Ok(participating_agents)
-    }
-
-    /// Broadcast a message to all agents
-    ///
-    /// # Arguments
-    ///
-    /// * `message` - The message to broadcast
-    pub async fn broadcast_message(&self, message: AgentMessage) {
-        for entry in self.agents.iter() {
-            let agent = entry.value();
-            let info = agent.info();
-            if let Err(e) = agent.handle_message(message.clone()).await {
-                eprintln!("Failed to send message to agent {}: {}", info.id, e);
-            }
-        }
     }
 
     /// Get registry statistics
@@ -556,58 +474,6 @@ mod tests {
         assert_eq!(stats.idle_agents, 1);
         assert_eq!(stats.busy_agents, 0);
         assert_eq!(stats.error_agents, 0);
-    }
-
-    #[tokio::test]
-    async fn test_get_idle_agents() {
-        let ai_provider = Arc::new(AIProviderManager::new());
-        let registry = AgentRegistry::new(ai_provider);
-
-        let config = AgentConfig {
-            agent_id: "test-agent".to_string(),
-            workspace_id: "workspace-1".to_string(),
-            ai_provider: "gemini".to_string(),
-            model: "gemini-2.0-flash".to_string(),
-            settings: serde_json::json!({}),
-        };
-
-        let message_bus = registry.message_bus();
-        let agent = Arc::new(BaseAgent::new(
-            config.clone(),
-            registry.ai_provider(),
-            message_bus,
-        ));
-
-        registry.register_agent(agent, config).await.unwrap();
-
-        let idle_agents = registry.get_idle_agents().await;
-        assert_eq!(idle_agents.len(), 1);
-    }
-
-    #[tokio::test]
-    async fn test_get_busy_agents() {
-        let ai_provider = Arc::new(AIProviderManager::new());
-        let registry = AgentRegistry::new(ai_provider);
-
-        let config = AgentConfig {
-            agent_id: "test-agent".to_string(),
-            workspace_id: "workspace-1".to_string(),
-            ai_provider: "gemini".to_string(),
-            model: "gemini-2.0-flash".to_string(),
-            settings: serde_json::json!({}),
-        };
-
-        let message_bus = registry.message_bus();
-        let agent = Arc::new(BaseAgent::new(
-            config.clone(),
-            registry.ai_provider(),
-            message_bus,
-        ));
-
-        registry.register_agent(agent, config).await.unwrap();
-
-        let busy_agents = registry.get_busy_agents().await;
-        assert_eq!(busy_agents.len(), 0);
     }
 
     #[tokio::test]

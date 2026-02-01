@@ -14,7 +14,7 @@ use crate::agents::{
 /// CriticAgent evaluates task results and provides quality assessments
 pub struct CriticAgent {
     base: BaseAgent,
-    registry: Arc<AgentRegistry>,
+    // Registry removed (unused)
 }
 
 impl CriticAgent {
@@ -24,7 +24,7 @@ impl CriticAgent {
         let message_bus = registry.message_bus();
         let base = BaseAgent::new(config, ai_provider, message_bus);
 
-        Self { base, registry }
+        Self { base }
     }
 
     /// Evaluate task result quality
@@ -50,21 +50,6 @@ impl CriticAgent {
         })?;
 
         Ok(evaluation)
-    }
-
-    /// Provide improvement suggestions for a task result
-    pub async fn suggest_improvements(
-        &self,
-        result: &TaskResult,
-    ) -> Result<Vec<String>, AgentError> {
-        let evaluation = self.evaluate_result(result).await?;
-        Ok(evaluation.suggestions)
-    }
-
-    /// Get quality score for a task result
-    pub async fn get_quality_score(&self, result: &TaskResult) -> Result<u8, AgentError> {
-        let evaluation = self.evaluate_result(result).await?;
-        Ok(evaluation.quality_score)
     }
 }
 

@@ -29,12 +29,11 @@
 // let agent = ExecutorAgent::new(config, registry);
 // ```
 
-use std::sync::Arc;
 use crate::agents::{
-    Agent, AgentConfig, AgentError, AgentInfo, AgentMessage,
-    AgentStatus, AgentType, Task, TaskResult,
-    BaseAgent, AgentRegistry
+    Agent, AgentConfig, AgentError, AgentInfo, AgentMessage, AgentRegistry, AgentStatus, AgentType,
+    BaseAgent, Task, TaskResult,
 };
+use std::sync::Arc;
 
 /// ExecutorAgent specializes in executing operations and tasks
 ///
@@ -46,8 +45,7 @@ use crate::agents::{
 pub struct ExecutorAgent {
     /// Base agent providing common functionality
     base: BaseAgent,
-    /// Agent registry for accessing other agents and services
-    registry: Arc<AgentRegistry>,
+    // Registry removed (unused)
 }
 
 impl ExecutorAgent {
@@ -61,15 +59,12 @@ impl ExecutorAgent {
     /// # Returns
     ///
     /// A new ExecutorAgent instance
-    pub fn new(
-        config: AgentConfig,
-        registry: Arc<AgentRegistry>,
-    ) -> Self {
+    pub fn new(config: AgentConfig, registry: Arc<AgentRegistry>) -> Self {
         let ai_provider = registry.ai_provider();
         let message_bus = registry.message_bus();
         let base = BaseAgent::new(config, ai_provider, message_bus);
 
-        Self { base, registry }
+        Self { base }
     }
 
     /// Execute a file operation
@@ -227,10 +222,11 @@ impl Agent for ExecutorAgent {
         self.base.update_status(AgentStatus::Busy).await;
         self.base.set_current_task(Some(task.id.clone())).await;
 
-        let result = if task.description.contains("move") ||
-                       task.description.contains("copy") ||
-                       task.description.contains("rename") ||
-                       task.description.contains("delete") {
+        let result = if task.description.contains("move")
+            || task.description.contains("copy")
+            || task.description.contains("rename")
+            || task.description.contains("delete")
+        {
             // File operation
             let operation = if task.description.contains("move") {
                 "move"
@@ -243,15 +239,19 @@ impl Agent for ExecutorAgent {
             };
 
             let default_source = "unknown".to_string();
-            let source = task.context.relevant_files
+            let source = task
+                .context
+                .relevant_files
                 .first()
                 .unwrap_or(&default_source);
             let destination = task.context.relevant_files.get(1);
 
-            self.execute_file_operation(operation, source, destination.map(|s| s.as_str())).await?
-        } else if task.description.contains("execute") ||
-                   task.description.contains("run") ||
-                   task.description.contains("command") {
+            self.execute_file_operation(operation, source, destination.map(|s| s.as_str()))
+                .await?
+        } else if task.description.contains("execute")
+            || task.description.contains("run")
+            || task.description.contains("command")
+        {
             // Command execution
             let parts: Vec<&str> = task.description.split_whitespace().collect();
             let command = parts.get(1).unwrap_or(&"");
@@ -260,10 +260,7 @@ impl Agent for ExecutorAgent {
             self.execute_command(command, &args).await?
         } else if task.description.contains("batch") {
             // Batch operations
-            let operations: Vec<String> = task.context.relevant_files
-                .iter()
-                .cloned()
-                .collect();
+            let operations: Vec<String> = task.context.relevant_files.iter().cloned().collect();
             self.execute_batch(&operations).await?
         } else if task.description.contains("system") {
             // System operation
@@ -273,8 +270,7 @@ impl Agent for ExecutorAgent {
             let prompt = format!(
                 "Execution Task: {}\n\nContext: {}\n\n\
                  Please complete this execution task and provide detailed results.",
-                task.description,
-                task.context.user_instruction
+                task.description, task.context.user_instruction
             );
             self.base.query_ai(&prompt).await?
         };
@@ -318,15 +314,15 @@ impl Agent for ExecutorAgent {
 
     fn can_handle(&self, task: &Task) -> bool {
         let desc = task.description.to_lowercase();
-        desc.contains("move") ||
-        desc.contains("copy") ||
-        desc.contains("rename") ||
-        desc.contains("delete") ||
-        desc.contains("execute") ||
-        desc.contains("run") ||
-        desc.contains("command") ||
-        desc.contains("batch") ||
-        desc.contains("system")
+        desc.contains("move")
+            || desc.contains("copy")
+            || desc.contains("rename")
+            || desc.contains("delete")
+            || desc.contains("execute")
+            || desc.contains("run")
+            || desc.contains("command")
+            || desc.contains("batch")
+            || desc.contains("system")
     }
 
     async fn initialize(&mut self, config: AgentConfig) -> Result<(), AgentError> {

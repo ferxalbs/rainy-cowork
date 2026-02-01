@@ -35,8 +35,7 @@ use std::path::PathBuf;
 #[derive(Debug, Clone)]
 pub struct LongTermMemory {
     /// Path to the database storage
-    #[allow(dead_code)]
-    db_path: PathBuf,
+    _db_path: PathBuf,
     // TODO: Add LanceDB client when available
     // client: Option<lancedb::Connection>,
 }
@@ -57,7 +56,7 @@ impl LongTermMemory {
     /// let memory = LongTermMemory::new(PathBuf::from("./memory_db"));
     /// ```
     pub fn new(db_path: PathBuf) -> Self {
-        Self { db_path }
+        Self { _db_path: db_path }
     }
 
     /// Store an entry with embedding
@@ -102,7 +101,7 @@ impl LongTermMemory {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn store(&self, entry: MemoryEntry) -> Result<(), MemoryError> {
+    pub async fn store(&self, _entry: MemoryEntry) -> Result<(), MemoryError> {
         // TODO: Implement LanceDB storage
         // 1. Generate embedding if not present
         // 2. Store entry in LanceDB with embedding
@@ -185,7 +184,7 @@ impl LongTermMemory {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn get(&self, id: &str) -> Result<Option<MemoryEntry>, MemoryError> {
+    pub async fn get(&self, _id: &str) -> Result<Option<MemoryEntry>, MemoryError> {
         // TODO: Implement retrieval
         // 1. Query LanceDB by ID
         // 2. Return the entry if found
@@ -222,7 +221,7 @@ impl LongTermMemory {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn delete(&self, id: &str) -> Result<(), MemoryError> {
+    pub async fn delete(&self, _id: &str) -> Result<(), MemoryError> {
         // TODO: Implement deletion
         // 1. Delete entry from LanceDB
         // 2. Handle non-existent entries gracefully
@@ -265,44 +264,15 @@ impl LongTermMemory {
             total_size: 0,
         })
     }
-
-    /// Get the database path
-    ///
-    /// # Returns
-    ///
-    /// The path to the database storage directory
-    #[allow(dead_code)]
-    pub fn db_path(&self) -> &PathBuf {
-        &self.db_path
-    }
 }
 
 /// Error types for memory operations
+
 #[derive(Debug, thiserror::Error)]
 pub enum MemoryError {
-    /// Storage-related errors
-    #[error("Storage error: {0}")]
-    #[allow(dead_code)]
-    Storage(String),
-
-    /// Search-related errors
-    #[error("Search error: {0}")]
-    #[allow(dead_code)]
-    Search(String),
-
-    /// Embedding generation errors
-    #[error("Embedding error: {0}")]
-    #[allow(dead_code)]
-    Embedding(String),
-
     /// IO errors
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
-
-    /// Serialization/deserialization errors
-    #[error("Serialization error: {0}")]
-    #[allow(dead_code)]
-    Serialization(String),
 }
 
 /// Memory statistics
@@ -328,12 +298,6 @@ mod tests {
             timestamp: Utc::now(),
             tags: vec![],
         }
-    }
-
-    #[test]
-    fn test_new_long_term_memory() {
-        let memory = LongTermMemory::new(PathBuf::from("./test_db"));
-        assert_eq!(memory.db_path(), &PathBuf::from("./test_db"));
     }
 
     #[tokio::test]
@@ -385,14 +349,8 @@ mod tests {
 
     #[test]
     fn test_memory_error_display() {
-        let err = MemoryError::Storage("test error".to_string());
-        assert_eq!(err.to_string(), "Storage error: test error");
-
-        let err = MemoryError::Search("search failed".to_string());
-        assert_eq!(err.to_string(), "Search error: search failed");
-
-        let err = MemoryError::Embedding("embedding failed".to_string());
-        assert_eq!(err.to_string(), "Embedding error: embedding failed");
+        let err = MemoryError::Io(std::io::Error::new(std::io::ErrorKind::Other, "test error"));
+        assert_eq!(err.to_string(), "IO error: test error");
     }
 
     #[test]

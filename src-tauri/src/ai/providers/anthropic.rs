@@ -57,10 +57,6 @@ struct AnthropicChatRequest {
 /// Anthropic API response
 #[derive(Debug, Deserialize)]
 struct AnthropicChatResponse {
-    id: String,
-    #[serde(rename = "type")]
-    response_type: String,
-    role: String,
     content: Vec<AnthropicContentBlock>,
     model: String,
     stop_reason: Option<String>,
@@ -70,8 +66,6 @@ struct AnthropicChatResponse {
 /// Anthropic content block
 #[derive(Debug, Deserialize)]
 struct AnthropicContentBlock {
-    #[serde(rename = "type")]
-    content_type: String,
     text: Option<String>,
 }
 
@@ -145,9 +139,6 @@ impl AnthropicProvider {
     }
 
     /// Get the HTTP client
-    pub fn client(&self) -> &reqwest::Client {
-        &self.client
-    }
 
     /// Convert chat messages to Anthropic format
     fn convert_messages(messages: &[ChatMessage]) -> (Option<String>, Vec<AnthropicMessage>) {
@@ -433,14 +424,6 @@ impl AIProvider for AnthropicProvider {
         ))
     }
 
-    fn supports_capability(&self, capability: &str) -> bool {
-        match capability {
-            "chat_completions" | "streaming" | "function_calling" | "vision" => true,
-            "embeddings" => false,
-            _ => false,
-        }
-    }
-
     fn default_model(&self) -> &str {
         &self.config.model
     }
@@ -496,9 +479,17 @@ mod tests {
     #[test]
     fn test_convert_messages() {
         let messages = vec![
-            ChatMessage::system("You are a helpful assistant"),
+            ChatMessage {
+                role: "system".to_string(),
+                content: "You are a helpful assistant".to_string(),
+                name: None,
+            },
             ChatMessage::user("Hello"),
-            ChatMessage::assistant("Hi there!"),
+            ChatMessage {
+                role: "assistant".to_string(),
+                content: "Hi there!".to_string(),
+                name: None,
+            },
         ];
 
         let (system, anthropic_messages) = AnthropicProvider::convert_messages(&messages);

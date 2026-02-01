@@ -166,28 +166,10 @@ pub struct ChatMessage {
 }
 
 impl ChatMessage {
-    /// Create a new system message
-    pub fn system(content: impl Into<String>) -> Self {
-        Self {
-            role: "system".to_string(),
-            content: content.into(),
-            name: None,
-        }
-    }
-
     /// Create a new user message
     pub fn user(content: impl Into<String>) -> Self {
         Self {
             role: "user".to_string(),
-            content: content.into(),
-            name: None,
-        }
-    }
-
-    /// Create a new assistant message
-    pub fn assistant(content: impl Into<String>) -> Self {
-        Self {
-            role: "assistant".to_string(),
             content: content.into(),
             name: None,
         }

@@ -29,12 +29,11 @@
 // let agent = CreatorAgent::new(config, registry);
 // ```
 
-use std::sync::Arc;
 use crate::agents::{
-    Agent, AgentConfig, AgentError, AgentInfo, AgentMessage,
-    AgentStatus, AgentType, Task, TaskResult,
-    BaseAgent, AgentRegistry
+    Agent, AgentConfig, AgentError, AgentInfo, AgentMessage, AgentRegistry, AgentStatus, AgentType,
+    BaseAgent, Task, TaskResult,
 };
+use std::sync::Arc;
 
 /// CreatorAgent specializes in content creation and document generation
 ///
@@ -46,8 +45,7 @@ use crate::agents::{
 pub struct CreatorAgent {
     /// Base agent providing common functionality
     base: BaseAgent,
-    /// Agent registry for accessing other agents and services
-    registry: Arc<AgentRegistry>,
+    // Registry removed (unused)
 }
 
 impl CreatorAgent {
@@ -61,15 +59,12 @@ impl CreatorAgent {
     /// # Returns
     ///
     /// A new CreatorAgent instance
-    pub fn new(
-        config: AgentConfig,
-        registry: Arc<AgentRegistry>,
-    ) -> Self {
+    pub fn new(config: AgentConfig, registry: Arc<AgentRegistry>) -> Self {
         let ai_provider = registry.ai_provider();
         let message_bus = registry.message_bus();
         let base = BaseAgent::new(config, ai_provider, message_bus);
 
-        Self { base, registry }
+        Self { base }
     }
 
     /// Generate a document based on specifications
@@ -226,7 +221,9 @@ impl Agent for CreatorAgent {
         let result = if task.description.contains("document") {
             // Document generation
             let default_title = "Untitled".to_string();
-            let title = task.context.relevant_files
+            let title = task
+                .context
+                .relevant_files
                 .first()
                 .unwrap_or(&default_title);
             let content_type = if task.description.contains("report") {
@@ -237,13 +234,9 @@ impl Agent for CreatorAgent {
                 "document"
             };
 
-            self.generate_document(
-                title,
-                content_type,
-                &task.context.user_instruction,
-            ).await?
-        } else if task.description.contains("create") ||
-                   task.description.contains("write") {
+            self.generate_document(title, content_type, &task.context.user_instruction)
+                .await?
+        } else if task.description.contains("create") || task.description.contains("write") {
             // Content creation
             let content_type = if task.description.contains("article") {
                 "article"
@@ -256,15 +249,14 @@ impl Agent for CreatorAgent {
             };
 
             let default_topic = "General topic".to_string();
-            let topic = task.context.relevant_files
+            let topic = task
+                .context
+                .relevant_files
                 .first()
                 .unwrap_or(&default_topic);
 
-            self.create_content(
-                content_type,
-                topic,
-                &task.context.user_instruction,
-            ).await?
+            self.create_content(content_type, topic, &task.context.user_instruction)
+                .await?
         } else if task.description.contains("report") {
             // Report generation
             let report_type = if task.description.contains("analysis") {
@@ -276,38 +268,33 @@ impl Agent for CreatorAgent {
             };
 
             let default_data = "No data provided".to_string();
-            let data = task.context.relevant_files
-                .first()
-                .unwrap_or(&default_data);
+            let data = task.context.relevant_files.first().unwrap_or(&default_data);
 
-            let findings = task.context.memory_context
+            let findings = task
+                .context
+                .memory_context
                 .first()
                 .map(|m| m.content.as_str())
                 .unwrap_or("No findings provided");
 
-            self.generate_report(
-                report_type,
-                data,
-                findings,
-            ).await?
+            self.generate_report(report_type, data, findings).await?
         } else if task.description.contains("template") {
             // Template-based generation
             let default_template = "No template provided".to_string();
-            let template = task.context.relevant_files
+            let template = task
+                .context
+                .relevant_files
                 .first()
                 .unwrap_or(&default_template);
 
-            self.generate_from_template(
-                template,
-                &task.context.user_instruction,
-            ).await?
+            self.generate_from_template(template, &task.context.user_instruction)
+                .await?
         } else {
             // Use AI to process general creation task
             let prompt = format!(
                 "Creation Task: {}\n\nContext: {}\n\n\
                  Please complete this creation task and provide high-quality content.",
-                task.description,
-                task.context.user_instruction
+                task.description, task.context.user_instruction
             );
             self.base.query_ai(&prompt).await?
         };
@@ -351,14 +338,14 @@ impl Agent for CreatorAgent {
 
     fn can_handle(&self, task: &Task) -> bool {
         let desc = task.description.to_lowercase();
-        desc.contains("create") ||
-        desc.contains("write") ||
-        desc.contains("generate") ||
-        desc.contains("document") ||
-        desc.contains("report") ||
-        desc.contains("article") ||
-        desc.contains("blog") ||
-        desc.contains("template")
+        desc.contains("create")
+            || desc.contains("write")
+            || desc.contains("generate")
+            || desc.contains("document")
+            || desc.contains("report")
+            || desc.contains("article")
+            || desc.contains("blog")
+            || desc.contains("template")
     }
 
     async fn initialize(&mut self, config: AgentConfig) -> Result<(), AgentError> {

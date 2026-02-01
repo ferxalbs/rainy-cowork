@@ -29,12 +29,11 @@
 // let agent = AnalystAgent::new(config, registry);
 // ```
 
-use std::sync::Arc;
 use crate::agents::{
-    Agent, AgentConfig, AgentError, AgentInfo, AgentMessage,
-    AgentStatus, AgentType, Task, TaskResult,
-    BaseAgent, AgentRegistry
+    Agent, AgentConfig, AgentError, AgentInfo, AgentMessage, AgentRegistry, AgentStatus, AgentType,
+    BaseAgent, Task, TaskResult,
 };
+use std::sync::Arc;
 
 /// AnalystAgent specializes in data analysis and insights generation
 ///
@@ -46,8 +45,7 @@ use crate::agents::{
 pub struct AnalystAgent {
     /// Base agent providing common functionality
     base: BaseAgent,
-    /// Agent registry for accessing other agents and services
-    registry: Arc<AgentRegistry>,
+    // Agent registry removed (unused)
 }
 
 impl AnalystAgent {
@@ -61,15 +59,12 @@ impl AnalystAgent {
     /// # Returns
     ///
     /// A new AnalystAgent instance
-    pub fn new(
-        config: AgentConfig,
-        registry: Arc<AgentRegistry>,
-    ) -> Self {
+    pub fn new(config: AgentConfig, registry: Arc<AgentRegistry>) -> Self {
         let ai_provider = registry.ai_provider();
         let message_bus = registry.message_bus();
         let base = BaseAgent::new(config, ai_provider, message_bus);
 
-        Self { base, registry }
+        Self { base }
     }
 
     /// Analyze data and provide insights
@@ -82,11 +77,7 @@ impl AnalystAgent {
     /// # Returns
     ///
     /// Analysis results and insights
-    async fn analyze_data(
-        &self,
-        data: &str,
-        analysis_type: &str,
-    ) -> Result<String, AgentError> {
+    async fn analyze_data(&self, data: &str, analysis_type: &str) -> Result<String, AgentError> {
         let prompt = format!(
             "Perform {} analysis on the following data:\n\n\
              {}\n\n\
@@ -234,101 +225,82 @@ impl Agent for AnalystAgent {
         self.base.update_status(AgentStatus::Busy).await;
         self.base.set_current_task(Some(task.id.clone())).await;
 
-        let result = if task.description.contains("analyze") ||
-                       task.description.contains("analysis") {
-            // Data analysis
-            let analysis_type = if task.description.contains("statistical") {
-                "statistical"
-            } else if task.description.contains("trend") {
-                "trend"
-            } else if task.description.contains("comparative") {
-                "comparative"
+        let result =
+            if task.description.contains("analyze") || task.description.contains("analysis") {
+                // Data analysis
+                let analysis_type = if task.description.contains("statistical") {
+                    "statistical"
+                } else if task.description.contains("trend") {
+                    "trend"
+                } else if task.description.contains("comparative") {
+                    "comparative"
+                } else {
+                    "comprehensive"
+                };
+
+                let default_data = "No data provided".to_string();
+                let data = task.context.relevant_files.first().unwrap_or(&default_data);
+
+                self.analyze_data(data, analysis_type).await?
+            } else if task.description.contains("visualize")
+                || task.description.contains("chart")
+                || task.description.contains("graph")
+            {
+                // Visualization
+                let default_data = "No data provided".to_string();
+                let data = task.context.relevant_files.first().unwrap_or(&default_data);
+
+                let visualization_goals = if task.description.contains("trend") {
+                    "show trends over time"
+                } else if task.description.contains("comparison") {
+                    "compare different categories"
+                } else if task.description.contains("distribution") {
+                    "show data distribution"
+                } else {
+                    "general visualization"
+                };
+
+                self.generate_visualization(data, visualization_goals)
+                    .await?
+            } else if task.description.contains("insight")
+                || task.description.contains("recommendation")
+            {
+                // Insights generation
+                let default_data = "No data provided".to_string();
+                let data = task.context.relevant_files.first().unwrap_or(&default_data);
+
+                let insight_type = if task.description.contains("business") {
+                    "business"
+                } else if task.description.contains("technical") {
+                    "technical"
+                } else {
+                    "general"
+                };
+
+                self.generate_insights(data, insight_type).await?
+            } else if task.description.contains("pattern") || task.description.contains("trend") {
+                // Pattern recognition
+                let default_data = "No data provided".to_string();
+                let data = task.context.relevant_files.first().unwrap_or(&default_data);
+
+                let pattern_type = if task.description.contains("seasonal") {
+                    "seasonal"
+                } else if task.description.contains("recurring") {
+                    "recurring"
+                } else {
+                    "general"
+                };
+
+                self.recognize_patterns(data, pattern_type).await?
             } else {
-                "comprehensive"
-            };
-
-            let default_data = "No data provided".to_string();
-            let data = task.context.relevant_files
-                .first()
-                .unwrap_or(&default_data);
-
-            self.analyze_data(
-                data,
-                analysis_type,
-            ).await?
-        } else if task.description.contains("visualize") ||
-                    task.description.contains("chart") ||
-                    task.description.contains("graph") {
-            // Visualization
-            let default_data = "No data provided".to_string();
-            let data = task.context.relevant_files
-                .first()
-                .unwrap_or(&default_data);
-
-            let visualization_goals = if task.description.contains("trend") {
-                "show trends over time"
-            } else if task.description.contains("comparison") {
-                "compare different categories"
-            } else if task.description.contains("distribution") {
-                "show data distribution"
-            } else {
-                "general visualization"
-            };
-
-            self.generate_visualization(
-                data,
-                visualization_goals,
-            ).await?
-        } else if task.description.contains("insight") ||
-                   task.description.contains("recommendation") {
-            // Insights generation
-            let default_data = "No data provided".to_string();
-            let data = task.context.relevant_files
-                .first()
-                .unwrap_or(&default_data);
-
-            let insight_type = if task.description.contains("business") {
-                "business"
-            } else if task.description.contains("technical") {
-                "technical"
-            } else {
-                "general"
-            };
-
-            self.generate_insights(
-                data,
-                insight_type,
-            ).await?
-        } else if task.description.contains("pattern") ||
-                   task.description.contains("trend") {
-            // Pattern recognition
-            let default_data = "No data provided".to_string();
-            let data = task.context.relevant_files
-                .first()
-                .unwrap_or(&default_data);
-
-            let pattern_type = if task.description.contains("seasonal") {
-                "seasonal"
-            } else if task.description.contains("recurring") {
-                "recurring"
-            } else {
-                "general"
-            };
-
-            self.recognize_patterns(
-                data,
-                pattern_type,
-            ).await?
-        } else {
-            // Use AI to process general analysis task
-            let prompt = format!(
-                "Analysis Task: {}\n\nContext: {}\n\n\
+                // Use AI to process general analysis task
+                let prompt = format!(
+                    "Analysis Task: {}\n\nContext: {}\n\n\
                  Please complete this analysis task and provide comprehensive insights.",
-                task.description,
-                task.context.user_instruction
-            );
-            self.base.query_ai(&prompt).await?
-        };
+                    task.description, task.context.user_instruction
+                );
+                self.base.query_ai(&prompt).await?
+            };
 
         self.base.update_status(AgentStatus::Idle).await;
         self.base.set_current_task(None).await;
@@ -369,16 +341,16 @@ impl Agent for AnalystAgent {
 
     fn can_handle(&self, task: &Task) -> bool {
         let desc = task.description.to_lowercase();
-        desc.contains("analyze") ||
-        desc.contains("analysis") ||
-        desc.contains("data") ||
-        desc.contains("visualize") ||
-        desc.contains("chart") ||
-        desc.contains("graph") ||
-        desc.contains("insight") ||
-        desc.contains("pattern") ||
-        desc.contains("trend") ||
-        desc.contains("statistics")
+        desc.contains("analyze")
+            || desc.contains("analysis")
+            || desc.contains("data")
+            || desc.contains("visualize")
+            || desc.contains("chart")
+            || desc.contains("graph")
+            || desc.contains("insight")
+            || desc.contains("pattern")
+            || desc.contains("trend")
+            || desc.contains("statistics")
     }
 
     async fn initialize(&mut self, config: AgentConfig) -> Result<(), AgentError> {
