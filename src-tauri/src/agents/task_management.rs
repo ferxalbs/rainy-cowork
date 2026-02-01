@@ -54,17 +54,17 @@ impl TaskManager {
         let agent_id = self.find_best_agent(&task)?;
 
         // Get agent
-        let agent = self
-            .agents
-            .get(&agent_id)
-            .ok_or_else(|| AgentError::TaskExecutionFailed(format!("Agent {} not found", agent_id)))?;
+        let agent = self.agents.get(&agent_id).ok_or_else(|| {
+            AgentError::TaskExecutionFailed(format!("Agent {} not found", agent_id))
+        })?;
 
         // Update agent status
         agent.update_status(AgentStatus::Busy).await;
         agent.set_current_task(Some(task.id.clone())).await;
 
         // Track assignment
-        self.task_assignments.insert(task.id.clone(), agent_id.clone());
+        self.task_assignments
+            .insert(task.id.clone(), agent_id.clone());
 
         Ok(agent_id)
     }
@@ -171,14 +171,11 @@ mod tests {
     use crate::agents::base_agent::BaseAgent;
     use crate::agents::types::{TaskContext, TaskPriority};
     use crate::ai::provider::AIProviderManager;
-    use crate::agents::message_bus::MessageBus;
 
     #[tokio::test]
     async fn test_task_assignment() {
         let agents: Arc<DashMap<String, Arc<dyn Agent>>> = Arc::new(DashMap::new());
         let ai_provider = Arc::new(AIProviderManager::new());
-        let message_bus = Arc::new(MessageBus::new());
-
         let config = crate::agents::agent_trait::AgentConfig {
             agent_id: "test-agent".to_string(),
             workspace_id: "workspace-1".to_string(),
@@ -187,7 +184,8 @@ mod tests {
             settings: serde_json::json!({}),
         };
 
-        let agent: Arc<dyn Agent> = Arc::new(BaseAgent::new(config.clone(), ai_provider, message_bus));
+        let agent: Arc<dyn Agent> =
+            Arc::new(BaseAgent::new(config.clone(), ai_provider, Arc::new(())));
         agents.insert(config.agent_id.clone(), agent);
 
         let task_manager = TaskManager::new(agents);
@@ -229,8 +227,6 @@ mod tests {
     async fn test_cancel_task() {
         let agents: Arc<DashMap<String, Arc<dyn Agent>>> = Arc::new(DashMap::new());
         let ai_provider = Arc::new(AIProviderManager::new());
-        let message_bus = Arc::new(MessageBus::new());
-
         let config = crate::agents::agent_trait::AgentConfig {
             agent_id: "test-agent".to_string(),
             workspace_id: "workspace-1".to_string(),
@@ -239,7 +235,8 @@ mod tests {
             settings: serde_json::json!({}),
         };
 
-        let agent: Arc<dyn Agent> = Arc::new(BaseAgent::new(config.clone(), ai_provider, message_bus));
+        let agent: Arc<dyn Agent> =
+            Arc::new(BaseAgent::new(config.clone(), ai_provider, Arc::new(())));
         agents.insert(config.agent_id.clone(), agent);
 
         let task_manager = TaskManager::new(agents);

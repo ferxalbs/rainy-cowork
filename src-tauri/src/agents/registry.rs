@@ -357,6 +357,7 @@ mod tests {
             registry.ai_provider(),
             Arc::new(()),
         ));
+        let result1 = registry.register_agent(agent1, config.clone()).await;
         assert!(result1.is_ok());
 
         let result2 = registry.register_agent(agent2, config).await;

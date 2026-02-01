@@ -141,15 +141,12 @@ mod tests {
     use super::*;
     use crate::agents::agent_trait::AgentConfig;
     use crate::agents::base_agent::BaseAgent;
-    use crate::agents::message_bus::MessageBus;
     use crate::ai::provider::AIProviderManager;
 
     #[tokio::test]
     async fn test_get_idle_agents() {
         let agents: Arc<DashMap<String, Arc<dyn Agent>>> = Arc::new(DashMap::new());
         let ai_provider = Arc::new(AIProviderManager::new());
-        let message_bus = Arc::new(MessageBus::new());
-
         let config = AgentConfig {
             agent_id: "test-agent".to_string(),
             workspace_id: "workspace-1".to_string(),
@@ -159,7 +156,7 @@ mod tests {
         };
 
         let agent: Arc<dyn Agent> =
-            Arc::new(BaseAgent::new(config.clone(), ai_provider, message_bus));
+            Arc::new(BaseAgent::new(config.clone(), ai_provider, Arc::new(())));
         agents.insert(config.agent_id.clone(), agent);
 
         let monitor = StatusMonitor::new(agents);
@@ -173,8 +170,6 @@ mod tests {
     async fn test_get_busy_agents() {
         let agents: Arc<DashMap<String, Arc<dyn Agent>>> = Arc::new(DashMap::new());
         let ai_provider = Arc::new(AIProviderManager::new());
-        let message_bus = Arc::new(MessageBus::new());
-
         let config = AgentConfig {
             agent_id: "test-agent".to_string(),
             workspace_id: "workspace-1".to_string(),
@@ -184,7 +179,7 @@ mod tests {
         };
 
         let agent: Arc<dyn Agent> =
-            Arc::new(BaseAgent::new(config.clone(), ai_provider, message_bus));
+            Arc::new(BaseAgent::new(config.clone(), ai_provider, Arc::new(())));
         agents.insert(config.agent_id.clone(), agent);
 
         let monitor = StatusMonitor::new(agents);
@@ -197,7 +192,6 @@ mod tests {
     async fn test_list_agents() {
         let agents: Arc<DashMap<String, Arc<dyn Agent>>> = Arc::new(DashMap::new());
         let ai_provider = Arc::new(AIProviderManager::new());
-        let message_bus = Arc::new(MessageBus::new());
 
         let config1 = AgentConfig {
             agent_id: "agent-1".to_string(),
@@ -218,10 +212,10 @@ mod tests {
         let agent1: Arc<dyn Agent> = Arc::new(BaseAgent::new(
             config1.clone(),
             ai_provider.clone(),
-            message_bus.clone(),
+            Arc::new(()),
         ));
         let agent2: Arc<dyn Agent> =
-            Arc::new(BaseAgent::new(config2.clone(), ai_provider, message_bus));
+            Arc::new(BaseAgent::new(config2.clone(), ai_provider, Arc::new(())));
 
         agents.insert(config1.agent_id.clone(), agent1);
         agents.insert(config2.agent_id.clone(), agent2);
@@ -236,8 +230,6 @@ mod tests {
     async fn test_agent_counts() {
         let agents: Arc<DashMap<String, Arc<dyn Agent>>> = Arc::new(DashMap::new());
         let ai_provider = Arc::new(AIProviderManager::new());
-        let message_bus = Arc::new(MessageBus::new());
-
         let config = AgentConfig {
             agent_id: "test-agent".to_string(),
             workspace_id: "workspace-1".to_string(),
@@ -247,7 +239,7 @@ mod tests {
         };
 
         let agent: Arc<dyn Agent> =
-            Arc::new(BaseAgent::new(config.clone(), ai_provider, message_bus));
+            Arc::new(BaseAgent::new(config.clone(), ai_provider, Arc::new(())));
         agents.insert(config.agent_id.clone(), agent);
 
         let monitor = StatusMonitor::new(agents);
