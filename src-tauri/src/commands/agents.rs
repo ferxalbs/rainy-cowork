@@ -373,11 +373,12 @@ pub async fn send_agent_message(
 /// Returns all pending messages for the specified agent from the message bus.
 #[tauri::command]
 pub async fn get_agent_messages(
-    registry: State<'_, AgentRegistryState>,
-    agent_id: String,
+    _registry: State<'_, AgentRegistryState>,
+    _agent_id: String,
 ) -> Result<Vec<AgentMessage>, String> {
-    let messages = registry.0.message_bus().receive(&agent_id).await;
-    Ok(messages)
+    // MessageBus has been removed as it was unused.
+    // This command is kept for API compatibility but returns empty list.
+    Ok(vec![])
 }
 
 /// Get registry statistics

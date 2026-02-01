@@ -1,7 +1,6 @@
 // Rainy Cowork - AI Features Module (PHASE 3)
 // Enhanced features for AI providers
 
-pub mod embeddings;
 pub mod streaming;
 pub mod usage_analytics;
 

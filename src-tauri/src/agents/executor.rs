@@ -61,8 +61,7 @@ impl ExecutorAgent {
     /// A new ExecutorAgent instance
     pub fn new(config: AgentConfig, registry: Arc<AgentRegistry>) -> Self {
         let ai_provider = registry.ai_provider();
-        let message_bus = registry.message_bus();
-        let base = BaseAgent::new(config, ai_provider, message_bus);
+        let base = BaseAgent::new(config, ai_provider, Arc::new(()));
 
         Self { base }
     }

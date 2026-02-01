@@ -101,8 +101,7 @@ impl DirectorAgent {
     /// A new DirectorAgent instance
     pub fn new(config: AgentConfig, registry: Arc<AgentRegistry>) -> Self {
         let ai_provider = registry.ai_provider();
-        let message_bus = registry.message_bus();
-        let base = BaseAgent::new(config, ai_provider, message_bus);
+        let base = BaseAgent::new(config, ai_provider, Arc::new(()));
 
         Self {
             base,
@@ -349,12 +348,9 @@ impl DirectorAgent {
 
             if ready_indices.is_empty() {
                 // Check if all tasks are completed
-                let all_completed = assignments.iter().all(|a| {
-                    matches!(
-                        a.status,
-                        AssignmentStatus::Completed | AssignmentStatus::Failed
-                    )
-                });
+                let all_completed = assignments
+                    .iter()
+                    .all(|a| matches!(a.status, AssignmentStatus::Completed));
 
                 if all_completed {
                     break;

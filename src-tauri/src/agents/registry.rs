@@ -22,7 +22,7 @@
 // ```
 
 use crate::agents::agent_trait::{Agent, AgentConfig, AgentError};
-use crate::agents::message_bus::MessageBus;
+
 use crate::agents::status_monitoring::StatusMonitor;
 use crate::agents::task_management::TaskManager;
 use crate::agents::types::{AgentInfo, Task};
@@ -61,8 +61,7 @@ pub struct AgentRegistry {
     task_manager: TaskManager,
     /// Status monitor for agent status tracking
     status_monitor: StatusMonitor,
-    /// Message bus for inter-agent communication
-    message_bus: Arc<MessageBus>,
+
     /// AI provider manager for agent operations
     ai_provider: Arc<AIProviderManager>,
 }
@@ -78,7 +77,6 @@ impl AgentRegistry {
     ///
     /// A new AgentRegistry instance
     pub fn new(ai_provider: Arc<AIProviderManager>) -> Self {
-        let message_bus = Arc::new(MessageBus::new());
         let agents = Arc::new(DashMap::new());
 
         Self {
@@ -86,7 +84,7 @@ impl AgentRegistry {
             agent_configs: DashMap::new(),
             task_manager: TaskManager::new(agents.clone()),
             status_monitor: StatusMonitor::new(agents),
-            message_bus,
+
             ai_provider,
         }
     }
@@ -271,15 +269,6 @@ impl AgentRegistry {
         }
     }
 
-    /// Get message bus reference
-    ///
-    /// # Returns
-    ///
-    /// Reference to the message bus
-    pub fn message_bus(&self) -> Arc<MessageBus> {
-        self.message_bus.clone()
-    }
-
     /// Get AI provider reference
     ///
     /// # Returns
@@ -298,7 +287,7 @@ impl Clone for AgentRegistry {
             agent_configs: self.agent_configs.clone(),
             task_manager: TaskManager::new(self.agents.clone()),
             status_monitor: StatusMonitor::new(self.agents.clone()),
-            message_bus: self.message_bus.clone(),
+
             ai_provider: self.ai_provider.clone(),
         }
     }
@@ -332,11 +321,10 @@ mod tests {
             settings: serde_json::json!({}),
         };
 
-        let message_bus = registry.message_bus();
         let agent = Arc::new(BaseAgent::new(
             config.clone(),
             registry.ai_provider(),
-            message_bus,
+            Arc::new(()),
         ));
 
         let result = registry.register_agent(agent, config).await;
@@ -359,19 +347,16 @@ mod tests {
             settings: serde_json::json!({}),
         };
 
-        let message_bus = registry.message_bus();
         let agent1 = Arc::new(BaseAgent::new(
             config.clone(),
             registry.ai_provider(),
-            message_bus.clone(),
+            Arc::new(()),
         ));
         let agent2 = Arc::new(BaseAgent::new(
             config.clone(),
             registry.ai_provider(),
-            message_bus,
+            Arc::new(()),
         ));
-
-        let result1 = registry.register_agent(agent1, config.clone()).await;
         assert!(result1.is_ok());
 
         let result2 = registry.register_agent(agent2, config).await;
@@ -391,11 +376,10 @@ mod tests {
             settings: serde_json::json!({}),
         };
 
-        let message_bus = registry.message_bus();
         let agent = Arc::new(BaseAgent::new(
             config.clone(),
             registry.ai_provider(),
-            message_bus,
+            Arc::new(()),
         ));
 
         registry.register_agent(agent, config).await.unwrap();
@@ -428,16 +412,15 @@ mod tests {
             settings: serde_json::json!({}),
         };
 
-        let message_bus = registry.message_bus();
         let agent1 = Arc::new(BaseAgent::new(
             config1.clone(),
             registry.ai_provider(),
-            message_bus.clone(),
+            Arc::new(()),
         ));
         let agent2 = Arc::new(BaseAgent::new(
             config2.clone(),
             registry.ai_provider(),
-            message_bus,
+            Arc::new(()),
         ));
 
         registry.register_agent(agent1, config1).await.unwrap();
@@ -460,11 +443,10 @@ mod tests {
             settings: serde_json::json!({}),
         };
 
-        let message_bus = registry.message_bus();
         let agent = Arc::new(BaseAgent::new(
             config.clone(),
             registry.ai_provider(),
-            message_bus,
+            Arc::new(()),
         ));
 
         registry.register_agent(agent, config).await.unwrap();
@@ -489,11 +471,10 @@ mod tests {
             settings: serde_json::json!({}),
         };
 
-        let message_bus = registry.message_bus();
         let agent = Arc::new(BaseAgent::new(
             config.clone(),
             registry.ai_provider(),
-            message_bus,
+            Arc::new(()),
         ));
 
         registry.register_agent(agent, config).await.unwrap();
@@ -542,11 +523,10 @@ mod tests {
             settings: serde_json::json!({}),
         };
 
-        let message_bus = registry.message_bus();
         let agent = Arc::new(BaseAgent::new(
             config.clone(),
             registry.ai_provider(),
-            message_bus,
+            Arc::new(()),
         ));
 
         registry.register_agent(agent, config).await.unwrap();

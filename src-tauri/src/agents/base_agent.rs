@@ -30,7 +30,7 @@
 // ```
 
 use crate::agents::agent_trait::{Agent, AgentConfig, AgentError};
-use crate::agents::message_bus::MessageBus;
+
 use crate::agents::types::{AgentInfo, AgentMessage, AgentStatus, AgentType, Task, TaskResult};
 use crate::ai::provider::AIProviderManager;
 use crate::ai::provider_types::StreamingChunk;
@@ -71,7 +71,7 @@ impl BaseAgent {
     pub fn new(
         config: AgentConfig,
         ai_provider: Arc<AIProviderManager>,
-        _message_bus: Arc<MessageBus>,
+        _message_bus: Arc<()>, // Removed MessageBus type
     ) -> Self {
         let info = AgentInfo {
             id: config.agent_id.clone(),
@@ -227,9 +227,8 @@ mod tests {
         };
 
         let ai_provider = Arc::new(AIProviderManager::new());
-        let message_bus = Arc::new(MessageBus::new());
 
-        let agent = BaseAgent::new(config, ai_provider, message_bus);
+        let agent = BaseAgent::new(config, ai_provider, Arc::new(()));
         assert_eq!(agent.config().agent_id, "test-agent");
     }
 
@@ -244,9 +243,8 @@ mod tests {
         };
 
         let ai_provider = Arc::new(AIProviderManager::new());
-        let message_bus = Arc::new(MessageBus::new());
 
-        let agent = BaseAgent::new(config, ai_provider, message_bus);
+        let agent = BaseAgent::new(config, ai_provider, Arc::new(()));
         agent.update_status(AgentStatus::Busy).await;
 
         let info = agent.info();
@@ -264,9 +262,8 @@ mod tests {
         };
 
         let ai_provider = Arc::new(AIProviderManager::new());
-        let message_bus = Arc::new(MessageBus::new());
 
-        let agent = BaseAgent::new(config, ai_provider, message_bus);
+        let agent = BaseAgent::new(config, ai_provider, Arc::new(()));
         agent.set_current_task(Some("task-1".to_string())).await;
 
         let info = agent.info();

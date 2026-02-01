@@ -54,7 +54,7 @@ pub mod director_agent;
 mod director_agent_tests;
 pub mod executor;
 pub mod governor;
-pub mod message_bus;
+
 pub mod registry;
 pub mod researcher;
 pub mod status_monitoring;
