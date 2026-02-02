@@ -14,16 +14,34 @@ import {
   bootstrapAtm,
   generatePairingCode,
   setNeuralCredentials,
+  setNeuralWorkspaceId,
   loadNeuralCredentials,
+  registerNode,
   respondToAirlock,
   getPendingAirlockApprovals,
   setHeadlessMode,
   ApprovalRequest,
   WorkspaceAuth,
+  SkillManifest,
 } from "../../services/tauri";
 import { AgentList } from "./AgentList";
 import { CreateAgentForm } from "./CreateAgentForm";
 
+// Default skills this Desktop Node exposes
+const DEFAULT_SKILLS: SkillManifest[] = [
+  {
+    name: "file_ops",
+    version: "1.0.0",
+    description: "File System Operations",
+    capabilities: ["read", "write", "move", "delete"],
+  },
+  {
+    name: "terminal",
+    version: "1.0.0",
+    description: "Terminal Execution",
+    capabilities: ["exec"],
+  },
+];
 type ConnectionStatus = "idle" | "loading" | "connected" | "error";
 
 export function NeuralPanel() {
@@ -77,7 +95,7 @@ export function NeuralPanel() {
     init();
   }, []);
 
-  // Main connection handler - follows legacy AtmBootstrap pattern
+  // Main connection handler - full connection flow
   const handleConnect = async () => {
     if (!platformKey.trim() || !userApiKey.trim()) {
       toast.danger("Both Platform Key and User API Key are required");
@@ -89,27 +107,37 @@ export function NeuralPanel() {
 
     try {
       // Step 1: Bootstrap workspace via ATM (creates or retrieves workspace)
-      // This is the ONLY API call needed - exactly like legacy AtmBootstrap
+      console.log("Step 1: Bootstrapping workspace...");
       const ws = await bootstrapAtm(
         platformKey,
         userApiKey,
         workspaceName.trim() || "Desktop Workspace",
       );
-
       console.log("Workspace created/retrieved:", ws);
 
-      // Step 2: Store credentials for future use
+      // Step 2: Store credentials for future use (also saves to Keychain)
+      console.log("Step 2: Storing credentials...");
       await setNeuralCredentials(platformKey, userApiKey);
 
-      // Step 3: Success!
+      // Step 3: Set workspace ID for NeuralService
+      console.log("Step 3: Setting workspace ID...");
+      await setNeuralWorkspaceId(ws.id);
+
+      // Step 4: Register this Desktop Node with the Cloud Cortex
+      console.log("Step 4: Registering desktop node...");
+      const nodeId = await registerNode(DEFAULT_SKILLS);
+      console.log("Node registered with ID:", nodeId);
+
+      // Success!
       setWorkspace(ws);
       setStatus("connected");
-      toast.success("Connected to Cloud Cortex!");
+      toast.success(`Connected to Cloud Cortex! Node: ${nodeId}`);
     } catch (err: unknown) {
       console.error("Connection failed:", err);
       const errorMsg = err instanceof Error ? err.message : JSON.stringify(err);
       setError(errorMsg);
       setStatus("error");
+
       toast.danger("Connection failed. Check your credentials.");
     }
   };
