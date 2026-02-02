@@ -47,15 +47,17 @@ export function AtmBootstrap() {
 
   const handleDeployAgent = async () => {
     setIsDeploying(true);
+    setError("");
     try {
       // Default "Echo" agent for testing
       const config = {
-        model: "gpt-4-turbo",
-        systemPrompt: "You are a helpful assistant deployed via Rainy ATM.",
+        model: "gemini-3-pro-minimal",
+        systemPrompt:
+          "You are a Premium Assistant deployed via Rainy ATM (Gemini 3 Pro).",
       };
       const res = await invoke("create_atm_agent", {
         name: "First Agent",
-        type_: "default",
+        type: "default",
         config: config,
       });
       setAgentResult(res);
@@ -98,6 +100,13 @@ export function AtmBootstrap() {
                 <p className="text-small text-default-500">
                   Deploy a test agent to verify the cloud runtime.
                 </p>
+
+                {error && (
+                  <div className="bg-danger-50 text-danger-600 p-3 rounded-lg text-sm mb-2">
+                    🚨 Error: {error}
+                  </div>
+                )}
+
                 {agentResult ? (
                   <div className="bg-primary-50 text-primary-600 p-4 rounded-lg">
                     <h4 className="font-bold">Agent Deployed!</h4>
@@ -163,6 +172,7 @@ export function AtmBootstrap() {
                   Rainy Platform API Key
                 </label>
                 <Input
+                  className="bg-background/20"
                   placeholder="rk_live_..."
                   value={masterKey}
                   onChange={(e) => setMasterKey(e.target.value)}
@@ -177,6 +187,7 @@ export function AtmBootstrap() {
                   User API Key (Creator Key)
                 </label>
                 <Input
+                  className="bg-background/20"
                   placeholder="rny_..."
                   value={userApiKey}
                   onChange={(e) => setUserApiKey(e.target.value)}
@@ -189,6 +200,7 @@ export function AtmBootstrap() {
               <div className="flex flex-col gap-1">
                 <label className="text-sm font-medium">Workspace Name</label>
                 <Input
+                  className="bg-background/20"
                   placeholder="e.g. My Agency"
                   value={workspaceName}
                   onChange={(e) => setWorkspaceName(e.target.value)}
