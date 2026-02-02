@@ -5,6 +5,15 @@ use tauri::{command, State};
 pub struct NeuralServiceState(pub NeuralService);
 
 #[command]
+pub async fn set_neural_workspace_id(
+    state: State<'_, NeuralServiceState>,
+    workspace_id: String,
+) -> Result<(), String> {
+    state.0.set_workspace_id(workspace_id).await;
+    Ok(())
+}
+
+#[command]
 pub async fn register_node(
     state: State<'_, NeuralServiceState>,
     skills: Vec<SkillManifest>,

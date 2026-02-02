@@ -1407,6 +1407,10 @@ export async function registerNode(skills: SkillManifest[]): Promise<string> {
   return invoke("register_node", { skills });
 }
 
+export async function setNeuralWorkspaceId(workspaceId: string): Promise<void> {
+  return invoke("set_neural_workspace_id", { workspaceId });
+}
+
 export async function sendHeartbeat(): Promise<void> {
   return invoke("send_heartbeat");
 }

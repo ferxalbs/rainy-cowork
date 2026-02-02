@@ -13,6 +13,7 @@ import {
   Plus,
   LayoutGrid,
   Settings,
+  Network,
 } from "lucide-react";
 import { MacOSToggle } from "./MacOSToggle";
 import { useTheme } from "../../hooks/useTheme";
@@ -255,10 +256,10 @@ export function AppSidebar({
             colorClass="text-green-500"
           />
           <NavItem
-            id="atm-bootstrap"
-            label="Run on Cloud"
-            icon={Sparkles}
-            colorClass="text-amber-500"
+            id="neural-link"
+            label="Neural Link"
+            icon={Network}
+            colorClass="text-purple-500"
           />
         </div>
       </div>

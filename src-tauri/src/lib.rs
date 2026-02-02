@@ -357,6 +357,7 @@ pub fn run() {
             commands::set_atm_credentials,
             commands::generate_pairing_code,
             // Neural System Commands (Desktop Nerve Center)
+            commands::set_neural_workspace_id,
             commands::register_node,
             commands::send_heartbeat,
             commands::poll_commands,

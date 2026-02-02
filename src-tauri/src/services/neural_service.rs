@@ -59,6 +59,13 @@ impl NeuralService {
         }
     }
 
+    pub async fn set_workspace_id(&self, workspace_id: String) {
+        let mut metadata = self.metadata.lock().await;
+        metadata.workspace_id = workspace_id;
+        // Reset node_id to force re-registration with new workspace
+        metadata.node_id = None;
+    }
+
     /// Registers this Desktop Node with the Cloud Cortex
     pub async fn register(&self, skills: Vec<SkillManifest>) -> Result<String, String> {
         let mut metadata = self.metadata.lock().await;

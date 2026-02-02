@@ -1,18 +1,17 @@
 import { Button, Card, Chip, Separator, Switch } from "@heroui/react";
 import {
   Network,
-  Wifi,
-  WifiOff,
+  RefreshCw,
+  Copy,
   Shield,
   CheckCircle2,
   XCircle,
   Clock,
-  Copy,
-  RefreshCw,
 } from "lucide-react";
 import { useNeuralService } from "../../hooks/useNeuralService";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "@heroui/react";
+import { setNeuralWorkspaceId } from "../../services/tauri";
 
 export function NeuralPanel() {
   const {
@@ -22,17 +21,19 @@ export function NeuralPanel() {
     lastHeartbeat,
     connect,
     respond,
-    isPending,
     isHeadless,
     toggleHeadless,
   } = useNeuralService();
 
-  // Auto-connect on mount (can be changed to manual)
+  const [inputWorkspaceId, setInputWorkspaceId] = useState("");
+  const [isPairing, setIsPairing] = useState(false);
+
+  // Auto-connect on mount if we have a node ID, otherwise wait for pairing
   useEffect(() => {
-    if (isPending) {
+    if (status !== "pending-pairing" && !nodeId) {
       connect();
     }
-  }, []);
+  }, [status, nodeId, connect]);
 
   const copyNodeId = () => {
     if (nodeId) {
@@ -41,30 +42,38 @@ export function NeuralPanel() {
     }
   };
 
-  const statusConfig = {
-    "pending-pairing": {
-      icon: <RefreshCw className="size-5 animate-spin text-yellow-500" />,
-      label: "Connecting...",
-      color: "warning" as const,
-    },
-    connected: {
-      icon: <Wifi className="size-5 text-green-500" />,
-      label: "Connected",
-      color: "success" as const,
-    },
-    offline: {
-      icon: <WifiOff className="size-5 text-gray-500" />,
-      label: "Offline",
-      color: "default" as const,
-    },
-    error: {
-      icon: <WifiOff className="size-5 text-red-500" />,
-      label: "Error",
-      color: "danger" as const,
-    },
+  const handlePairing = async () => {
+    if (!inputWorkspaceId.trim()) {
+      toast.danger("Please enter a Workspace ID");
+      return;
+    }
+    setIsPairing(true);
+    try {
+      await setNeuralWorkspaceId(inputWorkspaceId);
+      await connect();
+      toast.success("Pairing initiated");
+    } catch (error) {
+      console.error("Pairing failed:", error);
+      toast.danger("Pairing failed");
+    } finally {
+      setIsPairing(false);
+    }
   };
 
-  const currentStatus = statusConfig[status];
+  const getStatusColor = (currentStatus: string) => {
+    switch (currentStatus) {
+      case "connected":
+        return "text-green-500";
+      case "pending-pairing":
+        return "text-yellow-500";
+      case "offline":
+        return "text-gray-500";
+      case "error":
+        return "text-red-500";
+      default:
+        return "text-gray-500";
+    }
+  };
 
   return (
     <div className="flex flex-col gap-6 p-6 max-w-2xl mx-auto">
@@ -79,26 +88,60 @@ export function NeuralPanel() {
         </div>
       </div>
 
-      {/* Status Card */}
+      {/* Connection Status Card */}
       <Card className="p-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            {currentStatus.icon}
-            <div>
-              <h3 className="font-semibold">Connection Status</h3>
-              <Chip color={currentStatus.color} size="sm" className="mt-1">
-                {currentStatus.label}
-              </Chip>
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div
+              className={`p-2 rounded-full ${getStatusColor(status).replace("text-", "bg-")}/10`}
+            >
+              <Network className={`size-6 ${getStatusColor(status)}`} />
             </div>
-          </div>
-
-          {status === "connected" && lastHeartbeat && (
-            <div className="text-right text-sm text-muted-foreground">
-              <div className="flex items-center gap-1">
-                <Clock className="size-3" />
-                <span>Last sync: {lastHeartbeat.toLocaleTimeString()}</span>
+            <div>
+              <h3 className="text-lg font-semibold">Neural Link</h3>
+              <div className="flex items-center gap-2">
+                <span
+                  className={`size-2 rounded-full ${getStatusColor(status).replace("text-", "bg-")} animate-pulse`}
+                />
+                <span className="text-sm text-muted-foreground capitalize">
+                  {status.replace("-", " ")}
+                </span>
               </div>
             </div>
+          </div>
+          {status === "pending-pairing" ? (
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Enter Workspace ID"
+                className="px-3 py-1 rounded border bg-background text-sm"
+                value={inputWorkspaceId}
+                onChange={(e) => setInputWorkspaceId(e.target.value)}
+              />
+              <Button
+                size="sm"
+                variant="primary"
+                onPress={handlePairing}
+                isDisabled={isPairing}
+                className="min-w-[80px]"
+              >
+                {isPairing ? (
+                  <RefreshCw className="size-4 animate-spin" />
+                ) : (
+                  "Pair"
+                )}
+              </Button>
+            </div>
+          ) : (
+            <Button
+              size="sm"
+              variant="ghost"
+              onPress={connect}
+              className="gap-2"
+            >
+              <RefreshCw className="size-4" />
+              {status === "error" ? "Retry" : "Reconnect"}
+            </Button>
           )}
         </div>
 
@@ -121,12 +164,13 @@ export function NeuralPanel() {
           </div>
         )}
 
-        {/* Reconnect Button */}
-        {(status === "offline" || status === "error") && (
-          <Button className="mt-4 w-full" onPress={connect}>
-            <RefreshCw className="size-4 mr-2" />
-            Reconnect
-          </Button>
+        {status === "connected" && lastHeartbeat && (
+          <div className="text-right text-sm text-muted-foreground mt-4">
+            <div className="flex items-center gap-1 justify-end">
+              <Clock className="size-3" />
+              <span>Last sync: {lastHeartbeat.toLocaleTimeString()}</span>
+            </div>
+          </div>
         )}
       </Card>
 
