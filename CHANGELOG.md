@@ -5,6 +5,54 @@ All notable changes to Rainy Cowork will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.4] - 2026-01-29 - Introduction of Distributed Neural System & Airlock
+
+### Added - Desktop Nerve Center (Tauri)
+
+**Rust Backend (`src-tauri/src/`)**
+
+- `services/neural_service.rs` - **NeuralService** for Cloud Cortex integration:
+  - RainyRPC protocol implementation (polling-based)
+  - `register_node` - Handshake with Cloud Cortex
+  - `heartbeat` - Send status and fetch pending commands
+  - `start_command` / `complete_command` - Lifecycle management
+
+- `services/airlock.rs` - **Airlock Security** implementation:
+  - Security firewall for incoming Cloud commands
+  - **Level 0 (Safe)**: Auto-approved read-only operations
+  - **Level 1 (Sensitive)**: Notification required (Write ops)
+  - **Level 2 (Dangerous)**: Explicit approval required (Execute ops)
+  - Event-based approval flow with frontend integration
+
+- `models/neural.rs` - Shared data models:
+  - `RainyMessage`, `RainyContext`, `RainyPayload`
+  - `AirlockLevel`, `CommandStatus`, `DesktopNodeStatus`
+
+- `commands/` - New Tauri commands:
+  - **Neural**: `register_node`, `send_heartbeat`, `poll_commands`
+  - **Airlock**: `respond_to_airlock`, `get_pending_airlock_approvals`
+
+### Added - Cloud Cortex (Infrastructure)
+
+**Database & API (`rainy-atm/src/`)**
+
+- Turso Database Schema:
+  - `desktop_nodes` - registry of connected devices
+  - `command_queue` - persistent command buffer
+  - `command_log` - immutable audit trail
+
+- API Endpoints:
+  - `POST /v1/nodes/register` - Node registration
+  - `POST /v1/nodes/:id/heartbeat` - Status sync & command fetch
+  - `POST /v1/nodes/:id/commands/...` - Command status updates
+
+### Technical
+
+- Full end-to-end "Distributed Neural System" architecture
+- Secure "Airlock" pattern for remote command execution
+- Polling-based bidirectional communication (Cloud <-> Desktop)
+- Type-safe implementation across TypeScript (Cloud) and Rust (Desktop)
+
 ## [0.5.3] - 2026-01-28 - PHASE 3: Intelligent Router Integration
 
 ### Added - PHASE 3: Intelligent Router Commands

@@ -2,6 +2,7 @@
 // Core data structures for tasks, files, and AI providers
 
 pub mod folder;
+pub mod neural;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};

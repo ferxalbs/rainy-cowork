@@ -12,8 +12,8 @@ use agents::AgentRegistry;
 use ai::{AIProviderManager, IntelligentRouter, ProviderRegistry};
 use services::{
     ATMClient, CoworkAgent, DocumentService, FileManager, FileOperationEngine, FolderManager,
-    ImageService, ManagedResearchService, MemoryManager, ReflectionEngine, SettingsManager,
-    WebResearchService, WorkspaceManager,
+    ImageService, ManagedResearchService, MemoryManager, NeuralService, ReflectionEngine,
+    SettingsManager, WebResearchService, WorkspaceManager,
 };
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
@@ -78,6 +78,12 @@ pub fn run() {
         None,
     );
 
+    // Initialize Neural Service (Distributed Neural System)
+    let neural_service = NeuralService::new(
+        "https://rainy-atm-cfe3gvcwua-uc.a.run.app".to_string(),
+        "pending-pairing".to_string(), // Initial state, will be updated after pairing
+    );
+
     // Initialize folder manager (requires app handle for data dir)
     // We'll initialize it in setup since we need the app handle
 
@@ -108,7 +114,12 @@ pub fn run() {
         )) // Arc<ReflectionEngine>
         .manage(commands::router::IntelligentRouterState(intelligent_router)) // Arc<RwLock<IntelligentRouter>>
         .manage(atm_client) // ATMClient
+        .manage(commands::neural::NeuralServiceState(neural_service)) // NeuralService
+        .manage(commands::airlock::AirlockServiceState(Arc::new(
+            Mutex::new(None),
+        ))) // Placeholder, initialized in setup
         .setup(|app| {
+            use crate::services::AirlockService;
             use tauri::Manager;
 
             // Initialize folder manager with app data dir
@@ -149,6 +160,14 @@ pub fn run() {
 
             // Manage memory manager state
             app.manage(commands::memory::MemoryManagerState(memory_manager));
+
+            // Initialize Airlock Service with app handle
+            let airlock = AirlockService::new(app.handle().clone());
+            let airlock_state = app.state::<commands::airlock::AirlockServiceState>();
+            {
+                let mut guard = tauri::async_runtime::block_on(airlock_state.0.lock());
+                *guard = Some(airlock);
+            }
 
             Ok(())
         })
@@ -337,6 +356,15 @@ pub fn run() {
             commands::list_atm_agents,
             commands::set_atm_credentials,
             commands::generate_pairing_code,
+            // Neural System Commands (Desktop Nerve Center)
+            commands::register_node,
+            commands::send_heartbeat,
+            commands::poll_commands,
+            commands::start_command_execution,
+            commands::complete_command_execution,
+            // Airlock Commands (Security)
+            commands::respond_to_airlock,
+            commands::get_pending_airlock_approvals,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
