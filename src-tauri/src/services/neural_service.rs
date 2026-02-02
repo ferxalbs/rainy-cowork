@@ -123,6 +123,13 @@ impl NeuralService {
             return Ok(id.clone());
         }
 
+        // Check for credentials
+        let platform_key = metadata
+            .platform_key
+            .as_ref()
+            .ok_or("Not authenticated: Platform Key required")?
+            .clone();
+
         let url = format!("{}/v1/nodes/register", self.base_url);
 
         let body = serde_json::json!({
@@ -135,13 +142,16 @@ impl NeuralService {
         let res = self
             .http
             .post(&url)
+            .header("Authorization", format!("Bearer {}", platform_key))
             .json(&body)
             .send()
             .await
             .map_err(|e| e.to_string())?;
 
         if !res.status().is_success() {
-            return Err(format!("Registration failed: {}", res.status()));
+            let status = res.status();
+            let err_text = res.text().await.unwrap_or_default();
+            return Err(format!("Registration failed: {} - {}", status, err_text));
         }
 
         let data: RegisterResponse = res.json().await.map_err(|e| e.to_string())?;
@@ -158,6 +168,7 @@ impl NeuralService {
     pub async fn heartbeat(&self, status: DesktopNodeStatus) -> Result<Vec<QueuedCommand>, String> {
         let metadata = self.metadata.lock().await;
         let node_id = metadata.node_id.as_ref().ok_or("Node not registered")?;
+        let platform_key = metadata.platform_key.as_ref().ok_or("Not authenticated")?;
 
         let url = format!("{}/v1/nodes/{}/heartbeat", self.base_url, node_id);
 
@@ -168,6 +179,7 @@ impl NeuralService {
         let res = self
             .http
             .post(&url)
+            .header("Authorization", format!("Bearer {}", platform_key))
             .json(&body)
             .send()
             .await

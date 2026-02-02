@@ -1460,3 +1460,26 @@ export async function createAtmAgent(
 ): Promise<any> {
   return invoke("create_atm_agent", { name, type_: type, config });
 }
+
+// ============ ATM Bootstrap Commands ============
+
+export interface WorkspaceAuth {
+  id: string;
+  name: string;
+  apiKey: string;
+}
+
+export async function bootstrapAtm(
+  masterKey: string,
+  userApiKey: string,
+  name: string,
+): Promise<WorkspaceAuth> {
+  return invoke("bootstrap_atm", { masterKey, userApiKey, name });
+}
+
+export async function generatePairingCode(): Promise<{
+  code: string;
+  expiresAt: number;
+}> {
+  return invoke("generate_pairing_code");
+}
