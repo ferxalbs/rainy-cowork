@@ -1429,3 +1429,20 @@ export async function getPendingAirlockApprovals(): Promise<ApprovalRequest[]> {
 export async function setHeadlessMode(enabled: boolean): Promise<void> {
   return invoke("set_headless_mode", { enabled });
 }
+
+// ============ Neural Credentials Commands ============
+
+export async function setNeuralCredentials(
+  platformKey: string,
+  userApiKey: string,
+): Promise<void> {
+  return invoke("set_neural_credentials", { platformKey, userApiKey });
+}
+
+export async function loadNeuralCredentials(): Promise<boolean> {
+  return invoke("load_neural_credentials");
+}
+
+export async function hasNeuralCredentials(): Promise<boolean> {
+  return invoke("has_neural_credentials");
+}

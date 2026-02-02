@@ -17,6 +17,8 @@ pub struct NodeMetadata {
     pub workspace_id: String,
     pub hostname: String,
     pub platform: String,
+    pub platform_key: Option<String>,
+    pub user_api_key: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -55,6 +57,8 @@ impl NeuralService {
                 workspace_id,
                 hostname,
                 platform,
+                platform_key: None,
+                user_api_key: None,
             })),
         }
     }
@@ -64,6 +68,50 @@ impl NeuralService {
         metadata.workspace_id = workspace_id;
         // Reset node_id to force re-registration with new workspace
         metadata.node_id = None;
+    }
+
+    /// Set authentication credentials (Platform Key + User API Key)
+    /// Keys are also persisted to macOS Keychain for session persistence
+    pub async fn set_credentials(
+        &self,
+        platform_key: String,
+        user_api_key: String,
+    ) -> Result<(), String> {
+        // Store in memory
+        let mut metadata = self.metadata.lock().await;
+        metadata.platform_key = Some(platform_key.clone());
+        metadata.user_api_key = Some(user_api_key.clone());
+        metadata.node_id = None; // Force re-registration with new credentials
+
+        // Persist to Keychain
+        let keychain = crate::ai::keychain::KeychainManager::new();
+        keychain.store_key("neural_platform_key", &platform_key)?;
+        keychain.store_key("neural_user_api_key", &user_api_key)?;
+
+        Ok(())
+    }
+
+    /// Load credentials from Keychain (call on app startup)
+    pub async fn load_credentials_from_keychain(&self) -> Result<bool, String> {
+        let keychain = crate::ai::keychain::KeychainManager::new();
+
+        let platform_key = keychain.get_key("neural_platform_key")?;
+        let user_api_key = keychain.get_key("neural_user_api_key")?;
+
+        if let (Some(pk), Some(uk)) = (platform_key, user_api_key) {
+            let mut metadata = self.metadata.lock().await;
+            metadata.platform_key = Some(pk);
+            metadata.user_api_key = Some(uk);
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    /// Check if credentials are configured
+    pub async fn has_credentials(&self) -> bool {
+        let metadata = self.metadata.lock().await;
+        metadata.platform_key.is_some() && metadata.user_api_key.is_some()
     }
 
     /// Registers this Desktop Node with the Cloud Cortex

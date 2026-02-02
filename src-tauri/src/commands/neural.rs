@@ -52,3 +52,22 @@ pub async fn complete_command_execution(
 ) -> Result<(), String> {
     state.0.complete_command(&command_id, result).await
 }
+
+#[command]
+pub async fn set_neural_credentials(
+    state: State<'_, NeuralServiceState>,
+    platform_key: String,
+    user_api_key: String,
+) -> Result<(), String> {
+    state.0.set_credentials(platform_key, user_api_key).await
+}
+
+#[command]
+pub async fn load_neural_credentials(state: State<'_, NeuralServiceState>) -> Result<bool, String> {
+    state.0.load_credentials_from_keychain().await
+}
+
+#[command]
+pub async fn has_neural_credentials(state: State<'_, NeuralServiceState>) -> Result<bool, String> {
+    Ok(state.0.has_credentials().await)
+}

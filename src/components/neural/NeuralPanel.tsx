@@ -7,11 +7,15 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
+  Key,
 } from "lucide-react";
 import { useNeuralService } from "../../hooks/useNeuralService";
 import { useEffect, useState } from "react";
 import { toast } from "@heroui/react";
-import { setNeuralWorkspaceId } from "../../services/tauri";
+import {
+  setNeuralCredentials,
+  loadNeuralCredentials,
+} from "../../services/tauri";
 
 export function NeuralPanel() {
   const {
@@ -25,15 +29,35 @@ export function NeuralPanel() {
     toggleHeadless,
   } = useNeuralService();
 
-  const [inputWorkspaceId, setInputWorkspaceId] = useState("");
+  const [platformKey, setPlatformKey] = useState("");
+  const [userApiKey, setUserApiKey] = useState("");
   const [isPairing, setIsPairing] = useState(false);
+  const [hasCredentials, setHasCredentials] = useState(false);
 
-  // Auto-connect on mount if we have a node ID, otherwise wait for pairing
+  // Check for existing credentials on mount
   useEffect(() => {
-    if (status !== "pending-pairing" && !nodeId) {
+    const checkCredentials = async () => {
+      try {
+        // Try to load from Keychain
+        const loaded = await loadNeuralCredentials();
+        if (loaded) {
+          setHasCredentials(true);
+          // Auto-connect if we have credentials
+          connect();
+        }
+      } catch (error) {
+        console.error("Failed to load credentials:", error);
+      }
+    };
+    checkCredentials();
+  }, [connect]);
+
+  // Auto-connect when credentials are set
+  useEffect(() => {
+    if (hasCredentials && status === "pending-pairing") {
       connect();
     }
-  }, [status, nodeId, connect]);
+  }, [hasCredentials, status, connect]);
 
   const copyNodeId = () => {
     if (nodeId) {
@@ -43,18 +67,19 @@ export function NeuralPanel() {
   };
 
   const handlePairing = async () => {
-    if (!inputWorkspaceId.trim()) {
-      toast.danger("Please enter a Workspace ID");
+    if (!platformKey.trim() || !userApiKey.trim()) {
+      toast.danger("Both Platform Key and User API Key are required");
       return;
     }
     setIsPairing(true);
     try {
-      await setNeuralWorkspaceId(inputWorkspaceId);
+      await setNeuralCredentials(platformKey, userApiKey);
+      setHasCredentials(true);
       await connect();
-      toast.success("Pairing initiated");
+      toast.success("Successfully paired with Cloud Cortex");
     } catch (error) {
       console.error("Pairing failed:", error);
-      toast.danger("Pairing failed");
+      toast.danger("Pairing failed. Check your credentials.");
     } finally {
       setIsPairing(false);
     }
@@ -109,26 +134,39 @@ export function NeuralPanel() {
               </div>
             </div>
           </div>
-          {status === "pending-pairing" ? (
-            <div className="flex gap-2">
+          {status === "pending-pairing" && !hasCredentials ? (
+            <div className="flex flex-col gap-3 mt-4">
+              <div className="flex items-center gap-2">
+                <Key className="size-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Authentication Keys</span>
+              </div>
               <input
-                type="text"
-                placeholder="Enter Workspace ID"
-                className="px-3 py-1 rounded border bg-background text-sm"
-                value={inputWorkspaceId}
-                onChange={(e) => setInputWorkspaceId(e.target.value)}
+                type="password"
+                placeholder="Platform Key (RAINY_PLATFORM_KEY)"
+                className="px-3 py-2 rounded-lg border bg-background text-sm font-mono"
+                value={platformKey}
+                onChange={(e) => setPlatformKey(e.target.value)}
+              />
+              <input
+                type="password"
+                placeholder="User API Key (rny_...)"
+                className="px-3 py-2 rounded-lg border bg-background text-sm font-mono"
+                value={userApiKey}
+                onChange={(e) => setUserApiKey(e.target.value)}
               />
               <Button
                 size="sm"
                 variant="primary"
                 onPress={handlePairing}
-                isDisabled={isPairing}
-                className="min-w-[80px]"
+                isDisabled={
+                  isPairing || !platformKey.trim() || !userApiKey.trim()
+                }
+                className="w-full"
               >
                 {isPairing ? (
                   <RefreshCw className="size-4 animate-spin" />
                 ) : (
-                  "Pair"
+                  "Connect to Cloud Cortex"
                 )}
               </Button>
             </div>
