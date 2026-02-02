@@ -3,6 +3,7 @@ import { TahoeLayout, AIDocumentPanel, AIResearchPanel } from "./components";
 import { SettingsPage } from "./components/settings";
 import { AgentChatPanel } from "./components/agent-chat/AgentChatPanel";
 import { AtmBootstrap } from "./components/AtmBootstrap";
+import { NeuralPanel } from "./components/neural";
 import { Button, Card } from "@heroui/react";
 import { AlertCircle, FolderPlus } from "lucide-react";
 import { useAIProvider, useFolderManager } from "./hooks";
@@ -95,7 +96,8 @@ function App() {
           !isSettingsSection &&
           activeSection !== "documents" &&
           activeSection !== "research" &&
-          activeSection !== "atm-bootstrap"
+          activeSection !== "atm-bootstrap" &&
+          activeSection !== "neural-link"
         }
       >
         {/* Main Content Area - Dynamic based on section */}
@@ -146,6 +148,13 @@ function App() {
           {activeSection === "atm-bootstrap" && (
             <div className="flex-1 flex items-center justify-center p-6 bg-content1/50">
               <AtmBootstrap />
+            </div>
+          )}
+
+          {/* Neural Link */}
+          {activeSection === "neural-link" && (
+            <div className="flex-1 overflow-auto bg-content1/50">
+              <NeuralPanel />
             </div>
           )}
 

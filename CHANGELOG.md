@@ -5,6 +5,39 @@ All notable changes to Rainy Cowork will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.5] - 2026-02-02 - Neural Link UI
+
+### Added - Frontend Pairing Interface
+
+**Components (`src/components/neural/`)**
+
+- `NeuralPanel.tsx` - Primary UI for Neural Link management:
+  - Connection status card with real-time status indicators
+  - Node ID display with copy-to-clipboard functionality
+  - Reconnect button for error/offline states
+  - Security Approvals section for Airlock requests
+  - Pending approval cards with Approve/Deny buttons
+
+**Hooks (`src/hooks/`)**
+
+- `useNeuralService.ts` - React hook for Neural System integration:
+  - Automatic node registration on mount
+  - Heartbeat loop for connection maintenance
+  - Airlock event listener for approval requests
+  - `connect()`, `respond()` methods exposed
+
+**API Bindings (`src/services/tauri.ts`)**
+
+- Neural System types: `AirlockLevel`, `ApprovalRequest`, `SkillManifest`
+- Commands: `registerNode`, `sendHeartbeat`, `respondToAirlock`
+
+### Changed
+
+- `Sidebar.tsx` - Added "Neural Link" navigation item with Network icon
+- `App.tsx` - Added route handling for `neural-link` section
+
+---
+
 ## [0.5.4] - 2026-01-29 - Introduction of Distributed Neural System & Airlock
 
 ### Added - Desktop Nerve Center (Tauri)

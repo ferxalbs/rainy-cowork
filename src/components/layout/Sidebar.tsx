@@ -15,6 +15,7 @@ import {
   MessageSquare,
   FileText,
   Search,
+  Network,
 } from "lucide-react";
 import type { Folder } from "../../types";
 
@@ -192,6 +193,12 @@ export function Sidebar({
               <div className="flex items-center gap-2">
                 <Search className="size-4 shrink-0 text-green-500" />
                 <span>Research</span>
+              </div>
+            </ListBox.Item>
+            <ListBox.Item id="neural-link" textValue="Neural Link">
+              <div className="flex items-center gap-2">
+                <Network className="size-4 shrink-0 text-cyan-500" />
+                <span>Neural Link</span>
               </div>
             </ListBox.Item>
           </ListBox>
