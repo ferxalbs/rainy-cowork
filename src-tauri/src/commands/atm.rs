@@ -5,9 +5,10 @@ use tauri::{command, State};
 pub async fn bootstrap_atm(
     client: State<'_, ATMClient>,
     master_key: String,
+    user_api_key: String,
     name: String,
 ) -> Result<crate::services::atm_client::WorkspaceAuth, String> {
-    let auth = client.bootstrap(master_key, name).await?;
+    let auth = client.bootstrap(master_key, user_api_key, name).await?;
     // Automatically set credentials in client
     client.set_credentials(auth.api_key.clone()).await;
     Ok(auth)

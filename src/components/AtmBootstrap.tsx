@@ -4,6 +4,7 @@ import { Button, Input, Separator } from "@heroui/react";
 
 export function AtmBootstrap() {
   const [masterKey, setMasterKey] = useState("");
+  const [userApiKey, setUserApiKey] = useState("");
   const [workspaceName, setWorkspaceName] = useState("");
   const [status, setStatus] = useState<
     "idle" | "loading" | "success" | "error"
@@ -21,6 +22,7 @@ export function AtmBootstrap() {
     try {
       const res = await invoke("bootstrap_atm", {
         masterKey,
+        userApiKey,
         name: workspaceName,
       });
       setResult(res);
@@ -171,6 +173,20 @@ export function AtmBootstrap() {
                 </p>
               </div>
               <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium">
+                  User API Key (Creator Key)
+                </label>
+                <Input
+                  placeholder="rny_..."
+                  value={userApiKey}
+                  onChange={(e) => setUserApiKey(e.target.value)}
+                  type="password"
+                />
+                <p className="text-xs text-default-400">
+                  Required for Premium Agents (Gemini 3 Pro)
+                </p>
+              </div>
+              <div className="flex flex-col gap-1">
                 <label className="text-sm font-medium">Workspace Name</label>
                 <Input
                   placeholder="e.g. My Agency"
@@ -193,7 +209,7 @@ export function AtmBootstrap() {
           {status !== "success" && (
             <Button
               className="bg-primary text-white"
-              isDisabled={!masterKey || status === "loading"}
+              isDisabled={!masterKey || !userApiKey || status === "loading"}
               onPress={handleBootstrap}
             >
               {status === "loading"

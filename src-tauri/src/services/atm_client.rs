@@ -83,6 +83,7 @@ impl ATMClient {
     pub async fn bootstrap(
         &self,
         master_key: String,
+        user_api_key: String,
         name: String,
     ) -> Result<WorkspaceAuth, String> {
         let state = self.state.lock().await;
@@ -93,6 +94,7 @@ impl ATMClient {
             .post(&url)
             .json(&serde_json::json!({
                 "masterKey": master_key,
+                "apiKey": user_api_key,
                 "name": name,
                 "ownerId": "rainy-mate-desktop"
             }))
