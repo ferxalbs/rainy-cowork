@@ -23,6 +23,7 @@ import {
   ApprovalRequest,
   WorkspaceAuth,
   SkillManifest,
+  getNeuralCredentialsValues,
 } from "../../services/tauri";
 import { AgentList } from "./AgentList";
 import { CreateAgentForm } from "./CreateAgentForm";
@@ -32,14 +33,60 @@ const DEFAULT_SKILLS: SkillManifest[] = [
   {
     name: "file_ops",
     version: "1.0.0",
-    description: "File System Operations",
-    capabilities: ["read", "write", "move", "delete"],
+    methods: [
+      {
+        name: "read_file",
+        description: "Read file content",
+        airlockLevel: "Safe",
+        parameters: {
+          path: {
+            type: "string",
+            description: "Absolute path to file",
+            required: true,
+          },
+        },
+      },
+      {
+        name: "write_file",
+        description: "Write content to file",
+        airlockLevel: "Sensitive",
+        parameters: {
+          path: {
+            type: "string",
+            description: "Absolute path to file",
+            required: true,
+          },
+          content: {
+            type: "string",
+            description: "Content to write",
+            required: true,
+          },
+        },
+      },
+    ],
   },
   {
     name: "terminal",
     version: "1.0.0",
-    description: "Terminal Execution",
-    capabilities: ["exec"],
+    methods: [
+      {
+        name: "exec",
+        description: "Execute terminal command",
+        airlockLevel: "Dangerous",
+        parameters: {
+          command: {
+            type: "string",
+            description: "Command to execute",
+            required: true,
+          },
+          cwd: {
+            type: "string",
+            description: "Working directory",
+            required: false,
+          },
+        },
+      },
+    ],
   },
 ];
 type ConnectionStatus = "idle" | "loading" | "connected" | "error";
@@ -76,9 +123,14 @@ export function NeuralPanel() {
       try {
         const hasCredentials = await loadNeuralCredentials();
         if (hasCredentials) {
-          // We have credentials but need to re-bootstrap to get workspace
-          // For now, just show idle state - user will re-connect
           console.log("Credentials loaded from Keychain");
+          const creds = await getNeuralCredentialsValues();
+          if (creds) {
+            const [pk, uk] = creds;
+            setPlatformKey(pk);
+            setUserApiKey(uk);
+            toast.success("Credentials restored");
+          }
         }
       } catch (err) {
         console.error("Failed to load credentials:", err);

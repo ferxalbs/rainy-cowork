@@ -17,14 +17,60 @@ const DEFAULT_SKILLS: SkillManifest[] = [
   {
     name: "file_ops",
     version: "1.0.0",
-    description: "File System Operations",
-    capabilities: ["read", "write", "move", "delete"],
+    methods: [
+      {
+        name: "read_file",
+        description: "Read file content",
+        airlockLevel: "Safe",
+        parameters: {
+          path: {
+            type: "string",
+            description: "Absolute path to file",
+            required: true,
+          },
+        },
+      },
+      {
+        name: "write_file",
+        description: "Write content to file",
+        airlockLevel: "Sensitive",
+        parameters: {
+          path: {
+            type: "string",
+            description: "Absolute path to file",
+            required: true,
+          },
+          content: {
+            type: "string",
+            description: "Content to write",
+            required: true,
+          },
+        },
+      },
+    ],
   },
   {
     name: "terminal",
     version: "1.0.0",
-    description: "Terminal Execution",
-    capabilities: ["exec"],
+    methods: [
+      {
+        name: "exec",
+        description: "Execute terminal command",
+        airlockLevel: "Dangerous",
+        parameters: {
+          command: {
+            type: "string",
+            description: "Command to execute",
+            required: true,
+          },
+          cwd: {
+            type: "string",
+            description: "Working directory",
+            required: false,
+          },
+        },
+      },
+    ],
   },
 ];
 

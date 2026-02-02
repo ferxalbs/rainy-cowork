@@ -71,3 +71,10 @@ pub async fn load_neural_credentials(state: State<'_, NeuralServiceState>) -> Re
 pub async fn has_neural_credentials(state: State<'_, NeuralServiceState>) -> Result<bool, String> {
     Ok(state.0.has_credentials().await)
 }
+
+#[command]
+pub async fn get_neural_credentials_values(
+    state: State<'_, NeuralServiceState>,
+) -> Result<Option<(String, String)>, String> {
+    Ok(state.0.get_credentials().await)
+}

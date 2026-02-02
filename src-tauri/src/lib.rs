@@ -366,6 +366,7 @@ pub fn run() {
             commands::set_neural_credentials,
             commands::load_neural_credentials,
             commands::has_neural_credentials,
+            commands::get_neural_credentials_values,
             // Airlock Commands (Security)
             commands::respond_to_airlock,
             commands::get_pending_airlock_approvals,

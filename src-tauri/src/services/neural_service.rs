@@ -114,6 +114,16 @@ impl NeuralService {
         metadata.platform_key.is_some() && metadata.user_api_key.is_some()
     }
 
+    /// Retrieve credentials (for session persistence in UI)
+    pub async fn get_credentials(&self) -> Option<(String, String)> {
+        let metadata = self.metadata.lock().await;
+        if let (Some(pk), Some(uk)) = (&metadata.platform_key, &metadata.user_api_key) {
+            Some((pk.clone(), uk.clone()))
+        } else {
+            None
+        }
+    }
+
     /// Registers this Desktop Node with the Cloud Cortex
     pub async fn register(&self, skills: Vec<SkillManifest>) -> Result<String, String> {
         let mut metadata = self.metadata.lock().await;

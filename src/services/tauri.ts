@@ -1382,11 +1382,23 @@ export interface ApprovalRequest {
   requester_id?: string;
 }
 
+export interface ParameterSchema {
+  type: string;
+  required?: boolean;
+  description?: string;
+}
+
+export interface SkillMethod {
+  name: string;
+  description: string;
+  airlockLevel: "Safe" | "Sensitive" | "Dangerous";
+  parameters: Record<string, ParameterSchema>;
+}
+
 export interface SkillManifest {
   name: string;
   version: string;
-  description: string;
-  capabilities: string[];
+  methods: SkillMethod[];
 }
 
 export interface NeuralNodeInfo {
@@ -1445,6 +1457,12 @@ export async function loadNeuralCredentials(): Promise<boolean> {
 
 export async function hasNeuralCredentials(): Promise<boolean> {
   return invoke("has_neural_credentials");
+}
+
+export async function getNeuralCredentialsValues(): Promise<
+  [string, string] | null
+> {
+  return invoke("get_neural_credentials_values");
 }
 
 // ============ Agent Management Commands ============
