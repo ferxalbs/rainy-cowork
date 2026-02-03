@@ -4,7 +4,6 @@ use serde_json::Value;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::fs;
-use uuid::Uuid;
 
 #[derive(Clone)]
 pub struct SkillExecutor {
@@ -22,14 +21,9 @@ impl SkillExecutor {
         let skill = payload.skill.as_deref().unwrap_or("unknown");
         let method = payload.method.as_deref().unwrap_or("unknown");
 
-        let workspace_id_str = match &command.workspace_id {
-            Some(id) => id.as_str(),
+        let workspace_id = match &command.workspace_id {
+            Some(id) => id.clone(),
             None => return self.error("Missing workspace ID in command"),
-        };
-
-        let workspace_id = match Uuid::parse_str(workspace_id_str) {
-            Ok(uuid) => uuid,
-            Err(_) => return self.error("Invalid workspace ID format"),
         };
 
         match skill {
@@ -48,7 +42,7 @@ impl SkillExecutor {
 
     async fn execute_filesystem(
         &self,
-        workspace_id: Uuid,
+        workspace_id: String,
         method: &str,
         params: &Option<Value>,
     ) -> CommandResult {
@@ -71,7 +65,7 @@ impl SkillExecutor {
         }
     }
 
-    async fn resolve_path(&self, workspace_id: Uuid, path_str: &str) -> Result<PathBuf, String> {
+    async fn resolve_path(&self, workspace_id: String, path_str: &str) -> Result<PathBuf, String> {
         let workspace = self
             .workspace_manager
             .load_workspace(&workspace_id)
@@ -104,7 +98,7 @@ impl SkillExecutor {
         Ok(target_path)
     }
 
-    async fn handle_read_file(&self, workspace_id: Uuid, params: &Value) -> CommandResult {
+    async fn handle_read_file(&self, workspace_id: String, params: &Value) -> CommandResult {
         let path_str = match params.get("path").and_then(|v| v.as_str()) {
             Some(p) => p,
             None => return self.error("Missing path parameter"),
@@ -126,7 +120,7 @@ impl SkillExecutor {
         }
     }
 
-    async fn handle_list_files(&self, workspace_id: Uuid, params: &Value) -> CommandResult {
+    async fn handle_list_files(&self, workspace_id: String, params: &Value) -> CommandResult {
         let path_str = params.get("path").and_then(|v| v.as_str()).unwrap_or(".");
         let path = match self.resolve_path(workspace_id, path_str).await {
             Ok(p) => p,
@@ -157,12 +151,12 @@ impl SkillExecutor {
         }
     }
 
-    async fn handle_search_files(&self, _workspace_id: Uuid, _params: &Value) -> CommandResult {
+    async fn handle_search_files(&self, _workspace_id: String, _params: &Value) -> CommandResult {
         // Placeholder
         self.error("search_files not implemented yet")
     }
 
-    async fn handle_write_file(&self, workspace_id: Uuid, params: &Value) -> CommandResult {
+    async fn handle_write_file(&self, workspace_id: String, params: &Value) -> CommandResult {
         let path_str = match params.get("path").and_then(|v| v.as_str()) {
             Some(p) => p,
             None => return self.error("Missing path parameter"),

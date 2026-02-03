@@ -8,7 +8,7 @@ use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Workspace {
-    pub id: Uuid,
+    pub id: String,
     pub name: String,
     pub allowed_paths: Vec<String>,
     pub permissions: WorkspacePermissions,
@@ -48,7 +48,7 @@ pub struct WorkspaceTemplate {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkspaceAnalytics {
-    pub workspace_id: Uuid,
+    pub workspace_id: String,
     pub total_files: u64,
     pub total_folders: u64,
     pub total_operations: u64,
@@ -108,7 +108,7 @@ impl WorkspaceManager {
         name: String,
         allowed_paths: Vec<String>,
     ) -> Result<Workspace, Box<dyn std::error::Error>> {
-        let id = Uuid::new_v4();
+        let id = Uuid::new_v4().to_string();
         let workspace = Workspace {
             id,
             name,
@@ -141,7 +141,7 @@ impl WorkspaceManager {
         Ok(workspace)
     }
 
-    pub fn load_workspace(&self, id: &Uuid) -> Result<Workspace, Box<dyn std::error::Error>> {
+    pub fn load_workspace(&self, id: &str) -> Result<Workspace, Box<dyn std::error::Error>> {
         let json_path = self.workspaces_dir.join(format!("{}.json", id));
         let toml_path = self.workspaces_dir.join(format!("{}.toml", id));
 
@@ -176,7 +176,7 @@ impl WorkspaceManager {
         Ok(())
     }
 
-    pub fn list_workspaces(&self) -> Result<Vec<Uuid>, Box<dyn std::error::Error>> {
+    pub fn list_workspaces(&self) -> Result<Vec<String>, Box<dyn std::error::Error>> {
         let mut workspaces = Vec::new();
 
         for entry in fs::read_dir(&self.workspaces_dir)? {
@@ -186,9 +186,8 @@ impl WorkspaceManager {
             if let Some(extension) = path.extension() {
                 if extension == "json" || extension == "toml" {
                     if let Some(stem) = path.file_stem() {
-                        if let Ok(id) = Uuid::parse_str(&stem.to_string_lossy()) {
-                            workspaces.push(id);
-                        }
+                        // Accept any string ID now
+                        workspaces.push(stem.to_string_lossy().to_string());
                     }
                 }
             }
@@ -197,7 +196,7 @@ impl WorkspaceManager {
         Ok(workspaces)
     }
 
-    pub fn delete_workspace(&self, id: &Uuid) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn delete_workspace(&self, id: &str) -> Result<(), Box<dyn std::error::Error>> {
         let json_path = self.workspaces_dir.join(format!("{}.json", id));
         let toml_path = self.workspaces_dir.join(format!("{}.toml", id));
 
@@ -503,7 +502,7 @@ impl WorkspaceManager {
         let allowed_paths = custom_paths.unwrap_or_else(|| template.suggested_paths.clone());
 
         let workspace = Workspace {
-            id: Uuid::new_v4(),
+            id: Uuid::new_v4().to_string(),
             name,
             allowed_paths,
             permissions: template.default_permissions.clone(),
@@ -566,7 +565,7 @@ impl WorkspaceManager {
     /// Get analytics for a workspace
     pub fn get_analytics(
         &self,
-        workspace_id: &Uuid,
+        workspace_id: &str,
     ) -> Result<WorkspaceAnalytics, Box<dyn std::error::Error>> {
         // Load workspace
         let workspace = self.load_workspace(workspace_id)?;

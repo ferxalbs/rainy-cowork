@@ -268,7 +268,7 @@ impl CoworkAgent {
         // Create and set workspace context for file operations
         // This is an ad-hoc workspace based on the user's selected folder
         let adhoc_workspace = crate::services::workspace::Workspace {
-            id: uuid::Uuid::new_v4(),
+            id: uuid::Uuid::new_v4().to_string(),
             name: format!("Cowork - {}", workspace_path),
             allowed_paths: vec![workspace_path.to_string()],
             permissions: crate::services::workspace::WorkspacePermissions {

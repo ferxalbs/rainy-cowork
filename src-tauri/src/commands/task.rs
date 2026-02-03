@@ -34,13 +34,9 @@ pub async fn set_task_manager_workspace(
         .await
         .ok_or_else(|| format!("Folder not found: {}", workspace_id))?;
 
-    // Parse folder ID as UUID
-    let uuid = uuid::Uuid::parse_str(&folder.id)
-        .map_err(|e| format!("Invalid folder ID: {}", e))?;
-
     // Convert folder to workspace for task manager
     let workspace = crate::services::workspace::Workspace {
-        id: uuid,
+        id: folder.id.clone(),
         name: folder.name,
         allowed_paths: vec![folder.path.clone()],
         permissions: crate::services::workspace::WorkspacePermissions {
@@ -128,7 +124,9 @@ pub async fn save_task_queue_state(
     path: String,
     task_manager: State<'_, crate::services::TaskManager>,
 ) -> Result<(), String> {
-    task_manager.save_state(&std::path::PathBuf::from(path)).await
+    task_manager
+        .save_state(&std::path::PathBuf::from(path))
+        .await
         .map_err(|e| e.to_string())
 }
 
@@ -138,7 +136,9 @@ pub async fn load_task_queue_state(
     path: String,
     task_manager: State<'_, crate::services::TaskManager>,
 ) -> Result<(), String> {
-    task_manager.load_state(&std::path::PathBuf::from(path)).await
+    task_manager
+        .load_state(&std::path::PathBuf::from(path))
+        .await
         .map_err(|e| e.to_string())
 }
 

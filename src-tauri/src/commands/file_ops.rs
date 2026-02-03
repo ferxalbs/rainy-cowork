@@ -269,11 +269,8 @@ pub async fn set_file_ops_workspace(
     workspace_manager: State<'_, Arc<crate::services::WorkspaceManager>>,
     file_ops: State<'_, Arc<FileOperationEngine>>,
 ) -> Result<(), String> {
-    let uuid =
-        uuid::Uuid::parse_str(&workspace_id).map_err(|e| format!("Invalid workspace ID: {}", e))?;
-
     let workspace = workspace_manager
-        .load_workspace(&uuid)
+        .load_workspace(&workspace_id)
         .map_err(|e| format!("Failed to load workspace: {}", e))?;
 
     file_ops.set_workspace(workspace).await;

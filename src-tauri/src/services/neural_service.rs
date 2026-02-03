@@ -252,6 +252,7 @@ impl NeuralService {
     pub async fn start_command(&self, command_id: &str) -> Result<(), String> {
         let metadata = self.metadata.lock().await;
         let node_id = metadata.node_id.as_ref().ok_or("Node not registered")?;
+        let platform_key = metadata.platform_key.as_ref().ok_or("Not authenticated")?;
 
         let url = format!(
             "{}/v1/nodes/{}/commands/{}/start",
@@ -261,6 +262,7 @@ impl NeuralService {
         let res = self
             .http
             .post(&url)
+            .header("Authorization", format!("Bearer {}", platform_key))
             .send()
             .await
             .map_err(|e| e.to_string())?;
@@ -280,6 +282,7 @@ impl NeuralService {
     ) -> Result<(), String> {
         let metadata = self.metadata.lock().await;
         let node_id = metadata.node_id.as_ref().ok_or("Node not registered")?;
+        let platform_key = metadata.platform_key.as_ref().ok_or("Not authenticated")?;
 
         let url = format!(
             "{}/v1/nodes/{}/commands/{}/complete",
@@ -289,6 +292,7 @@ impl NeuralService {
         let res = self
             .http
             .post(&url)
+            .header("Authorization", format!("Bearer {}", platform_key))
             .json(&result)
             .send()
             .await

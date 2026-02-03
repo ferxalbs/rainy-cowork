@@ -4,7 +4,6 @@
 use crate::services::{PermissionOverride, Workspace, WorkspaceManager, WorkspacePermissions};
 use std::sync::Arc;
 use tauri::State;
-use uuid::Uuid;
 
 /// Create a new workspace
 #[tauri::command]
@@ -24,9 +23,8 @@ pub async fn load_workspace(
     id: String,
     workspace_manager: State<'_, Arc<WorkspaceManager>>,
 ) -> Result<Workspace, String> {
-    let uuid = Uuid::parse_str(&id).map_err(|e| format!("Invalid UUID: {}", e))?;
     workspace_manager
-        .load_workspace(&uuid)
+        .load_workspace(&id)
         .map_err(|e| e.to_string())
 }
 
@@ -53,11 +51,9 @@ pub async fn save_workspace(
 pub async fn list_workspaces(
     workspace_manager: State<'_, Arc<WorkspaceManager>>,
 ) -> Result<Vec<String>, String> {
-    let ids = workspace_manager
+    workspace_manager
         .list_workspaces()
-        .map_err(|e| e.to_string())?;
-
-    Ok(ids.iter().map(|id| id.to_string()).collect())
+        .map_err(|e| e.to_string())
 }
 
 /// Delete a workspace by ID
@@ -66,9 +62,8 @@ pub async fn delete_workspace(
     id: String,
     workspace_manager: State<'_, Arc<WorkspaceManager>>,
 ) -> Result<(), String> {
-    let uuid = Uuid::parse_str(&id).map_err(|e| format!("Invalid UUID: {}", e))?;
     workspace_manager
-        .delete_workspace(&uuid)
+        .delete_workspace(&id)
         .map_err(|e| e.to_string())
 }
 
@@ -80,9 +75,8 @@ pub async fn add_permission_override(
     permissions: WorkspacePermissions,
     workspace_manager: State<'_, Arc<WorkspaceManager>>,
 ) -> Result<(), String> {
-    let uuid = Uuid::parse_str(&workspace_id).map_err(|e| format!("Invalid UUID: {}", e))?;
     let mut workspace = workspace_manager
-        .load_workspace(&uuid)
+        .load_workspace(&workspace_id)
         .map_err(|e| format!("Failed to load workspace: {}", e))?;
 
     workspace_manager
@@ -104,9 +98,8 @@ pub async fn remove_permission_override(
     path: String,
     workspace_manager: State<'_, Arc<WorkspaceManager>>,
 ) -> Result<(), String> {
-    let uuid = Uuid::parse_str(&workspace_id).map_err(|e| format!("Invalid UUID: {}", e))?;
     let mut workspace = workspace_manager
-        .load_workspace(&uuid)
+        .load_workspace(&workspace_id)
         .map_err(|e| format!("Failed to load workspace: {}", e))?;
 
     workspace_manager
@@ -127,9 +120,8 @@ pub async fn get_permission_overrides(
     workspace_id: String,
     workspace_manager: State<'_, Arc<WorkspaceManager>>,
 ) -> Result<Vec<PermissionOverride>, String> {
-    let uuid = Uuid::parse_str(&workspace_id).map_err(|e| format!("Invalid UUID: {}", e))?;
     let workspace = workspace_manager
-        .load_workspace(&uuid)
+        .load_workspace(&workspace_id)
         .map_err(|e| format!("Failed to load workspace: {}", e))?;
 
     Ok(workspace_manager.get_permission_overrides(&workspace))
@@ -142,9 +134,8 @@ pub async fn get_effective_permissions(
     path: String,
     workspace_manager: State<'_, Arc<WorkspaceManager>>,
 ) -> Result<WorkspacePermissions, String> {
-    let uuid = Uuid::parse_str(&workspace_id).map_err(|e| format!("Invalid UUID: {}", e))?;
     let workspace = workspace_manager
-        .load_workspace(&uuid)
+        .load_workspace(&workspace_id)
         .map_err(|e| format!("Failed to load workspace: {}", e))?;
 
     Ok(workspace_manager.get_effective_permissions(&workspace, &path))
@@ -155,9 +146,7 @@ pub async fn get_effective_permissions(
 pub async fn get_workspace_templates(
     workspace_manager: State<'_, Arc<WorkspaceManager>>,
 ) -> Result<Vec<crate::services::WorkspaceTemplate>, String> {
-    workspace_manager
-        .get_templates()
-        .map_err(|e| e.to_string())
+    workspace_manager.get_templates().map_err(|e| e.to_string())
 }
 
 /// Create a workspace from a template
@@ -201,8 +190,7 @@ pub async fn get_workspace_analytics(
     workspace_id: String,
     workspace_manager: State<'_, Arc<WorkspaceManager>>,
 ) -> Result<crate::services::WorkspaceAnalytics, String> {
-    let uuid = Uuid::parse_str(&workspace_id).map_err(|e| format!("Invalid UUID: {}", e))?;
     workspace_manager
-        .get_analytics(&uuid)
+        .get_analytics(&workspace_id)
         .map_err(|e| e.to_string())
 }

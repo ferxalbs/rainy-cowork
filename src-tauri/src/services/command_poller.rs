@@ -138,16 +138,31 @@ impl CommandPoller {
             }
 
             // Notify start
-            let _ = self.neural_service.start_command(&command.id).await;
+            if let Err(e) = self.neural_service.start_command(&command.id).await {
+                eprintln!(
+                    "[CommandPoller] Failed to mark command {} as started: {}",
+                    command.id, e
+                );
+            }
 
             // Execute
             let result = self.skill_executor.execute(&command).await;
+            println!(
+                "[CommandPoller] Execution result for {}: success={}",
+                command.id, result.success
+            );
 
             // Report result
-            let _ = self
+            if let Err(e) = self
                 .neural_service
                 .complete_command(&command.id, result)
-                .await;
+                .await
+            {
+                eprintln!(
+                    "[CommandPoller] Failed to report completion for {}: {}",
+                    command.id, e
+                );
+            }
         }
 
         Ok(())
