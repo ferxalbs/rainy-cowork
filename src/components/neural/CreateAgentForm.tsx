@@ -40,7 +40,7 @@ export function CreateAgentForm({ onSuccess, onCancel }: CreateAgentFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const config = {
-    prompt,
+    systemPrompt: prompt,
     model,
     temperature,
     maxTokens,

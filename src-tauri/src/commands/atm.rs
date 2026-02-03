@@ -18,12 +18,12 @@ pub async fn bootstrap_atm(
 pub async fn create_atm_agent(
     client: State<'_, ATMClient>,
     name: String,
-    type_: String,
+    agent_type: String,
     config: serde_json::Value,
 ) -> Result<serde_json::Value, String> {
     let params = CreateAgentParams {
         name,
-        type_,
+        type_: agent_type,
         config,
     };
     client.create_agent(params).await

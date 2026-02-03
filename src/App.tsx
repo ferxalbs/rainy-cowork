@@ -4,7 +4,7 @@ import { SettingsPage } from "./components/settings";
 import { AgentChatPanel } from "./components/agent-chat/AgentChatPanel";
 import { AtmBootstrap } from "./components/AtmBootstrap";
 import { NeuralPanel } from "./components/neural";
-import { Button, Card } from "@heroui/react";
+import { Button, Card, Toast } from "@heroui/react";
 import { AlertCircle, FolderPlus } from "lucide-react";
 import { useAIProvider, useFolderManager } from "./hooks";
 import type { Folder } from "./types";
@@ -186,7 +186,8 @@ function App() {
         </div>
       </TahoeLayout>
 
-      {/* Settings Modal Removed */}
+      {/* Toast Container for notifications */}
+      <Toast.Container className="bg-background/20" />
     </>
   );
 }

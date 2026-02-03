@@ -1480,7 +1480,7 @@ export async function createAtmAgent(
   type: string,
   config: any,
 ): Promise<any> {
-  return invoke("create_atm_agent", { name, type_: type, config });
+  return invoke("create_atm_agent", { name, agentType: type, config });
 }
 
 // ============ ATM Bootstrap Commands ============
