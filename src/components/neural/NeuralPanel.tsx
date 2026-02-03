@@ -24,6 +24,7 @@ import {
   WorkspaceAuth,
   SkillManifest,
   getNeuralCredentialsValues,
+  AirlockLevels,
 } from "../../services/tauri";
 import { AgentList } from "./AgentList";
 import { CreateAgentForm } from "./CreateAgentForm";
@@ -37,7 +38,7 @@ const DEFAULT_SKILLS: SkillManifest[] = [
       {
         name: "read_file",
         description: "Read file content",
-        airlockLevel: "Safe",
+        airlockLevel: AirlockLevels.Safe,
         parameters: {
           path: {
             type: "string",
@@ -49,7 +50,7 @@ const DEFAULT_SKILLS: SkillManifest[] = [
       {
         name: "write_file",
         description: "Write content to file",
-        airlockLevel: "Sensitive",
+        airlockLevel: AirlockLevels.Sensitive,
         parameters: {
           path: {
             type: "string",
@@ -72,7 +73,7 @@ const DEFAULT_SKILLS: SkillManifest[] = [
       {
         name: "exec",
         description: "Execute terminal command",
-        airlockLevel: "Dangerous",
+        airlockLevel: AirlockLevels.Dangerous,
         parameters: {
           command: {
             type: "string",
@@ -595,15 +596,19 @@ export function NeuralPanel() {
                     <div className="flex items-center gap-2">
                       <Chip
                         color={
-                          request.level === "Dangerous"
+                          request.level === AirlockLevels.Dangerous
                             ? "danger"
-                            : request.level === "Sensitive"
+                            : request.level === AirlockLevels.Sensitive
                               ? "warning"
                               : "success"
                         }
                         size="sm"
                       >
-                        {request.level}
+                        {request.level === AirlockLevels.Dangerous
+                          ? "Dangerous"
+                          : request.level === AirlockLevels.Sensitive
+                            ? "Sensitive"
+                            : "Safe"}
                       </Chip>
                       <span className="font-medium">
                         {request.command_type}

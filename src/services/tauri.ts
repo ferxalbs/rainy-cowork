@@ -1371,7 +1371,19 @@ export async function routerHasProviders(): Promise<boolean> {
 
 // ============ Neural System Types ============
 
-export type AirlockLevel = "Safe" | "Sensitive" | "Dangerous";
+/**
+ * Airlock Levels:
+ * 0 = Safe (auto-approved)
+ * 1 = Sensitive (notify user)
+ * 2 = Dangerous (require explicit approval)
+ */
+export type AirlockLevel = 0 | 1 | 2;
+
+export const AirlockLevels = {
+  Safe: 0 as const,
+  Sensitive: 1 as const,
+  Dangerous: 2 as const,
+};
 
 export interface ApprovalRequest {
   id: string;
@@ -1391,7 +1403,7 @@ export interface ParameterSchema {
 export interface SkillMethod {
   name: string;
   description: string;
-  airlockLevel: "Safe" | "Sensitive" | "Dangerous";
+  airlockLevel: AirlockLevel;
   parameters: Record<string, ParameterSchema>;
 }
 

@@ -58,7 +58,9 @@ pub struct ParameterSchema {
 // The Airlock (Security Firewall)
 // ──────────────────────────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, PartialOrd, Default)]
+use serde_repr::{Deserialize_repr, Serialize_repr};
+
+#[derive(Debug, Clone, Copy, Serialize_repr, Deserialize_repr, PartialEq, PartialOrd, Default)]
 #[repr(u8)]
 pub enum AirlockLevel {
     #[default]
@@ -142,7 +144,8 @@ pub struct QueuedCommand {
     pub workspace_id: Option<String>,
     #[serde(default)]
     pub desktop_node_id: Option<String>,
-    pub intent: RainyIntent,
+    /// The intent format is "skill.method" e.g. "filesystem.list_files"
+    pub intent: String,
     pub payload: RainyPayload,
     #[serde(default)]
     pub priority: CommandPriority,

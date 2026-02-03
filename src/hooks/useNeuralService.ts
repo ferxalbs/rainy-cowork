@@ -9,6 +9,7 @@ import {
   SkillManifest,
   DesktopNodeStatus,
   setHeadlessMode,
+  AirlockLevels,
 } from "../services/tauri";
 import { toast } from "@heroui/react";
 
@@ -21,7 +22,7 @@ const DEFAULT_SKILLS: SkillManifest[] = [
       {
         name: "read_file",
         description: "Read file content",
-        airlockLevel: "Safe",
+        airlockLevel: AirlockLevels.Safe,
         parameters: {
           path: {
             type: "string",
@@ -33,7 +34,7 @@ const DEFAULT_SKILLS: SkillManifest[] = [
       {
         name: "write_file",
         description: "Write content to file",
-        airlockLevel: "Sensitive",
+        airlockLevel: AirlockLevels.Sensitive,
         parameters: {
           path: {
             type: "string",
@@ -56,7 +57,7 @@ const DEFAULT_SKILLS: SkillManifest[] = [
       {
         name: "exec",
         description: "Execute terminal command",
-        airlockLevel: "Dangerous",
+        airlockLevel: AirlockLevels.Dangerous,
         parameters: {
           command: {
             type: "string",
