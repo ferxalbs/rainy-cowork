@@ -125,7 +125,7 @@ impl AirlockService {
         // Create approval request for frontend
         let request = ApprovalRequest {
             command_id: command.id.clone(),
-            intent: format!("{:?}", command.intent),
+            intent: command.intent.clone(),
             payload_summary: serde_json::to_string(&command.payload).unwrap_or_default(),
             airlock_level: command.airlock_level,
             timestamp: chrono::Utc::now().timestamp_millis(),
