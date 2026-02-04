@@ -95,9 +95,9 @@ export function CreateAgentForm({ onSuccess, onCancel }: CreateAgentFormProps) {
   };
 
   return (
-    <div className="flex flex-col gap-8 p-1">
+    <div className="flex flex-col gap-8 p-1 text-foreground relative z-50">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <TextField className="w-full">
+        <TextField className="w-full text-foreground">
           <Label className="text-xs font-semibold uppercase tracking-wider text-default-500 mb-1.5 ml-1">
             Agent Name
           </Label>
@@ -105,7 +105,7 @@ export function CreateAgentForm({ onSuccess, onCancel }: CreateAgentFormProps) {
             placeholder="e.g., Sales Assistant"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full h-11 bg-background/40 backdrop-blur-sm border-white/5 hover:border-white/10 focus:border-primary/50 transition-colors"
+            className="w-full h-11 bg-zinc-800/50 backdrop-blur-sm border-white/10 hover:border-white/20 focus:border-primary/50 transition-colors text-foreground placeholder:text-muted-foreground"
           />
         </TextField>
 
@@ -114,11 +114,11 @@ export function CreateAgentForm({ onSuccess, onCancel }: CreateAgentFormProps) {
           selectedKey={type}
           onSelectionChange={(key) => setType(key as string)}
         >
-          <Label className="text-xs font-semibold uppercase tracking-wider text-default-500 mb-1.5 ml-1">
+          <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5 ml-1">
             Agent Type
           </Label>
-          <Select.Trigger className="h-11 bg-background/40 backdrop-blur-sm border-white/5 hover:border-white/10 focus:border-primary/50 transition-colors">
-            <Select.Value className="flex items-center gap-2">
+          <Select.Trigger className="h-11 bg-zinc-800/50 backdrop-blur-sm border-white/10 hover:border-white/20 focus:border-primary/50 transition-colors text-foreground">
+            <Select.Value className="flex items-center gap-2 text-foreground">
               {({ selectedItem, defaultChildren }) => {
                 const selectedKey = (selectedItem as any)?.key;
                 const selectedType = AGENT_TYPES.find(
@@ -127,17 +127,19 @@ export function CreateAgentForm({ onSuccess, onCancel }: CreateAgentFormProps) {
                 return (
                   <div className="flex items-center gap-2">
                     {selectedType?.icon}
-                    <span>{selectedType?.label || defaultChildren}</span>
+                    <span className="text-foreground">
+                      {selectedType?.label || defaultChildren}
+                    </span>
                   </div>
                 );
               }}
             </Select.Value>
             <Select.Indicator>
-              <ChevronDown className="size-4 opacity-50" />
+              <ChevronDown className="size-4 opacity-50 text-foreground" />
             </Select.Indicator>
           </Select.Trigger>
-          <Select.Popover>
-            <ListBox>
+          <Select.Popover className="bg-zinc-900 border border-white/10">
+            <ListBox className="bg-zinc-900 text-foreground">
               {AGENT_TYPES.map((t) => (
                 <ListBox.Item key={t.key} id={t.key} textValue={t.label}>
                   <div className="flex items-center gap-2">
@@ -156,25 +158,32 @@ export function CreateAgentForm({ onSuccess, onCancel }: CreateAgentFormProps) {
         selectedKey={model}
         onSelectionChange={(key) => setModel(key as string)}
       >
-        <Label className="text-xs font-semibold uppercase tracking-wider text-default-500 mb-1.5 ml-1">
+        <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5 ml-1">
           Model (Gemini 3 Family)
         </Label>
-        <Select.Trigger className="h-11 font-mono text-xs bg-background/40 backdrop-blur-sm border-white/5 hover:border-white/10 focus:border-primary/50 transition-colors">
-          <Select.Value />
+        <Select.Trigger className="h-11 font-mono text-xs bg-zinc-800/50 backdrop-blur-sm border-white/10 hover:border-white/20 focus:border-primary/50 transition-colors text-foreground">
+          <Select.Value className="text-foreground" />
           <Select.Indicator>
-            <ChevronDown className="size-4 opacity-50" />
+            <ChevronDown className="size-4 opacity-50 text-foreground" />
           </Select.Indicator>
         </Select.Trigger>
         <Description className="text-[10px] mt-1 text-default-400 font-medium">
           All models support up to 1M token input context
         </Description>
-        <Select.Popover>
-          <ListBox>
+        <Select.Popover className="bg-zinc-900 border border-white/10">
+          <ListBox className="bg-zinc-900 text-foreground">
             {GEMINI_MODELS.map((m) => (
-              <ListBox.Item key={m.key} id={m.key} textValue={m.label}>
+              <ListBox.Item
+                key={m.key}
+                id={m.key}
+                textValue={m.label}
+                className="data-[hover=true]:bg-white/5"
+              >
                 <div className="flex flex-col gap-0.5">
-                  <span className="font-medium text-sm">{m.label}</span>
-                  <span className="text-[10px] text-default-500">
+                  <span className="font-medium text-sm text-foreground">
+                    {m.label}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">
                     {m.description}
                   </span>
                 </div>
@@ -235,14 +244,14 @@ export function CreateAgentForm({ onSuccess, onCancel }: CreateAgentFormProps) {
       </div>
 
       <TextField className="w-full">
-        <Label className="text-xs font-semibold uppercase tracking-wider text-default-500 mb-1.5 ml-1">
+        <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5 ml-1">
           System Prompt
         </Label>
         <TextArea
           placeholder="You are a helpful assistant who..."
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
-          className="w-full min-h-[120px] bg-background/40 backdrop-blur-sm border-white/5 hover:border-white/10 focus:border-primary/50 transition-colors"
+          className="w-full min-h-[120px] bg-zinc-800/50 backdrop-blur-sm border-white/10 hover:border-white/20 focus:border-primary/50 transition-colors text-foreground placeholder:text-muted-foreground"
         />
       </TextField>
 

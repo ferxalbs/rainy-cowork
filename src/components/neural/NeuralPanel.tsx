@@ -15,8 +15,6 @@ import {
   CheckCircle2,
   XCircle,
   Smartphone,
-  Bot,
-  Plus,
   Unplug,
   Sparkles,
   ExternalLink,
@@ -421,39 +419,59 @@ export function NeuralPanel() {
                 </div>
 
                 {/* Settings Column */}
-                <div className="flex flex-col gap-4 justify-center md:items-end">
+                <div className="flex flex-col gap-4 justify-center md:items-end font-sans">
                   {/* Headless Toggle */}
-                  <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-white/5 hover:bg-white/10 transition-colors border border-white/5 w-full max-w-xs">
-                    <div className="flex items-center gap-3">
-                      <Shield className="size-4 text-purple-400" />
-                      <span className="text-sm font-medium">Headless Mode</span>
+                  <div className="flex items-center justify-between gap-4 p-5 rounded-2xl bg-default-100/40 hover:bg-default-100/60 transition-all border border-white/5 hover:border-white/10 w-full backdrop-blur-xl group">
+                    <div className="flex items-center gap-4">
+                      <div className="size-10 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-400 group-hover:scale-110 transition-transform">
+                        <Shield className="size-5" />
+                      </div>
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-sm font-semibold text-foreground">
+                          Headless Mode
+                        </span>
+                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
+                          {isHeadless ? "Active" : "Disabled"}
+                        </span>
+                      </div>
                     </div>
                     <Switch
                       isSelected={isHeadless}
-                      onChange={(e) =>
-                        handleToggleHeadless((e as any).target?.checked ?? e)
-                      }
-                      size="sm"
-                    >
-                      <Switch.Thumb />
-                    </Switch>
+                      onChange={handleToggleHeadless}
+                      size="lg"
+                      className="group-data-[selected=true]:bg-purple-500"
+                    />
                   </div>
 
                   {/* Mobile Link */}
-                  <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-white/5 hover:bg-white/10 transition-colors border border-white/5 w-full max-w-xs">
-                    <div className="flex items-center gap-3">
-                      <Smartphone className="size-4 text-primary" />
-                      <span className="text-sm font-medium">Mobile Link</span>
+                  <div className="flex items-center justify-between gap-4 p-5 rounded-2xl bg-default-100/40 hover:bg-default-100/60 transition-all border border-white/5 hover:border-white/10 w-full backdrop-blur-xl group">
+                    <div className="flex items-center gap-4">
+                      <div className="size-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400 group-hover:scale-110 transition-transform">
+                        <Smartphone className="size-5" />
+                      </div>
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-sm font-semibold text-foreground">
+                          Mobile Link
+                        </span>
+                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
+                          Remote Access
+                        </span>
+                      </div>
                     </div>
                     {pairingCode ? (
-                      <span className="font-mono font-bold text-primary tracking-wider">
-                        {pairingCode}
-                      </span>
+                      <div className="flex flex-col items-end">
+                        <span className="font-mono text-xl font-bold text-blue-400 tracking-widest">
+                          {pairingCode}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">
+                          Expires in 5m
+                        </span>
+                      </div>
                     ) : (
                       <Button
                         size="sm"
                         variant="ghost"
-                        className="h-6 text-xs px-2"
+                        className="font-semibold text-primary"
                         onPress={handleGeneratePairingCode}
                       >
                         Generate
@@ -467,22 +485,6 @@ export function NeuralPanel() {
 
               {/* Agents Section - Clean List */}
               <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold flex items-center gap-2">
-                    <Bot className="size-4 text-purple-500" />
-                    Cloud Agents
-                  </h3>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="hover:bg-primary/10 hover:text-primary transition-colors"
-                    onPress={() => setIsCreatingAgent(true)}
-                  >
-                    <Plus className="size-4 mr-2" />
-                    Deploy Agent
-                  </Button>
-                </div>
-
                 {/* Agent List Container - Transparent */}
                 <div className="rounded-xl border border-white/5 bg-background/20 backdrop-blur-md overflow-hidden p-1">
                   <AgentList onCreateClick={() => setIsCreatingAgent(true)} />
@@ -561,32 +563,33 @@ export function NeuralPanel() {
 
           {/* CREATE AGENT MODAL - Floating & Blurry */}
           <Modal isOpen={isCreatingAgent} onOpenChange={setIsCreatingAgent}>
-            <Modal.Backdrop className="backdrop-blur-xl bg-black/40" />
-            <Modal.Container>
-              <Modal.Dialog className="backdrop-blur-3xl bg-background/80 border border-white/10 shadow-2xl shadow-black/50 max-w-2xl w-full rounded-3xl">
-                <Modal.Header className="px-8 pt-8 pb-4 border-b border-white/5">
-                  <div className="flex items-center gap-4">
-                    <div className="size-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
-                      <Sparkles className="size-5" />
+            <Modal.Backdrop className="backdrop-blur-xl bg-black/60">
+              <Modal.Container>
+                <Modal.Dialog className="bg-zinc-900 border border-white/10 shadow-2xl shadow-black/50 max-w-2xl w-full rounded-3xl relative z-[100]">
+                  <Modal.Header className="px-8 pt-8 pb-4 border-b border-white/5">
+                    <div className="flex items-center gap-4">
+                      <div className="size-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                        <Sparkles className="size-5" />
+                      </div>
+                      <div>
+                        <Modal.Heading className="text-xl font-bold tracking-tight text-foreground">
+                          Deploy Cloud Agent
+                        </Modal.Heading>
+                        <p className="text-xs text-muted-foreground font-medium uppercase tracking-widest mt-0.5">
+                          New Instance
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <Modal.Heading className="text-xl font-bold tracking-tight">
-                        Deploy Cloud Agent
-                      </Modal.Heading>
-                      <p className="text-xs text-muted-foreground font-medium uppercase tracking-widest mt-0.5">
-                        New Instance
-                      </p>
-                    </div>
-                  </div>
-                </Modal.Header>
-                <Modal.Body className="p-8">
-                  <CreateAgentForm
-                    onSuccess={() => setIsCreatingAgent(false)}
-                    onCancel={() => setIsCreatingAgent(false)}
-                  />
-                </Modal.Body>
-              </Modal.Dialog>
-            </Modal.Container>
+                  </Modal.Header>
+                  <Modal.Body className="p-8 relative z-[101]">
+                    <CreateAgentForm
+                      onSuccess={() => setIsCreatingAgent(false)}
+                      onCancel={() => setIsCreatingAgent(false)}
+                    />
+                  </Modal.Body>
+                </Modal.Dialog>
+              </Modal.Container>
+            </Modal.Backdrop>
           </Modal>
         </div>
       </div>
