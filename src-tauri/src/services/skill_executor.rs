@@ -89,19 +89,48 @@ impl SkillExecutor {
         path_str: &str,
         allowed_paths: &[String],
     ) -> Result<PathBuf, String> {
+        let path_buf = PathBuf::from(path_str);
+
+        // FAST PATH: If the path is absolute, validate it directly
+        if path_buf.is_absolute() {
+            // Try to load workspace to get allowed paths
+            let workspace_allowed = match self.workspace_manager.load_workspace(&workspace_id) {
+                Ok(ws) => ws.allowed_paths,
+                Err(_) => {
+                    // Use Cloud-provided allowed_paths
+                    if !allowed_paths.is_empty() {
+                        allowed_paths.to_vec()
+                    } else {
+                        // No restrictions, allow absolute path as-is (bootstrap mode)
+                        return Ok(path_buf);
+                    }
+                }
+            };
+
+            // If we have allowed paths, validate the absolute path is within them
+            if !workspace_allowed.is_empty() {
+                let is_allowed = workspace_allowed
+                    .iter()
+                    .any(|allowed| path_str.starts_with(allowed));
+
+                if !is_allowed {
+                    return Err(format!(
+                        "Path '{}' is outside allowed workspace paths",
+                        path_str
+                    ));
+                }
+            }
+
+            return Ok(path_buf);
+        }
+
+        // RELATIVE PATH: Resolve against workspace root
         // Try to load workspace locally first
         let workspace_allowed_paths = match self.workspace_manager.load_workspace(&workspace_id) {
             Ok(ws) => ws.allowed_paths,
             Err(_) => {
                 // Fallback to allowed_paths from command payload (Cloud-provided)
                 if allowed_paths.is_empty() {
-                    // SECOND FALLBACK: If the requested path is absolute, use it as the allowed path
-                    // This allows "bootstrapping" a workspace from a single absolute path command
-                    let path_buf = PathBuf::from(path_str);
-                    if path_buf.is_absolute() {
-                        return Ok(path_buf); // It is its own root
-                    }
-
                     return Err(format!(
                         "No workspace context found. Please provide an absolute path (e.g. /Users/name/Projects) to start.",
                     ));

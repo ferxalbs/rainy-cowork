@@ -147,10 +147,17 @@ impl CommandPoller {
 
             // Execute
             let result = self.skill_executor.execute(&command).await;
-            println!(
-                "[CommandPoller] Execution result for {}: success={}",
-                command.id, result.success
-            );
+            if result.success {
+                println!(
+                    "[CommandPoller] Execution result for {}: success=true",
+                    command.id
+                );
+            } else {
+                println!(
+                    "[CommandPoller] Execution result for {}: success=false, error={:?}",
+                    command.id, result.error
+                );
+            }
 
             // Report result
             if let Err(e) = self
