@@ -1,6 +1,5 @@
 import {
   Button,
-  Card,
   Chip,
   Separator,
   Switch,
@@ -8,26 +7,19 @@ import {
   TextField,
   Input,
   Label,
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
   Description,
 } from "@heroui/react";
 import {
-  Network,
   RefreshCw,
   Shield,
   CheckCircle2,
   XCircle,
   Smartphone,
   Bot,
-  Key,
-  Database,
   Plus,
   Unplug,
-  Fingerprint,
-  ExternalLink,
   Sparkles,
+  ExternalLink,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "@heroui/react";
@@ -239,26 +231,25 @@ export function NeuralPanel() {
 
       {/* Scrollable Content Area - Absolute Inset - Z-10 */}
       <div className="absolute inset-0 overflow-y-auto w-full h-full scrollbar-none z-10">
-        <div className="flex flex-col gap-8 p-8 max-w-5xl mx-auto min-h-full pb-20 pt-20">
-          {/* Header */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="size-12 rounded-2xl bg-linear-to-br from-purple-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-purple-500/20">
-                <Network className="size-7 text-white" />
-              </div>
-              <div>
-                <h1 className="text-3xl font-bold tracking-tight bg-clip-text text-transparent bg-linear-to-r from-foreground to-foreground/60">
-                  Neural Link
-                </h1>
-                <p className="text-muted-foreground text-sm font-medium">
-                  Desktop Node Management
-                </p>
-              </div>
+        <div className="flex flex-col px-6 max-w-4xl mx-auto min-h-full pt-16 pb-20">
+          {/* Header - Flat, No Icons, Centered */}
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-foreground">
+                Neural Link
+              </h1>
+              <p className="text-muted-foreground text-sm font-medium">
+                Desktop Node Management
+              </p>
             </div>
 
             {state === "connected" && (
               <div className="flex items-center gap-3">
-                <Button variant="outline" size="sm" className="h-9">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-9 hover:bg-background/40"
+                >
                   <RefreshCw className="size-3 mr-2" />
                   Refresh
                 </Button>
@@ -275,371 +266,292 @@ export function NeuralPanel() {
             )}
           </div>
 
-          <Separator />
+          <Separator className="mb-10 opacity-40" />
 
-          {/* STATE: IDLE (No Credentials Found) */}
+          {/* STATE: IDLE (No Credentials) - Floating Inputs */}
           {state === "idle" && (
-            <div className="max-w-xl mx-auto w-full pt-10">
-              <Card className="animate-appear border-white/10 bg-background/40 backdrop-blur-xl shadow-xl transition-all hover:bg-background/50">
-                <Card.Header>
-                  <div className="flex items-center gap-2 mb-1">
-                    <Key className="size-4 text-purple-400" />
-                    <Card.Title className="text-xl">
-                      Authentication Required
-                    </Card.Title>
-                  </div>
-                  <Card.Description>
-                    Provide your credentials to join the Cloud Cortex.
-                  </Card.Description>
-                </Card.Header>
-                <Card.Content className="space-y-6 pt-4">
-                  <TextField>
-                    <Label className="text-xs font-semibold text-default-500 uppercase ml-1">
-                      Platform API Key
-                    </Label>
-                    <Input
-                      type="password"
-                      placeholder="rk_live_..."
-                      value={platformKey}
-                      onChange={(e) => setPlatformKey(e.target.value)}
-                      className="bg-background/40"
-                    />
-                    <Description className="text-xs">
-                      Available at platform.rainymate.com
-                    </Description>
-                  </TextField>
-
-                  <TextField>
-                    <Label className="text-xs font-semibold text-default-500 uppercase ml-1">
-                      Creator API Key
-                    </Label>
-                    <Input
-                      type="password"
-                      placeholder="rny_..."
-                      value={userApiKey}
-                      onChange={(e) => setUserApiKey(e.target.value)}
-                      className="bg-background/40"
-                    />
-                  </TextField>
-
-                  <TextField>
-                    <Label className="text-xs font-semibold text-default-500 uppercase ml-1">
-                      Workspace Name (Optional)
-                    </Label>
-                    <Input
-                      placeholder="e.g. My Neural Net"
-                      value={workspaceName}
-                      onChange={(e) => setWorkspaceName(e.target.value)}
-                      className="bg-background/40"
-                    />
-                  </TextField>
-                </Card.Content>
-                <Card.Footer className="flex justify-end pt-4 pb-8">
-                  <Button
-                    variant="primary"
-                    className="h-12 px-8 font-bold shadow-xl shadow-primary/20"
-                    onPress={handleConnect}
-                  >
-                    Connect Node
-                  </Button>
-                </Card.Footer>
-              </Card>
-            </div>
-          )}
-
-          {/* STATE: RESTORED (Credentials Found in Keychain) */}
-          {state === "restored" && (
-            <div className="max-w-xl mx-auto w-full pt-10">
-              <Card className="animate-appear border-white/10 bg-background/40 backdrop-blur-xl p-4 shadow-3xl">
-                <div className="flex flex-col items-center text-center py-8 space-y-6">
-                  <div className="size-20 rounded-full bg-primary/10 flex items-center justify-center animate-pulse">
-                    <Fingerprint className="size-10 text-primary" />
-                  </div>
-                  <div className="space-y-2 px-8">
-                    <h2 className="text-2xl font-bold">Welcome Back</h2>
-                    <p className="text-muted-foreground">
-                      We found your credentials securely stored. Ready to
-                      activate your Neural Link session?
-                    </p>
-                  </div>
-                  <div className="flex flex-col gap-3 w-full max-w-xs pt-4">
-                    <Button
-                      variant="primary"
-                      size="md"
-                      className="h-14 font-extrabold text-lg shadow-2xl shadow-primary/30"
-                      onPress={handleConnect}
-                    >
-                      Quick Connect
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      onPress={() => setState("idle")}
-                      className="font-medium text-default-500"
-                    >
-                      Use Different Keys
-                    </Button>
-                  </div>
-                </div>
-              </Card>
-            </div>
-          )}
-
-          {/* STATE: CONNECTING (Loading spinner) */}
-          {state === "connecting" && (
-            <div className="flex-1 flex flex-col items-center justify-center py-20 space-y-6 animate-appear">
-              <div className="relative">
-                <div className="size-24 border-4 border-primary/20 rounded-full" />
-                <div className="size-24 border-t-4 border-primary rounded-full absolute top-0 animate-spin" />
-                <Network className="size-8 text-primary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-pulse" />
-              </div>
-              <div className="text-center space-y-2">
-                <h2 className="text-2xl font-bold animate-pulse">
-                  Synchronizing Cortex...
+            <div className="max-w-lg mx-auto w-full flex flex-col gap-8 animate-appear">
+              <div className="text-center space-y-2 mb-4">
+                <h2 className="text-xl font-semibold">
+                  Authentication Required
                 </h2>
-                <p className="text-muted-foreground">
-                  Registering desktop skills and establishing secure tunnel.
+                <p className="text-muted-foreground text-sm">
+                  Provide your credentials to join the Cloud Cortex.
                 </p>
               </div>
+
+              <div className="space-y-6">
+                <TextField>
+                  <Label className="uppercase text-[10px] font-bold tracking-widest text-muted-foreground mb-1.5 ml-1">
+                    Platform API Key
+                  </Label>
+                  <Input
+                    type="password"
+                    placeholder="rk_live_..."
+                    value={platformKey}
+                    onChange={(e) => setPlatformKey(e.target.value)}
+                    className="bg-background/40 backdrop-blur-sm border-white/5 hover:border-white/10 focus:border-primary/50 transition-colors h-12"
+                  />
+                  <Description className="text-xs mt-1.5 ml-1 text-muted-foreground/60">
+                    Available at platform.rainymate.com
+                  </Description>
+                </TextField>
+
+                <TextField>
+                  <Label className="uppercase text-[10px] font-bold tracking-widest text-muted-foreground mb-1.5 ml-1">
+                    Creator API Key
+                  </Label>
+                  <Input
+                    type="password"
+                    placeholder="rny_..."
+                    value={userApiKey}
+                    onChange={(e) => setUserApiKey(e.target.value)}
+                    className="bg-background/40 backdrop-blur-sm border-white/5 hover:border-white/10 focus:border-primary/50 transition-colors h-12"
+                  />
+                </TextField>
+
+                <TextField>
+                  <Label className="uppercase text-[10px] font-bold tracking-widest text-muted-foreground mb-1.5 ml-1">
+                    Workspace Name (Optional)
+                  </Label>
+                  <Input
+                    placeholder="e.g. My Neural Net"
+                    value={workspaceName}
+                    onChange={(e) => setWorkspaceName(e.target.value)}
+                    className="bg-background/40 backdrop-blur-sm border-white/5 hover:border-white/10 focus:border-primary/50 transition-colors h-12"
+                  />
+                </TextField>
+
+                <Button
+                  variant="primary"
+                  className="w-full h-12 font-bold shadow-lg shadow-primary/20 mt-4"
+                  onPress={handleConnect}
+                >
+                  Connect Node
+                </Button>
+              </div>
             </div>
           )}
 
-          {/* STATE: CONNECTED (Dashboard) */}
+          {/* STATE: RESTORED - Minimal Welcome */}
+          {state === "restored" && (
+            <div className="max-w-md mx-auto w-full flex flex-col items-center justify-center pt-20 animate-appear text-center">
+              <div className="mb-6 relative">
+                <div className="absolute inset-0 bg-primary/20 blur-3xl rounded-full opacity-50" />
+                <Shield className="size-16 text-primary/80 relative z-10" />
+              </div>
+
+              <h2 className="text-2xl font-bold mb-2">Welcome Back</h2>
+              <p className="text-muted-foreground mb-8">
+                Capabilities restored. Ready to reconnect?
+              </p>
+
+              <div className="flex flex-col gap-3 w-full">
+                <Button
+                  variant="primary"
+                  size="lg"
+                  className="h-12 font-bold shadow-xl shadow-primary/20 w-full"
+                  onPress={handleConnect}
+                >
+                  Quick Connect
+                </Button>
+                <Button
+                  variant="ghost"
+                  onPress={() => setState("idle")}
+                  className="font-medium text-muted-foreground hover:text-foreground w-full"
+                >
+                  Use Different Keys
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* STATE: CONNECTING - Minimal Spinner */}
+          {state === "connecting" && (
+            <div className="flex-1 flex flex-col items-center justify-center pt-20 animate-appear">
+              <div className="size-12 border-2 border-primary/20 border-t-primary rounded-full animate-spin mb-6" />
+              <h2 className="text-lg font-semibold animate-pulse">
+                Synchronizing...
+              </h2>
+            </div>
+          )}
+
+          {/* STATE: CONNECTED - Flat Dashboard */}
           {state === "connected" && workspace && (
-            <div className="animate-appear space-y-8">
-              {/* Main Dashboard Info */}
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                {/* Connection Status Card */}
-                <Card className="lg:col-span-8 overflow-hidden group border-white/10 bg-background/40 backdrop-blur-xl">
-                  <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity pointer-events-none">
-                    <Database className="size-32" />
-                  </div>
-                  <Card.Header>
-                    <div className="flex items-center gap-3">
-                      <Chip color="success" size="sm" className="pl-2">
-                        <CheckCircle2 className="size-3 mr-1 inline-block" />
-                        Active Session
+            <div className="animate-appear space-y-12">
+              {/* Workspace Info & Quick Stats */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                {/* Info Column */}
+                <div className="md:col-span-2 space-y-6">
+                  <div>
+                    <div className="flex items-center gap-3 mb-2">
+                      <h2 className="text-4xl font-light tracking-tight text-foreground">
+                        {workspace.name}
+                      </h2>
+                      <Chip
+                        color="success"
+                        size="sm"
+                        variant="soft"
+                        className="bg-green-500/10 text-green-500"
+                      >
+                        Active
                       </Chip>
-                      <span className="text-xs font-mono text-muted-foreground hidden sm:block">
-                        ID: {workspace.id}
+                    </div>
+                    <div className="flex items-center gap-4 text-xs font-mono text-muted-foreground">
+                      <span>ID: {workspace.id}</span>
+                      <span className="text-border/40">|</span>
+                      <span>NODE: Desktop_v2</span>
+                      <span className="text-border/40">|</span>
+                      <span className="flex items-center gap-1 text-green-500/80">
+                        <Shield className="size-3" /> Encrypted
                       </span>
                     </div>
-                    <Card.Title className="text-4xl font-extrabold mt-2 font-mono tracking-tight">
-                      {workspace.name}
-                    </Card.Title>
-                  </Card.Header>
-                  <Card.Content className="pt-4 flex flex-col sm:flex-row gap-6">
-                    <div className="flex-1 space-y-1 border-l-2 border-primary/20 pl-4 bg-primary/5 p-3 rounded-r-xl">
-                      <span className="text-xs uppercase font-bold text-primary opacity-70">
-                        Neural ID
-                      </span>
-                      <p className="font-mono text-lg font-bold break-all">
-                        {workspace.id}
-                      </p>
-                    </div>
-                    <div className="flex-1 space-y-1 border-l-2 border-orange-500/20 pl-4 bg-orange-500/5 p-3 rounded-r-xl">
-                      <span className="text-xs uppercase font-bold text-orange-500 opacity-70">
-                        Node Type
-                      </span>
-                      <p className="font-mono text-lg font-bold">Desktop_v2</p>
-                    </div>
-                  </Card.Content>
-                  <Card.Footer className="bg-default-100/30 backdrop-blur-sm border-t border-border/40 py-4 px-6 flex justify-between items-center mt-4">
-                    <div className="flex items-center gap-2">
-                      <Tooltip>
-                        <TooltipTrigger>
-                          <Shield className="size-4 text-green-500 cursor-help" />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          Keys are securely stored in your System Keychain
-                        </TooltipContent>
-                      </Tooltip>
-                      <span className="text-xs font-medium text-muted-foreground">
-                        E2E Encryption Active
-                      </span>
-                    </div>
+                  </div>
+
+                  <div className="flex gap-4">
                     <Button
-                      variant="ghost"
+                      variant="outline"
                       size="sm"
-                      className="h-8 font-bold text-xs"
+                      className="border-white/10 hover:bg-white/5 bg-transparent"
                     >
-                      <ExternalLink className="size-3 mr-1" />
+                      <ExternalLink className="size-3 mr-2 opacity-50" />
                       View in Cloud
                     </Button>
-                  </Card.Footer>
-                </Card>
+                  </div>
+                </div>
 
-                {/* Quick Actions Side Card */}
-                <div className="lg:col-span-4 flex flex-col gap-4">
-                  <Card className="flex-1 p-6 relative overflow-hidden border-white/10 bg-background/40 backdrop-blur-xl">
-                    <div className="absolute top-0 right-0 size-20 bg-purple-500/10 blur-2xl rounded-full" />
-                    <div className="flex flex-col h-full justify-between">
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <h3 className="font-bold flex items-center gap-2">
-                            <Shield className="size-4 text-purple-500" />
-                            Headless Mode
-                          </h3>
-                          <Switch
-                            isSelected={isHeadless}
-                            onChange={(e) =>
-                              handleToggleHeadless(
-                                (e as any).target?.checked ?? e,
-                              )
-                            }
-                          >
-                            <Switch.Thumb />
-                          </Switch>
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          Auto-approve sensitive operations from trusted agents.
-                          Use with caution.
-                        </p>
-                      </div>
-                      <Separator className="my-4 opacity-50" />
-                      <div className="space-y-4">
-                        <h3 className="font-bold flex items-center gap-2">
-                          <Smartphone className="size-4 text-primary" />
-                          Mobile Link
-                        </h3>
-                        {pairingCode ? (
-                          <div className="bg-primary/5 p-3 rounded-xl border border-primary/20 text-center space-y-1">
-                            <div className="text-2xl font-mono font-black tracking-widest text-primary">
-                              {pairingCode}
-                            </div>
-                            <p className="text-[10px] text-muted-foreground">
-                              Valid for 15 mins
-                            </p>
-                          </div>
-                        ) : (
-                          <Button
-                            variant="outline"
-                            className="w-full h-10 border-dashed border-2 hover:border-solid transition-all"
-                            onPress={handleGeneratePairingCode}
-                          >
-                            Pair Mobile Device
-                          </Button>
-                        )}
-                      </div>
+                {/* Settings Column */}
+                <div className="flex flex-col gap-4 justify-center md:items-end">
+                  {/* Headless Toggle */}
+                  <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-white/5 hover:bg-white/10 transition-colors border border-white/5 w-full max-w-xs">
+                    <div className="flex items-center gap-3">
+                      <Shield className="size-4 text-purple-400" />
+                      <span className="text-sm font-medium">Headless Mode</span>
                     </div>
-                  </Card>
+                    <Switch
+                      isSelected={isHeadless}
+                      onChange={(e) =>
+                        handleToggleHeadless((e as any).target?.checked ?? e)
+                      }
+                      size="sm"
+                    >
+                      <Switch.Thumb />
+                    </Switch>
+                  </div>
+
+                  {/* Mobile Link */}
+                  <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-white/5 hover:bg-white/10 transition-colors border border-white/5 w-full max-w-xs">
+                    <div className="flex items-center gap-3">
+                      <Smartphone className="size-4 text-primary" />
+                      <span className="text-sm font-medium">Mobile Link</span>
+                    </div>
+                    {pairingCode ? (
+                      <span className="font-mono font-bold text-primary tracking-wider">
+                        {pairingCode}
+                      </span>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 text-xs px-2"
+                        onPress={handleGeneratePairingCode}
+                      >
+                        Generate
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              {/* Agents Management Section */}
-              <div className="space-y-6 pt-4">
+              <Separator className="opacity-20" />
+
+              {/* Agents Section - Clean List */}
+              <div className="space-y-6">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="p-2 rounded-xl bg-purple-500/10 text-purple-600">
-                      <Bot className="size-6" />
-                    </div>
-                    <div>
-                      <h2 className="text-2xl font-bold">Cloud Agents</h2>
-                      <p className="text-xs text-muted-foreground font-medium">
-                        Manage neural instances running on this workspace
-                      </p>
-                    </div>
-                  </div>
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <Bot className="size-4 text-purple-500" />
+                    Cloud Agents
+                  </h3>
                   <Button
-                    variant="primary"
-                    className="shadow-lg shadow-primary/20 font-bold px-6 h-12"
+                    variant="ghost"
+                    size="sm"
+                    className="hover:bg-primary/10 hover:text-primary transition-colors"
                     onPress={() => setIsCreatingAgent(true)}
                   >
-                    <Plus className="size-4 shrink-0 mr-2" />
-                    Create New Agent
+                    <Plus className="size-4 mr-2" />
+                    Deploy Agent
                   </Button>
                 </div>
 
-                <Card className="p-1 border-white/10 bg-background/40 backdrop-blur-xl">
+                {/* Agent List Container - Transparent */}
+                <div className="rounded-xl border border-white/5 bg-background/20 backdrop-blur-md overflow-hidden p-1">
                   <AgentList onCreateClick={() => setIsCreatingAgent(true)} />
-                </Card>
+                </div>
               </div>
 
-              {/* Security & Airlock Section */}
-              <div className="space-y-6 pt-8">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 rounded-xl bg-orange-500/10 text-orange-600">
-                    <Shield className="size-6" />
-                  </div>
-                  <div>
-                    <h2 className="text-2xl font-bold">Airlock Monitor</h2>
-                    <p className="text-xs text-muted-foreground font-medium">
-                      Real-time security auditing and approvals
-                    </p>
-                  </div>
-                </div>
+              {/* Airlock Section - Clean Alerts */}
+              <div className="space-y-6">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <Shield className="size-4 text-orange-500" />
+                  Airlock Monitor
+                </h3>
 
                 {pendingApprovals.length === 0 ? (
-                  <Card className="p-12 text-center border-dashed border-2 bg-transparent opacity-60">
-                    <CheckCircle2 className="size-10 mx-auto mb-4 text-green-500/50" />
-                    <h3 className="text-lg font-semibold">Cortex Secure</h3>
-                    <p className="text-sm text-muted-foreground mt-1 max-w-xs mx-auto">
-                      No pending security approvals. All agent operations are
-                      synchronized.
-                    </p>
-                  </Card>
+                  <div className="flex flex-col items-center justify-center py-10 rounded-2xl border border-dashed border-white/10 text-muted-foreground/50">
+                    <CheckCircle2 className="size-8 mb-2 opacity-20" />
+                    <span className="text-sm font-medium">Cortex Secure</span>
+                  </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-3">
                     {pendingApprovals.map((request) => (
-                      <Card
+                      <div
                         key={request.id}
-                        className="p-5 border-l-4 border-l-orange-500 animate-in slide-in-from-right-4 bg-background/60 backdrop-blur-xl"
+                        className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5 hover:border-white/10 transition-all"
                       >
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex-1 space-y-3">
-                            <div className="flex items-center gap-2">
-                              <Chip
-                                size="sm"
-                                className={
-                                  request.level === AirlockLevels.Dangerous
-                                    ? "bg-red-500 text-white"
-                                    : request.level === AirlockLevels.Sensitive
-                                      ? "bg-orange-500 text-white"
-                                      : "bg-green-500 text-white"
-                                }
-                              >
-                                {request.level === AirlockLevels.Dangerous
-                                  ? "Critical"
-                                  : request.level === AirlockLevels.Sensitive
-                                    ? "Sensitive"
-                                    : "Trust"}
-                              </Chip>
-                              <span className="font-bold text-sm tracking-tight">
-                                {request.command_type}
-                              </span>
-                            </div>
-                            <pre className="text-[10px] font-mono bg-default-100 p-3 rounded-lg overflow-x-auto max-h-32 border border-default-200/50">
-                              {JSON.stringify(request.payload, null, 2)}
-                            </pre>
-                            <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-semibold uppercase">
-                              <RefreshCw className="size-3" />
-                              {new Date(request.timestamp).toLocaleTimeString()}
-                            </div>
-                          </div>
-                          <div className="flex flex-col gap-2">
-                            <Button
-                              variant="primary"
-                              size="sm"
-                              isIconOnly
-                              className="bg-green-600 text-white"
-                              onPress={() =>
-                                handleAirlockRespond(request.id, true)
-                              }
-                            >
-                              <CheckCircle2 className="size-4" />
-                            </Button>
-                            <Button
-                              variant="danger"
-                              size="sm"
-                              isIconOnly
-                              onPress={() =>
-                                handleAirlockRespond(request.id, false)
-                              }
-                            >
-                              <XCircle className="size-4" />
-                            </Button>
-                          </div>
+                        <div className="flex items-center gap-4">
+                          <Chip
+                            size="sm"
+                            className={
+                              request.level === AirlockLevels.Dangerous
+                                ? "bg-red-500/20 text-red-400 border-red-500/20"
+                                : request.level === AirlockLevels.Sensitive
+                                  ? "bg-orange-500/20 text-orange-400 border-orange-500/20"
+                                  : "bg-green-500/20 text-green-400 border-green-500/20"
+                            }
+                            variant="soft"
+                          >
+                            {request.command_type}
+                          </Chip>
+                          <code className="text-xs text-muted-foreground font-mono bg-black/20 px-2 py-1 rounded">
+                            {JSON.stringify(request.payload).slice(0, 60)}...
+                          </code>
                         </div>
-                      </Card>
+
+                        <div className="flex gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            isIconOnly
+                            className="text-green-500 hover:bg-green-500/10"
+                            onPress={() =>
+                              handleAirlockRespond(request.id, true)
+                            }
+                          >
+                            <CheckCircle2 className="size-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            isIconOnly
+                            className="text-red-500 hover:bg-red-500/10"
+                            onPress={() =>
+                              handleAirlockRespond(request.id, false)
+                            }
+                          >
+                            <XCircle className="size-4" />
+                          </Button>
+                        </div>
+                      </div>
                     ))}
                   </div>
                 )}
@@ -647,27 +559,27 @@ export function NeuralPanel() {
             </div>
           )}
 
-          {/* CREATE AGENT MODAL - PREMIUM GLASSMORPHISM */}
+          {/* CREATE AGENT MODAL - Floating & Blurry */}
           <Modal isOpen={isCreatingAgent} onOpenChange={setIsCreatingAgent}>
             <Modal.Backdrop className="backdrop-blur-xl bg-black/40" />
             <Modal.Container>
-              <Modal.Dialog className="backdrop-blur-2xl bg-white/60 dark:bg-black/20 border border-white/10 shadow-3xl shadow-black/50">
-                <Modal.Header className="px-8 pt-8">
+              <Modal.Dialog className="backdrop-blur-3xl bg-background/80 border border-white/10 shadow-2xl shadow-black/50 max-w-2xl w-full rounded-3xl">
+                <Modal.Header className="px-8 pt-8 pb-4 border-b border-white/5">
                   <div className="flex items-center gap-4">
-                    <div className="size-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-inner">
-                      <Sparkles className="size-6" />
+                    <div className="size-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                      <Sparkles className="size-5" />
                     </div>
                     <div>
-                      <Modal.Heading className="text-2xl font-black tracking-tight">
-                        Deploy Agent
+                      <Modal.Heading className="text-xl font-bold tracking-tight">
+                        Deploy Cloud Agent
                       </Modal.Heading>
                       <p className="text-xs text-muted-foreground font-medium uppercase tracking-widest mt-0.5">
-                        Cloud Cortex Instance
+                        New Instance
                       </p>
                     </div>
                   </div>
                 </Modal.Header>
-                <Modal.Body className="px-8 pb-4">
+                <Modal.Body className="p-8">
                   <CreateAgentForm
                     onSuccess={() => setIsCreatingAgent(false)}
                     onCancel={() => setIsCreatingAgent(false)}

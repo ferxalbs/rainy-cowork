@@ -105,7 +105,7 @@ export function CreateAgentForm({ onSuccess, onCancel }: CreateAgentFormProps) {
             placeholder="e.g., Sales Assistant"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full h-11"
+            className="w-full h-11 bg-background/40 backdrop-blur-sm border-white/5 hover:border-white/10 focus:border-primary/50 transition-colors"
           />
         </TextField>
 
@@ -117,7 +117,7 @@ export function CreateAgentForm({ onSuccess, onCancel }: CreateAgentFormProps) {
           <Label className="text-xs font-semibold uppercase tracking-wider text-default-500 mb-1.5 ml-1">
             Agent Type
           </Label>
-          <Select.Trigger className="h-11">
+          <Select.Trigger className="h-11 bg-background/40 backdrop-blur-sm border-white/5 hover:border-white/10 focus:border-primary/50 transition-colors">
             <Select.Value className="flex items-center gap-2">
               {({ selectedItem, defaultChildren }) => {
                 const selectedKey = (selectedItem as any)?.key;
@@ -159,7 +159,7 @@ export function CreateAgentForm({ onSuccess, onCancel }: CreateAgentFormProps) {
         <Label className="text-xs font-semibold uppercase tracking-wider text-default-500 mb-1.5 ml-1">
           Model (Gemini 3 Family)
         </Label>
-        <Select.Trigger className="h-11 font-mono text-xs">
+        <Select.Trigger className="h-11 font-mono text-xs bg-background/40 backdrop-blur-sm border-white/5 hover:border-white/10 focus:border-primary/50 transition-colors">
           <Select.Value />
           <Select.Indicator>
             <ChevronDown className="size-4 opacity-50" />
@@ -242,7 +242,7 @@ export function CreateAgentForm({ onSuccess, onCancel }: CreateAgentFormProps) {
           placeholder="You are a helpful assistant who..."
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
-          className="w-full min-h-[120px]"
+          className="w-full min-h-[120px] bg-background/40 backdrop-blur-sm border-white/5 hover:border-white/10 focus:border-primary/50 transition-colors"
         />
       </TextField>
 
