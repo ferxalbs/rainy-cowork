@@ -1,4 +1,3 @@
-// src/hooks/useAgentChat.ts
 import { useState, useCallback } from "react";
 import { useStreaming } from "./useStreaming";
 import { useTauriTask } from "./useTauriTask";
@@ -16,7 +15,61 @@ export function useAgentChat() {
 
   const clearMessages = useCallback(() => {
     setMessages([]);
-    setCurrentPlan(null); // Reset plan too
+    setCurrentPlan(null);
+  }, []);
+
+  // Helper to parse tool calls from content
+  const parseToolCalls = useCallback((content: string) => {
+    const toolCalls: Array<{
+      skill: string;
+      method: string;
+      params: Record<string, any>;
+    }> = [];
+
+    // Pattern: write_file("path", "content")
+    const writeFileRegex =
+      /write_file\s*\(\s*["']([^"']+)["']\s*,\s*["']?([^)]*?)["']?\s*\)/gi;
+    let match;
+    while ((match = writeFileRegex.exec(content)) !== null) {
+      toolCalls.push({
+        skill: "filesystem",
+        method: "write_file",
+        params: { path: match[1], content: match[2] || "" },
+      });
+    }
+
+    // Pattern: read_file("path")
+    const readFileRegex = /read_file\s*\(\s*["']([^"']+)["']\s*\)/gi;
+    while ((match = readFileRegex.exec(content)) !== null) {
+      toolCalls.push({
+        skill: "filesystem",
+        method: "read_file",
+        params: { path: match[1] },
+      });
+    }
+
+    // Pattern: list_files("path")
+    const listFilesRegex = /list_files\s*\(\s*["']([^"']+)["']\s*\)/gi;
+    while ((match = listFilesRegex.exec(content)) !== null) {
+      toolCalls.push({
+        skill: "filesystem",
+        method: "list_files",
+        params: { path: match[1] },
+      });
+    }
+
+    // Pattern: search_files("query", "path")
+    const searchFilesRegex =
+      /search_files\s*\(\s*["']([^"']+)["']\s*(?:,\s*["']([^"']+)["'])?\s*\)/gi;
+    while ((match = searchFilesRegex.exec(content)) !== null) {
+      toolCalls.push({
+        skill: "filesystem",
+        method: "search_files",
+        params: { query: match[1], path: match[2] },
+      });
+    }
+
+    return toolCalls;
   }, []);
 
   const streamChat = useCallback(
@@ -46,11 +99,10 @@ export function useAgentChat() {
 
       try {
         // Construct history from current messages
-        // Filter out temporary/loading states or failed messages if needed
         const history = messages
           .filter((m) => !m.isLoading && !m.content.startsWith("[Error"))
           .map((m) => ({
-            role: m.type === "agent" ? "assistant" : "user",
+            role: m.type === "agent" ? "assistant" : ("user" as const),
             content: m.content,
           }));
 
@@ -72,10 +124,18 @@ export function useAgentChat() {
           (event) => {
             if (event.event === "chunk") {
               accumulatedContent += event.data.content;
+              const detectedTools = parseToolCalls(accumulatedContent);
+
               setMessages((prev) =>
                 prev.map((m) =>
                   m.id === agentMsgId
-                    ? { ...m, content: accumulatedContent, isLoading: false }
+                    ? {
+                        ...m,
+                        content: accumulatedContent,
+                        isLoading: false,
+                        toolCalls:
+                          detectedTools.length > 0 ? detectedTools : undefined,
+                      }
                     : m,
                 ),
               );
@@ -116,12 +176,11 @@ export function useAgentChat() {
         );
       }
     },
-    [streamWithRouting, messages], // Add messages to dependency array
+    [streamWithRouting, messages, parseToolCalls],
   );
 
   const sendInstruction = useCallback(
     async (instruction: string, workspacePath: string, modelId: string) => {
-      // This maps to "Deep Processing" / Task creation
       const userMsg: AgentMessage = {
         id: crypto.randomUUID(),
         type: "user",
@@ -132,9 +191,6 @@ export function useAgentChat() {
 
       setIsPlanning(true);
 
-      // Parse modelId (e.g. "gemini-2.0-flash" -> "gemini-2.0-flash")
-      // Parse modelId - remove explicit 'rainy:' prefix handling if backend handles it
-      // But keep safety check if ID comes formatted weirdly from other places
       let targetModel = modelId;
       if (targetModel.startsWith("rainy:")) {
         targetModel = targetModel.replace("rainy:", "");
@@ -142,11 +198,9 @@ export function useAgentChat() {
         targetModel = targetModel.replace("cowork:", "");
       }
 
-      const targetProvider = "rainyapi"; // Default to rainyapi
+      const targetProvider = "rainyapi";
 
-      // created a task
       try {
-        // Use selected model instead of hardcoded default
         const task = await createTask(
           instruction,
           targetProvider as any,
@@ -154,7 +208,6 @@ export function useAgentChat() {
           workspacePath,
         );
 
-        // Create a placeholder plan message
         const planMsgId = crypto.randomUUID();
         const planMsg: AgentMessage = {
           id: planMsgId,
@@ -165,7 +218,6 @@ export function useAgentChat() {
         };
         setMessages((prev) => [...prev, planMsg]);
 
-        // Execute the task
         await tauri.executeTask(task.id, (event) => {
           if (event.event === "progress") {
             setMessages((prev) =>
@@ -188,7 +240,7 @@ export function useAgentChat() {
                       content: "Task completed successfully.",
                       isLoading: false,
                       result: { totalSteps: 0, totalChanges: 0, errors: [] },
-                    } // Mock result
+                    }
                   : m,
               ),
             );
@@ -219,21 +271,12 @@ export function useAgentChat() {
     [createTask],
   );
 
-  const executePlan = useCallback(async (_planId: string) => {
-    // Legacy stub
-  }, []);
-
-  const cancelPlan = useCallback(async (_planId: string) => {
-    // Legacy stub
-  }, []);
-
   const executeDiscussedPlan = useCallback(
     async (workspaceId: string, _modelId: string) => {
       if (messages.length === 0) return;
 
       setIsExecuting(true);
 
-      // 1. Find tool calls from the AI's last response
       const lastAgentMessage = [...messages]
         .reverse()
         .find((m) => m.type === "agent" && !m.isLoading);
@@ -243,55 +286,9 @@ export function useAgentChat() {
         return;
       }
 
-      const content = lastAgentMessage.content;
-      console.log("[executeDiscussedPlan] Parsing from AI response:", content);
-
-      // Parse tool calls using regex patterns like: write_file("path", "content")
-      const toolCalls: Array<{
-        skill: string;
-        method: string;
-        params: Record<string, any>;
-      }> = [];
-
-      // Pattern: write_file("path", "content") or write_file("path", content)
-      const writeFileRegex =
-        /write_file\s*\(\s*["']([^"']+)["']\s*,\s*["']?([^)]*?)["']?\s*\)/gi;
-      let match;
-      while ((match = writeFileRegex.exec(content)) !== null) {
-        toolCalls.push({
-          skill: "filesystem",
-          method: "write_file",
-          params: {
-            path: match[1],
-            content: match[2] || "// Auto-generated file\n",
-          },
-        });
-      }
-
-      // Pattern: read_file("path")
-      const readFileRegex = /read_file\s*\(\s*["']([^"']+)["']\s*\)/gi;
-      while ((match = readFileRegex.exec(content)) !== null) {
-        toolCalls.push({
-          skill: "filesystem",
-          method: "read_file",
-          params: { path: match[1] },
-        });
-      }
-
-      // Pattern: list_files("path")
-      const listFilesRegex = /list_files\s*\(\s*["']([^"']+)["']\s*\)/gi;
-      while ((match = listFilesRegex.exec(content)) !== null) {
-        toolCalls.push({
-          skill: "filesystem",
-          method: "list_files",
-          params: { path: match[1] },
-        });
-      }
-
-      console.log("[executeDiscussedPlan] Parsed tool calls:", toolCalls);
+      const toolCalls = parseToolCalls(lastAgentMessage.content);
 
       if (toolCalls.length === 0) {
-        // No parseable tools, add error message
         setMessages((prev) => [
           ...prev,
           {
@@ -307,7 +304,7 @@ export function useAgentChat() {
         return;
       }
 
-      // 2. Create execution status message
+      // Re-use executeToolCalls logic via direct execution since we are in a hook
       const statusMsgId = crypto.randomUUID();
       setMessages((prev) => [
         ...prev,
@@ -321,15 +318,8 @@ export function useAgentChat() {
       ]);
 
       try {
-        // 3. Execute each tool
-        const results: {
-          call: (typeof toolCalls)[0];
-          result: tauri.CommandResult;
-        }[] = [];
-
+        const results = [];
         for (const call of toolCalls) {
-          console.log("[executeDiscussedPlan] Executing:", call);
-
           setMessages((prev) =>
             prev.map((m) =>
               m.id === statusMsgId
@@ -346,10 +336,9 @@ export function useAgentChat() {
             call.skill,
             call.method,
             call.params,
-            workspaceId, // Pass workspacePath for local path resolution
+            workspaceId,
           );
 
-          console.log("[executeDiscussedPlan] Result:", result);
           results.push({ call, result });
 
           if (!result.success) {
@@ -359,7 +348,6 @@ export function useAgentChat() {
           }
         }
 
-        // 4. Success message
         const successDetails = results
           .map((r) => `✅ ${r.call.method}("${r.call.params.path}")`)
           .join("\n");
@@ -376,7 +364,6 @@ export function useAgentChat() {
           ),
         );
       } catch (err: any) {
-        console.error("[executeDiscussedPlan] Error:", err);
         setMessages((prev) =>
           prev.map((m) =>
             m.id === statusMsgId
@@ -392,11 +379,106 @@ export function useAgentChat() {
         setIsExecuting(false);
       }
     },
-    [messages],
+    [messages, parseToolCalls],
   );
+
+  const executeToolCalls = useCallback(
+    async (
+      messageId: string,
+      toolCalls: Array<{ skill: string; method: string; params: any }>,
+      workspaceId: string,
+    ) => {
+      setIsExecuting(true);
+      const statusMsgId = crypto.randomUUID();
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: statusMsgId,
+          type: "agent",
+          content: `Executing ${toolCalls.length} operation(s)...`,
+          isLoading: true,
+          timestamp: new Date(),
+        },
+      ]);
+
+      try {
+        const results = [];
+        for (const call of toolCalls) {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === statusMsgId
+                ? {
+                    ...m,
+                    content: `⏳ ${call.method}("${call.params.path || call.params.query}")...`,
+                  }
+                : m,
+            ),
+          );
+
+          const result = await tauri.executeSkill(
+            workspaceId,
+            call.skill,
+            call.method,
+            call.params,
+            workspaceId,
+          );
+          results.push({ call, result });
+
+          if (!result.success)
+            throw new Error(`${call.method} failed: ${result.error}`);
+        }
+
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === messageId ? { ...m, isExecuted: true } : m,
+          ),
+        );
+
+        const successDetails = results
+          .map(
+            (r) =>
+              `✅ ${r.call.method}("${r.call.params.path || r.call.params.query}")`,
+          )
+          .join("\n");
+
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === statusMsgId
+              ? {
+                  ...m,
+                  content: `**Execution Complete**\n\n${successDetails}`,
+                  isLoading: false,
+                }
+              : m,
+          ),
+        );
+      } catch (err: any) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === statusMsgId
+              ? { ...m, content: `❌ ${err.message}`, isLoading: false }
+              : m,
+          ),
+        );
+      } finally {
+        setIsExecuting(false);
+      }
+    },
+    [],
+  );
+
+  const executePlan = useCallback(async (_planId: string) => {
+    // Legacy stub
+  }, []);
+
+  const cancelPlan = useCallback(async (_planId: string) => {
+    // Legacy stub
+  }, []);
 
   return {
     messages,
+    setMessages,
     isPlanning,
     isExecuting,
     currentPlan,
@@ -405,6 +487,7 @@ export function useAgentChat() {
     executePlan,
     cancelPlan,
     executeDiscussedPlan,
+    executeToolCalls,
     clearMessages,
   };
 }

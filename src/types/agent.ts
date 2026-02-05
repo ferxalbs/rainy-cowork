@@ -137,4 +137,10 @@ export interface AgentMessage {
   };
   plan?: TaskPlan;
   result?: ExecutionResult;
+  toolCalls?: Array<{
+    skill: string;
+    method: string;
+    params: Record<string, any>;
+  }>;
+  isExecuted?: boolean;
 }

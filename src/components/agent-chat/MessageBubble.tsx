@@ -1,5 +1,4 @@
 import React from "react";
-import Markdown from "react-markdown";
 import {
   Loader2,
   Play,
@@ -10,6 +9,8 @@ import {
 } from "lucide-react";
 import { Button, Card } from "@heroui/react";
 import type { AgentMessage, TaskPlan } from "../../types/agent";
+import { MarkdownRenderer } from "./MarkdownRenderer";
+import { PlanConfirmationCard } from "./PlanConfirmationCard";
 
 import { ThoughtDisplay, ThoughtBadge } from "./ThoughtDisplay";
 
@@ -32,17 +33,29 @@ interface MessageBubbleProps {
   currentPlan?: TaskPlan | null;
   isExecuting?: boolean;
   onExecute?: (planId: string) => void;
-  onCancel?: (planId: string) => void;
+  onExecuteToolCalls?: (
+    messageId: string,
+    toolCalls: any[],
+    workspaceId: string,
+  ) => void;
+  workspaceId?: string;
 }
 
 export function MessageBubble({
   message,
   onExecute,
-  onCancel,
+  onExecuteToolCalls,
   isExecuting,
+  workspaceId,
 }: MessageBubbleProps) {
   const isUser = message.type === "user";
   const isSystem = message.type === "system";
+
+  const handleExecuteToolCalls = () => {
+    if (message.toolCalls && onExecuteToolCalls && workspaceId) {
+      onExecuteToolCalls(message.id, message.toolCalls, workspaceId);
+    }
+  };
 
   if (isSystem) {
     return (
@@ -53,6 +66,9 @@ export function MessageBubble({
       </div>
     );
   }
+
+  // Remove the raw tool calls from the display content if we are visualizing them
+  // checking if toolCalls are present, we might want to keep the context though.
 
   return (
     <div
@@ -70,11 +86,7 @@ export function MessageBubble({
           }`}
         >
           {message.content ? (
-            <div
-              className={`prose prose-sm dark:prose-invert max-w-none ${isUser ? "text-primary-foreground" : ""}`}
-            >
-              <Markdown>{message.content}</Markdown>
-            </div>
+            <MarkdownRenderer content={message.content} />
           ) : message.isLoading ? (
             <span className="flex items-center gap-2 text-muted-foreground italic">
               <Loader2 className="size-3 animate-spin" /> Thinking...
@@ -97,12 +109,20 @@ export function MessageBubble({
           <ThoughtBadge thinkingLevel={message.thinkingLevel || "medium"} />
         )}
 
-        {/* Plan Display (Only for Agent) */}
+        {/* New Plan Confirmation Card (Deep Mode) */}
+        {!isUser && message.toolCalls && !message.isExecuted && (
+          <PlanConfirmationCard
+            toolCalls={message.toolCalls}
+            onExecute={handleExecuteToolCalls}
+            isExecuting={isExecuting}
+          />
+        )}
+
+        {/* Legacy Plan Display (Only for Agent) */}
         {!isUser && message.plan && (
           <PlanCard
             plan={message.plan}
             onExecute={onExecute}
-            onCancel={onCancel}
             isExecuting={isExecuting}
           />
         )}
@@ -142,12 +162,10 @@ export function MessageBubble({
 function PlanCard({
   plan,
   onExecute,
-  onCancel,
   isExecuting,
 }: {
   plan: TaskPlan;
   onExecute?: (id: string) => void;
-  onCancel?: (id: string) => void;
   isExecuting?: boolean;
 }) {
   return (
@@ -198,15 +216,6 @@ function PlanCard({
         >
           <Play className="size-3.5" />
           Execute Plan
-        </Button>
-        <Button
-          className="flex-1"
-          variant="danger-soft"
-          size="sm"
-          onPress={() => onCancel?.(plan.id)}
-          isDisabled={isExecuting}
-        >
-          Cancel
         </Button>
       </div>
     </Card>

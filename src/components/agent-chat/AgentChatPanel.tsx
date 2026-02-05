@@ -63,8 +63,8 @@ export function AgentChatPanel({
     sendInstruction,
     streamChat,
     executePlan,
-    cancelPlan,
     executeDiscussedPlan,
+    executeToolCalls,
     clearMessages,
   } = useAgentChat();
 
@@ -377,7 +377,8 @@ Click 'Execute Task' when ready."]`
                   currentPlan={currentPlan}
                   isExecuting={isExecuting}
                   onExecute={executePlan}
-                  onCancel={cancelPlan}
+                  onExecuteToolCalls={executeToolCalls}
+                  workspaceId={workspacePath}
                 />
               ))}
               <div ref={messagesEndRef} />
