@@ -48,7 +48,15 @@ impl RainySDKProvider {
         let mut thinking_config = ThinkingConfig::default();
         thinking_config.include_thoughts = Some(true); // Always include thoughts for thinking models
 
-        match model_id {
+        // Strip any prefix (e.g., "rainy:", "cowork:") from model_id
+        // The Rainy API expects clean model IDs without provider prefixes
+        let clean_id = if let Some(colon_pos) = model_id.find(':') {
+            &model_id[colon_pos + 1..]
+        } else {
+            model_id
+        };
+
+        match clean_id {
             // Gemini 3 Flash mappings
             "gemini-3-flash-minimal" => {
                 thinking_config.thinking_level = Some(ThinkingLevel::Minimal);
@@ -78,7 +86,7 @@ impl RainySDKProvider {
             }
 
             // Pass through others
-            _ => (model_id.to_string(), None),
+            _ => (clean_id.to_string(), None),
         }
     }
 }
