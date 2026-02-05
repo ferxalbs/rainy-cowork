@@ -82,7 +82,7 @@ export function AgentChatPanel({
 
     if (isDeepProcessing) {
       // Deep processing use legacy Cowork Agent (Plan -> Execute)
-      await sendInstruction(instruction, workspacePath);
+      await sendInstruction(instruction, workspacePath, currentModelId);
     } else {
       // Fast chat uses Unified Streaming
       await streamChat(instruction, currentModelId);

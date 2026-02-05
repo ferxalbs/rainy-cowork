@@ -99,7 +99,7 @@ export function useAgentChat() {
   );
 
   const sendInstruction = useCallback(
-    async (instruction: string, workspacePath: string) => {
+    async (instruction: string, workspacePath: string, modelId: string) => {
       // This maps to "Deep Processing" / Task creation
       const userMsg: AgentMessage = {
         id: crypto.randomUUID(),
@@ -111,13 +111,25 @@ export function useAgentChat() {
 
       setIsPlanning(true);
 
+      // Parse modelId (e.g. "rainy:gemini-2.0-flash" -> "gemini-2.0-flash")
+      let targetModel = modelId;
+      let targetProvider = "rainyapi"; // Default to rainyapi for now
+
+      if (modelId.includes(":")) {
+        const parts = modelId.split(":");
+        // parts[0] is provider prefix (rainy, cowork, etc), parts[1] is model
+        if (parts.length > 1) {
+          targetModel = parts[1];
+        }
+      }
+
       // created a task
       try {
-        // Hardcoded "default" provider/model for task loop for now, or fetch from settings
+        // Use selected model instead of hardcoded default
         const task = await createTask(
           instruction,
-          "rainyapi",
-          "gemini-2.0-flash",
+          targetProvider as any,
+          targetModel,
           workspacePath,
         );
 
