@@ -78,7 +78,13 @@ export function AgentChatPanel({
     if (!input.trim() || isProcessing) return;
     const instruction = input.trim();
     setInput("");
-    await streamChat(instruction, currentModelId);
+
+    // In Deep Mode, inject system context to prevent "I can't do that" refusals
+    const hiddenContext = isDeepProcessing
+      ? `[SYSTEM: You are a Planning Agent. The user wants to perform a task. You have full access to the file system via the 'Execute Task' button the user will press later. DO NOT say you cannot do it. Instead, PROPOSE the plan of action. Assume your plan will be executed.]`
+      : undefined;
+
+    await streamChat(instruction, currentModelId, hiddenContext);
   };
 
   const handlePlan = async () => {
@@ -192,7 +198,7 @@ export function AgentChatPanel({
                     : "bg-muted/50 text-muted-foreground hover:bg-muted/80"
                 }`}
               >
-                Plan Task
+                {isDeepProcessing ? "Execute Task" : "Plan Task"}
               </Button>
             )}
 
@@ -219,7 +225,7 @@ export function AgentChatPanel({
         <div className="mt-2 text-center">
           <p className="text-[10px] text-muted-foreground flex items-center justify-center gap-1">
             <Info className="size-3" />
-            Uses advanced reasoning and tools. May take longer to respond.
+            Deep Mode: Chat to analyze & plan (Enter). Cmd+Enter to execute.
           </p>
         </div>
       )}
@@ -312,7 +318,7 @@ export function AgentChatPanel({
                   title="Quick Question"
                   desc="Fast answers using lightweight models"
                   onClick={() => {
-                    const fastModel = "rainy:gemini-2.0-flash";
+                    const fastModel = "gemini-2.5-flash";
                     handleModelSelect(fastModel);
                     setIsDeepProcessing(false);
                     setInput("How do I...");
@@ -323,7 +329,7 @@ export function AgentChatPanel({
                   title="Deep Analysis"
                   desc="Complex tasks using reasoning models"
                   onClick={() => {
-                    const deepModel = "cowork:gemini-2.5-pro";
+                    const deepModel = "gemini-2.5-pro";
                     handleModelSelect(deepModel);
                     setIsDeepProcessing(true);
                     setInput("Analyze this project and...");

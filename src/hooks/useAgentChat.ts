@@ -20,7 +20,7 @@ export function useAgentChat() {
   }, []);
 
   const streamChat = useCallback(
-    async (instruction: string, modelId: string) => {
+    async (instruction: string, modelId: string, hiddenContext?: string) => {
       const userMsg: AgentMessage = {
         id: crypto.randomUUID(),
         type: "user",
@@ -54,10 +54,14 @@ export function useAgentChat() {
             content: m.content,
           }));
 
-        // Add the new user message
+        // Add the new user message (with hidden context if provided)
+        const effectiveContent = hiddenContext
+          ? `${hiddenContext}\n\nUser Query: "${instruction}"`
+          : instruction;
+
         const fullMessages = [
           ...history,
-          { role: "user", content: instruction },
+          { role: "user", content: effectiveContent },
         ];
 
         await streamWithRouting(
@@ -128,17 +132,17 @@ export function useAgentChat() {
 
       setIsPlanning(true);
 
-      // Parse modelId (e.g. "rainy:gemini-2.0-flash" -> "gemini-2.0-flash")
+      // Parse modelId (e.g. "gemini-2.0-flash" -> "gemini-2.0-flash")
+      // Parse modelId - remove explicit 'rainy:' prefix handling if backend handles it
+      // But keep safety check if ID comes formatted weirdly from other places
       let targetModel = modelId;
-      let targetProvider = "rainyapi"; // Default to rainyapi for now
-
-      if (modelId.includes(":")) {
-        const parts = modelId.split(":");
-        // parts[0] is provider prefix (rainy, cowork, etc), parts[1] is model
-        if (parts.length > 1) {
-          targetModel = parts[1];
-        }
+      if (targetModel.startsWith("rainy:")) {
+        targetModel = targetModel.replace("rainy:", "");
+      } else if (targetModel.startsWith("cowork:")) {
+        targetModel = targetModel.replace("cowork:", "");
       }
+
+      const targetProvider = "rainyapi"; // Default to rainyapi
 
       // created a task
       try {
