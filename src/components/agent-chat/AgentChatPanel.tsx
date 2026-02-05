@@ -218,7 +218,11 @@ Click 'Execute Task' when ready."]`
               <Button
                 size="sm"
                 onPress={handlePlan}
-                isDisabled={!input.trim() || isProcessing}
+                isDisabled={
+                  isDeepProcessing
+                    ? isProcessing || messages.length === 0
+                    : !input.trim() || isProcessing
+                }
                 className={`rounded-full h-8 px-3 text-xs font-medium transition-all duration-300 ${
                   isDeepProcessing
                     ? "bg-purple-500/10 text-purple-400 hover:bg-purple-500/20"

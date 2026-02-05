@@ -228,175 +228,161 @@ export function useAgentChat() {
   }, []);
 
   const executeDiscussedPlan = useCallback(
-    async (workspaceId: string, modelId: string) => {
+    async (workspaceId: string, _modelId: string) => {
       if (messages.length === 0) return;
 
       setIsExecuting(true);
 
-      // 1. Create a "Thinking..." message
-      const thinkingMsgId = crypto.randomUUID();
+      // 1. Find tool calls from the AI's last response
+      const lastAgentMessage = [...messages]
+        .reverse()
+        .find((m) => m.type === "agent" && !m.isLoading);
+
+      if (!lastAgentMessage) {
+        setIsExecuting(false);
+        return;
+      }
+
+      const content = lastAgentMessage.content;
+      console.log("[executeDiscussedPlan] Parsing from AI response:", content);
+
+      // Parse tool calls using regex patterns like: write_file("path", "content")
+      const toolCalls: Array<{
+        skill: string;
+        method: string;
+        params: Record<string, any>;
+      }> = [];
+
+      // Pattern: write_file("path", "content") or write_file("path", content)
+      const writeFileRegex =
+        /write_file\s*\(\s*["']([^"']+)["']\s*,\s*["']?([^)]*?)["']?\s*\)/gi;
+      let match;
+      while ((match = writeFileRegex.exec(content)) !== null) {
+        toolCalls.push({
+          skill: "filesystem",
+          method: "write_file",
+          params: {
+            path: match[1],
+            content: match[2] || "// Auto-generated file\n",
+          },
+        });
+      }
+
+      // Pattern: read_file("path")
+      const readFileRegex = /read_file\s*\(\s*["']([^"']+)["']\s*\)/gi;
+      while ((match = readFileRegex.exec(content)) !== null) {
+        toolCalls.push({
+          skill: "filesystem",
+          method: "read_file",
+          params: { path: match[1] },
+        });
+      }
+
+      // Pattern: list_files("path")
+      const listFilesRegex = /list_files\s*\(\s*["']([^"']+)["']\s*\)/gi;
+      while ((match = listFilesRegex.exec(content)) !== null) {
+        toolCalls.push({
+          skill: "filesystem",
+          method: "list_files",
+          params: { path: match[1] },
+        });
+      }
+
+      console.log("[executeDiscussedPlan] Parsed tool calls:", toolCalls);
+
+      if (toolCalls.length === 0) {
+        // No parseable tools, add error message
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: crypto.randomUUID(),
+            type: "agent",
+            content:
+              "❌ Could not find any executable operations in the plan. Please ask the AI to use write_file, read_file, or list_files commands.",
+            isLoading: false,
+            timestamp: new Date(),
+          },
+        ]);
+        setIsExecuting(false);
+        return;
+      }
+
+      // 2. Create execution status message
+      const statusMsgId = crypto.randomUUID();
       setMessages((prev) => [
         ...prev,
         {
-          id: thinkingMsgId,
+          id: statusMsgId,
           type: "agent",
-          content: "Generating execution plan from our discussion...",
+          content: `Executing ${toolCalls.length} operation(s)...`,
           isLoading: true,
           timestamp: new Date(),
         },
       ]);
 
       try {
-        // 2. Prepare history for context
-        const history = messages
-          .filter((m) => !m.isLoading && !m.content.startsWith("[Error"))
-          .map((m) => ({
-            role: m.type === "agent" ? "assistant" : "user",
-            content: m.content,
-          }));
-
-        // 3. Ask AI to convert plan to JSON tool calls
-        const response = await tauri.completeChat({
-          messages: [
-            ...history,
-            {
-              role: "system",
-              content: `Convert the proposed plan from the conversation into executable JSON tool calls.
-
-AVAILABLE TOOLS (use these exact names):
-- write_file: Creates or overwrites a file. Params: { "path": "<filepath>", "content": "<file content>" }
-- read_file: Reads a file. Params: { "path": "<filepath>" }
-- list_files: Lists directory contents. Params: { "path": "<directory path>" }
-- search_files: Searches for text. Params: { "query": "<search term>", "path": "<optional directory>" }
-
-OUTPUT RULES:
-1. Output ONLY a valid JSON array - no markdown, no explanation
-2. If the plan mentions creating a file, use write_file with appropriate content (not empty)
-3. If no file content was specified, generate reasonable default content
-4. Use relative paths from the project root
-
-EXAMPLE OUTPUT:
-[{"skill":"filesystem","method":"write_file","params":{"path":"test.txt","content":"Hello World"}}]
-
-Generate the JSON array now:`,
-            },
-          ],
-          model: modelId,
-          stream: false,
-        });
-
-        const content = response.content || "[]";
-        console.log("[executeDiscussedPlan] AI response content:", content);
-        let toolCalls: any[] = [];
-
-        try {
-          // clean markdown if present
-          const cleanContent = content
-            .replace(/```json/g, "")
-            .replace(/```/g, "")
-            .trim();
-          console.log("[executeDiscussedPlan] Cleaned content:", cleanContent);
-          toolCalls = JSON.parse(cleanContent);
-          console.log("[executeDiscussedPlan] Parsed tool calls:", toolCalls);
-        } catch (e) {
-          console.error("[executeDiscussedPlan] JSON parse error:", e);
-          throw new Error("Failed to parse execution plan: " + content);
-        }
-
-        // 4. Update UI to "Executing..."
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === thinkingMsgId
-              ? {
-                  ...m,
-                  content: `Executing ${toolCalls.length} operations...`,
-                  isLoading: true,
-                }
-              : m,
-          ),
-        );
-
-        // 5. Execute each tool
-        const results: { call: any; result: tauri.CommandResult }[] = [];
-        console.log(
-          "[executeDiscussedPlan] Starting execution of",
-          toolCalls.length,
-          "tool calls",
-        );
+        // 3. Execute each tool
+        const results: {
+          call: (typeof toolCalls)[0];
+          result: tauri.CommandResult;
+        }[] = [];
 
         for (const call of toolCalls) {
-          console.log("[executeDiscussedPlan] Processing call:", call);
+          console.log("[executeDiscussedPlan] Executing:", call);
 
-          if (call.skill === "filesystem") {
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === thinkingMsgId
-                  ? {
-                      ...m,
-                      content: `Executing: ${call.method} ${call.params?.path || ""}...`,
-                    }
-                  : m,
-              ),
-            );
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === statusMsgId
+                ? {
+                    ...m,
+                    content: `⏳ ${call.method}("${call.params.path}")...`,
+                  }
+                : m,
+            ),
+          );
 
-            console.log("[executeDiscussedPlan] Calling executeSkill:", {
-              workspaceId,
-              skill: call.skill,
-              method: call.method,
-              params: call.params,
-              workspacePath: workspaceId, // workspaceId IS the path for local execution
-            });
+          const result = await tauri.executeSkill(
+            workspaceId,
+            call.skill,
+            call.method,
+            call.params,
+            workspaceId, // Pass workspacePath for local path resolution
+          );
 
-            // For local Deep Mode execution, workspaceId is actually the filesystem path
-            const result = await tauri.executeSkill(
-              workspaceId,
-              call.skill,
-              call.method,
-              call.params || {},
-              workspaceId, // Pass the workspace path for relative path resolution
-            );
-            console.log("[executeDiscussedPlan] executeSkill result:", result);
-            results.push({ call, result });
+          console.log("[executeDiscussedPlan] Result:", result);
+          results.push({ call, result });
 
-            if (!result.success) {
-              throw new Error(
-                `Failed to execute ${call.method}: ${result.error}`,
-              );
-            }
-          } else {
-            console.log(
-              "[executeDiscussedPlan] Skipping non-filesystem call:",
-              call,
+          if (!result.success) {
+            throw new Error(
+              `Failed: ${call.method}("${call.params.path}"): ${result.error}`,
             );
           }
         }
 
-        // 6. Final success message
+        // 4. Success message
+        const successDetails = results
+          .map((r) => `✅ ${r.call.method}("${r.call.params.path}")`)
+          .join("\n");
+
         setMessages((prev) =>
           prev.map((m) =>
-            m.id === thinkingMsgId
+            m.id === statusMsgId
               ? {
                   ...m,
-                  content:
-                    `✅ Successfully executed ${toolCalls.length} operations.\n\n` +
-                    results
-                      .map(
-                        (r) =>
-                          `- ${r.call.method} ${r.call.params.path}: ${r.result.success ? "Success" : "Failed"}`,
-                      )
-                      .join("\n"),
+                  content: `**Execution Complete**\n\n${successDetails}`,
                   isLoading: false,
                 }
               : m,
           ),
         );
       } catch (err: any) {
+        console.error("[executeDiscussedPlan] Error:", err);
         setMessages((prev) =>
           prev.map((m) =>
-            m.id === thinkingMsgId
+            m.id === statusMsgId
               ? {
                   ...m,
-                  content: `Execution failed: ${err.message}`,
+                  content: `❌ ${err.message}`,
                   isLoading: false,
                 }
               : m,
