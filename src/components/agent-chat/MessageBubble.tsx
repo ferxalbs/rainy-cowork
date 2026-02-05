@@ -101,6 +101,8 @@ export function MessageBubble({
             thinkingLevel={message.thinkingLevel || "medium"}
             modelName={message.modelUsed?.name}
             className="w-full max-w-md"
+            isStreaming={message.isLoading}
+            durationMs={message.thoughtDuration}
           />
         )}
 

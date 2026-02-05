@@ -1,131 +1,160 @@
-import { useState } from "react";
-import { Lightbulb, ChevronDown, ChevronUp, Brain } from "lucide-react";
+import { useState, useEffect } from "react";
+import { ChevronDown, Brain, Clock } from "lucide-react";
 import { Button } from "@heroui/react";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface ThoughtDisplayProps {
   thought: string;
   thinkingLevel?: "minimal" | "low" | "medium" | "high";
   modelName?: string;
   className?: string;
+  isStreaming?: boolean;
+  durationMs?: number;
 }
 
-/**
- * Enterprise Thought Display Component
- * Shows AI reasoning/thinking process in an elegant, collapsible format
- * Designed for production-grade applications with thinking-capable models
- */
 export function ThoughtDisplay({
   thought,
   thinkingLevel = "medium",
   modelName,
   className,
+  isStreaming = false,
+  durationMs,
 }: ThoughtDisplayProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
+  // Default to expanded if currently streaming
+  const [isExpanded, setIsExpanded] = useState(isStreaming);
+  const [elapsed, setElapsed] = useState(0);
 
-  // Map thinking level to display attributes
-  const levelConfig = {
-    minimal: { color: "text-gray-500", bg: "bg-gray-500/5", label: "Quick" },
-    low: { color: "text-blue-500", bg: "bg-blue-500/5", label: "Light" },
-    medium: { color: "text-amber-500", bg: "bg-amber-500/5", label: "Standard" },
-    high: { color: "text-purple-500", bg: "bg-purple-500/5", label: "Deep" },
+  // Auto-expand and track time during streaming
+  useEffect(() => {
+    if (isStreaming) {
+      setIsExpanded(true);
+      const start = Date.now();
+      const interval = setInterval(() => {
+        setElapsed(Date.now() - start);
+      }, 100);
+      return () => clearInterval(interval);
+    }
+  }, [isStreaming]);
+
+  // Use provided duration (if finished) or local elapsed (if streaming)
+  const displayTime = durationMs || (isStreaming ? elapsed : null);
+
+  const formatTime = (ms: number) => {
+    return (ms / 1000).toFixed(1) + "s";
   };
 
-  const config = levelConfig[thinkingLevel];
+  // Use modelName if available
+  const headerTitle = modelName ? `${modelName} Thinking` : "Thinking Process";
+
+  const levelColor: Record<string, string> = {
+    minimal: "text-slate-500",
+    low: "text-blue-500",
+    medium: "text-amber-500",
+    high: "text-purple-500",
+  };
+
+  const bgColor: Record<string, string> = {
+    minimal: "bg-slate-500",
+    low: "bg-blue-500",
+    medium: "bg-amber-500",
+    high: "bg-purple-500",
+  };
+
+  const currentLevelColor = levelColor[thinkingLevel] || levelColor.medium;
+  const currentBgColor = bgColor[thinkingLevel] || bgColor.medium;
 
   return (
-    <div className={`w-full ${className}`}>
-      {/* Thought Header */}
+    <div className={`w-full font-sans ${className}`}>
       <div
-        className={`flex items-center justify-between p-3 rounded-lg border ${config.bg} border-opacity-20 cursor-pointer transition-all hover:bg-opacity-10`}
-        style={{ borderColor: "currentColor" }}
+        className="flex items-center gap-2 cursor-pointer group select-none py-2"
         onClick={() => setIsExpanded(!isExpanded)}
       >
-        <div className="flex items-center gap-2">
-          <div className={`${config.color}`}>
-            <Brain className="size-4" />
-          </div>
-          <div className="flex flex-col">
-            <span className={`text-xs font-medium ${config.color} flex items-center gap-1`}>
-              <Lightbulb className="size-3" />
-              AI Reasoning Process
-            </span>
-            <span className="text-[10px] text-muted-foreground">
-              {modelName && `${modelName} · `}
-              {config.label} thinking level
-            </span>
-          </div>
+        <div
+          className={`p-1 rounded-md bg-opacity-10 ${currentBgColor} transition-colors`}
+        >
+          <Brain className={`size-3.5 ${currentLevelColor}`} />
         </div>
+
+        <span className="text-sm font-medium text-foreground/80 group-hover:text-foreground transition-colors">
+          {headerTitle}
+        </span>
+
+        {displayTime && (
+          <span className="text-xs text-muted-foreground font-mono flex items-center gap-1 ml-1 bg-muted/30 px-1.5 py-0.5 rounded">
+            <Clock className="size-3" />
+            {formatTime(displayTime)}
+          </span>
+        )}
+
+        <div className="flex-1" />
+
         <Button
           size="sm"
           variant="ghost"
-          className={`${config.color} hover:${config.bg} h-6 px-2`}
+          isIconOnly
+          className="w-6 h-6 min-w-0 data-[hover=true]:bg-muted/50 text-muted-foreground"
           onPress={() => setIsExpanded(!isExpanded)}
         >
-          {isExpanded ? (
-            <ChevronUp className="size-3" />
-          ) : (
-            <ChevronDown className="size-3" />
-          )}
+          <ChevronDown
+            className={`size-3.5 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`}
+          />
         </Button>
       </div>
 
-      {/* Expanded Thought Content */}
-      {isExpanded && (
-        <div
-          className={`mt-2 p-4 rounded-lg ${config.bg} border border-opacity-10 text-sm leading-relaxed`}
-          style={{ borderColor: "currentColor" }}
-        >
-          <div className={`${config.color} font-medium text-xs mb-2 uppercase tracking-wide`}>
-            Reasoning Chain
-          </div>
-          <div className="text-muted-foreground whitespace-pre-wrap font-mono text-xs">
-            {thought}
-          </div>
-          
-          {/* Thought Signature */}
-          <div className="mt-4 pt-3 border-t border-opacity-10 flex items-center justify-between">
-            <span className="text-[10px] text-muted-foreground">
-              Powered by advanced reasoning
-            </span>
-            <div className="flex items-center gap-1">
-              <div className={`w-2 h-2 rounded-full ${config.color} bg-current animate-pulse`} />
-              <span className={`text-[10px] ${config.color}`}>
-                {thinkingLevel.charAt(0).toUpperCase() + thinkingLevel.slice(1)} reasoning
-              </span>
+      <AnimatePresence initial={false}>
+        {isExpanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2, ease: "easeInOut" }}
+            className="overflow-hidden"
+          >
+            <div className="pl-2 border-l-2 border-muted/30 ml-2.5 my-1">
+              <div className="pl-4 py-2 text-sm text-muted-foreground/90 whitespace-pre-wrap leading-relaxed font-mono bg-muted/5 rounded-r-lg">
+                {thought}
+                {isStreaming && (
+                  <span className="inline-block w-1.5 h-3.5 bg-current ml-1 animate-pulse align-middle" />
+                )}
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
 
-/**
- * Compact Thought Badge - for inline display
- */
 export function ThoughtBadge({
   thinkingLevel = "medium",
-  onClick,
 }: {
-  thinkingLevel?: "minimal" | "low" | "medium" | "high";
-  onClick?: () => void;
+  thinkingLevel?: string;
 }) {
-  const levelConfig = {
-    minimal: { color: "text-gray-500", bg: "bg-gray-500/10", label: "Quick" },
-    low: { color: "text-blue-500", bg: "bg-blue-500/10", label: "Light" },
-    medium: { color: "text-amber-500", bg: "bg-amber-500/10", label: "Reasoning" },
-    high: { color: "text-purple-500", bg: "bg-purple-500/10", label: "Deep" },
+  const levelColor: Record<string, string> = {
+    minimal: "text-slate-500",
+    low: "text-blue-500",
+    medium: "text-amber-500",
+    high: "text-purple-500",
   };
 
-  const config = levelConfig[thinkingLevel];
+  const bgColor: Record<string, string> = {
+    minimal: "bg-slate-500",
+    low: "bg-blue-500",
+    medium: "bg-amber-500",
+    high: "bg-purple-500",
+  };
+
+  const currentLevelColor = levelColor[thinkingLevel] || levelColor.medium;
+  const currentBgColor = bgColor[thinkingLevel] || bgColor.medium;
 
   return (
-    <button
-      onClick={onClick}
-      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${config.color} ${config.bg} hover:opacity-80 transition-opacity`}
+    <div
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-opacity-10 ${currentBgColor}`}
     >
-      <Brain className="size-3" />
-      {config.label}
-    </button>
+      <Brain className={`size-3 ${currentLevelColor}`} />
+      <span className={`text-[10px] font-medium ${currentLevelColor}`}>
+        Thinking
+      </span>
+    </div>
   );
 }

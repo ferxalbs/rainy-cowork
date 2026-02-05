@@ -163,7 +163,7 @@ async fn get_rainy_sdk_models(_app: &AppHandle) -> Result<Vec<UnifiedModel>, Str
                     id: model_id,
                     name: model_name.to_string(),
                     provider: "Rainy API".to_string(),
-                    capabilities: get_default_capabilities(),
+                    capabilities: get_model_capabilities(model_name),
                     enabled: true,
                     processing_mode: "rainy_api".to_string(),
                 });
@@ -210,7 +210,7 @@ async fn get_provider_manager_models(
                         id: format!("{}:{}", prefix, model_name),
                         name: model_name.clone(),
                         provider: provider_display.to_string(),
-                        capabilities: get_default_capabilities(),
+                        capabilities: get_model_capabilities(&model_name),
                         enabled: true,
                         processing_mode,
                     };
@@ -223,9 +223,12 @@ async fn get_provider_manager_models(
     Ok(models)
 }
 
-/// Get default model capabilities
-fn get_default_capabilities() -> ModelCapabilities {
-    ModelCapabilities {
+/// Get capabilities based on model name
+fn get_model_capabilities(model_name: &str) -> ModelCapabilities {
+    let is_gemini = model_name.to_lowercase().contains("gemini");
+
+    // Default capabilities
+    let mut caps = ModelCapabilities {
         chat: true,
         streaming: true,
         function_calling: true,
@@ -233,7 +236,15 @@ fn get_default_capabilities() -> ModelCapabilities {
         web_search: true,
         max_context: 128000,
         max_output: 8192,
+    };
+
+    // Enhanced limits for Gemini models
+    if is_gemini {
+        caps.max_context = 1_000_000; // 1M context
+        caps.max_output = 65_536; // 65k output
     }
+
+    caps
 }
 
 /// Get Rainy API key from keychain
@@ -444,7 +455,7 @@ pub async fn get_recommended_model(
         id: "rainy:gemini-2.5-flash".to_string(),
         name: "Gemini 2.5 Flash".to_string(),
         provider: "rainy".to_string(),
-        capabilities: get_default_capabilities(),
+        capabilities: get_model_capabilities("gemini-2.5-flash"),
         enabled: true,
         processing_mode: "rainy_api".to_string(),
     })

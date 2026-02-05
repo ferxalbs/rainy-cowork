@@ -135,6 +135,7 @@ export interface AgentMessage {
     name: string;
     thinkingEnabled: boolean;
   };
+  thoughtDuration?: number; // Duration in ms
   plan?: TaskPlan;
   result?: ExecutionResult;
   toolCalls?: Array<{
