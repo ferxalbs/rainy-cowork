@@ -28,9 +28,106 @@ pub struct AgentRuntime {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct AgentMessage {
     pub role: String,
-    pub content: String,
+    pub content: AgentContent,
     pub tool_calls: Option<Vec<crate::ai::provider_types::ToolCall>>,
     pub tool_call_id: Option<String>,
+}
+
+/// Content for agent messages - supports text and multimodal
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(untagged)]
+pub enum AgentContent {
+    /// Simple text content
+    Text(String),
+    /// Multimodal content with text and/or images
+    Parts(Vec<AgentContentPart>),
+}
+
+impl AgentContent {
+    /// Create text content
+    pub fn text(s: impl Into<String>) -> Self {
+        AgentContent::Text(s.into())
+    }
+
+    /// Create image content from a data URI
+    pub fn image(data_uri: impl Into<String>) -> Self {
+        AgentContent::Parts(vec![AgentContentPart::ImageUrl {
+            image_url: AgentImageUrl {
+                url: data_uri.into(),
+                detail: Some("auto".to_string()),
+            },
+        }])
+    }
+
+    /// Create mixed content (text + image)
+    #[allow(dead_code)] // @RESERVED - will be used for user-provided images
+    pub fn mixed(text: impl Into<String>, image_url: impl Into<String>) -> Self {
+        AgentContent::Parts(vec![
+            AgentContentPart::Text { text: text.into() },
+            AgentContentPart::ImageUrl {
+                image_url: AgentImageUrl {
+                    url: image_url.into(),
+                    detail: Some("auto".to_string()),
+                },
+            },
+        ])
+    }
+
+    /// Get text representation (for non-multimodal contexts)
+    pub fn as_text(&self) -> String {
+        match self {
+            AgentContent::Text(s) => s.clone(),
+            AgentContent::Parts(parts) => parts
+                .iter()
+                .filter_map(|p| match p {
+                    AgentContentPart::Text { text } => Some(text.clone()),
+                    AgentContentPart::ImageUrl { .. } => Some("[IMAGE]".to_string()),
+                })
+                .collect::<Vec<_>>()
+                .join(" "),
+        }
+    }
+
+    /// Check if content contains an image
+    #[allow(dead_code)] // @RESERVED - will be used for conditional image processing
+    pub fn has_image(&self) -> bool {
+        match self {
+            AgentContent::Text(_) => false,
+            AgentContent::Parts(parts) => parts
+                .iter()
+                .any(|p| matches!(p, AgentContentPart::ImageUrl { .. })),
+        }
+    }
+}
+
+impl From<String> for AgentContent {
+    fn from(s: String) -> Self {
+        AgentContent::Text(s)
+    }
+}
+
+impl From<&str> for AgentContent {
+    fn from(s: &str) -> Self {
+        AgentContent::Text(s.to_string())
+    }
+}
+
+/// Content part for multimodal messages
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum AgentContentPart {
+    /// Text content
+    Text { text: String },
+    /// Image URL (including data URIs)
+    ImageUrl { image_url: AgentImageUrl },
+}
+
+/// Image URL details
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct AgentImageUrl {
+    pub url: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub detail: Option<String>,
 }
 
 impl AgentRuntime {
@@ -57,7 +154,7 @@ impl AgentRuntime {
         // Add System Message to State
         state.messages.push(AgentMessage {
             role: "system".to_string(),
-            content: self.config.instructions.clone(),
+            content: AgentContent::text(self.config.instructions.clone()),
             tool_calls: None,
             tool_call_id: None,
         });
@@ -71,7 +168,7 @@ impl AgentRuntime {
         // Add the new User Message
         state.messages.push(AgentMessage {
             role: "user".to_string(),
-            content: input.to_string(),
+            content: AgentContent::text(input),
             tool_calls: None,
             tool_call_id: None,
         });
@@ -109,7 +206,7 @@ impl AgentRuntime {
             // Append the User Message (input) first
             hist.push(AgentMessage {
                 role: "user".to_string(),
-                content: input.to_string(),
+                content: AgentContent::text(input),
                 tool_calls: None,
                 tool_call_id: None,
             });
@@ -172,7 +269,7 @@ impl AgentRuntime {
         }
 
         if last_message.role == "assistant" {
-            Ok(last_message.content.clone())
+            Ok(last_message.content.as_text())
         } else {
             // Workflow ended on a Tool output or something?
             // Usually ThinkStep (Assistant) is the last one.

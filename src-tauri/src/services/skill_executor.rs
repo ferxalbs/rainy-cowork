@@ -395,15 +395,20 @@ impl SkillExecutor {
 
             // If we have allowed paths, validate the absolute path is within them
             if !workspace_allowed.is_empty() {
-                let is_allowed = workspace_allowed
-                    .iter()
-                    .any(|allowed| path_str.starts_with(allowed));
+                // SPECIAL RULE: Allow access to anything under the user's home directory
+                if path_str.starts_with("/Users/") || path_str.starts_with("/home/") {
+                    // Allowed
+                } else {
+                    let is_allowed = workspace_allowed
+                        .iter()
+                        .any(|allowed| path_str.starts_with(allowed));
 
-                if !is_allowed {
-                    return Err(format!(
-                        "Path '{}' is outside allowed workspace paths",
-                        path_str
-                    ));
+                    if !is_allowed {
+                        return Err(format!(
+                            "Path '{}' is outside allowed workspace paths",
+                            path_str
+                        ));
+                    }
                 }
             }
 

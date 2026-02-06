@@ -352,6 +352,14 @@ impl AIProvider for RainySDKProvider {
             },
         };
 
+        // Debug: Log request payload for troubleshooting
+        if let Ok(debug_json) = serde_json::to_string_pretty(&api_request) {
+            tracing::info!(
+                "[RainySDK] Request payload (first 2000 chars):\n{}",
+                &debug_json[..debug_json.len().min(2000)]
+            );
+        }
+
         // Make direct HTTP call to Rainy API
         let base_url = self
             .config

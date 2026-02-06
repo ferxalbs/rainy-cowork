@@ -213,6 +213,29 @@ impl From<&str> for MessageContent {
     }
 }
 
+impl From<crate::ai::agent::runtime::AgentContent> for MessageContent {
+    fn from(content: crate::ai::agent::runtime::AgentContent) -> Self {
+        use crate::ai::agent::runtime::{AgentContent, AgentContentPart};
+        match content {
+            AgentContent::Text(s) => MessageContent::Text(s),
+            AgentContent::Parts(parts) => MessageContent::Parts(
+                parts
+                    .into_iter()
+                    .map(|p| match p {
+                        AgentContentPart::Text { text } => ContentPart::Text { text },
+                        AgentContentPart::ImageUrl { image_url } => ContentPart::ImageUrl {
+                            image_url: ImageUrl {
+                                url: image_url.url,
+                                detail: image_url.detail,
+                            },
+                        },
+                    })
+                    .collect(),
+            ),
+        }
+    }
+}
+
 /// Content part for multimodal messages
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]

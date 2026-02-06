@@ -24,6 +24,7 @@ pub async fn run_agent_workflow(
             
             CAPABILITIES:
             - You can read, write, list, and search files in the workspace.
+            - **MULTIMODAL: You can SEE images.** If you use `read_file` on an image, you will receive its visual content.
             - You can plan multi-step tasks.
             
             GUIDELINES:

@@ -1,5 +1,5 @@
 use crate::ai::agent::memory::AgentMemory;
-use crate::ai::agent::runtime::{AgentConfig, AgentMessage};
+use crate::ai::agent::runtime::{AgentConfig, AgentContent, AgentMessage};
 use crate::ai::router::IntelligentRouter;
 use crate::models::neural::{
     AirlockLevel, CommandPriority, CommandStatus, QueuedCommand, RainyPayload,
@@ -12,6 +12,22 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::Arc;
 use tokio::sync::RwLock;
+
+/// Helper to detect if a string is a base64 data URI for an image
+fn is_image_data_uri(s: &str) -> bool {
+    s.starts_with("data:image/") && s.contains("base64,")
+}
+
+/// Convert tool output to appropriate AgentContent
+fn tool_output_to_content(output: String) -> AgentContent {
+    if is_image_data_uri(&output) {
+        // Pure image - wrap in ImageUrl part
+        AgentContent::image(output)
+    } else {
+        // Plain text
+        AgentContent::text(output)
+    }
+}
 
 /// Shared state passed between workflow steps
 #[derive(Clone, Debug)]
@@ -143,10 +159,13 @@ impl WorkflowStep for ThinkStep {
             .iter()
             .map(|m| {
                 if m.role == "system" {
-                    crate::ai::provider_types::ChatMessage::system(m.content.clone())
+                    // System messages are text-only, use as_text()
+                    crate::ai::provider_types::ChatMessage::system(m.content.as_text())
                 } else if m.role == "user" {
+                    // User messages support multimodal, convert AgentContent -> MessageContent
                     crate::ai::provider_types::ChatMessage::user(m.content.clone())
                 } else {
+                    // Other roles (assistant, tool) also support multimodal
                     crate::ai::provider_types::ChatMessage {
                         role: m.role.clone(),
                         content: m.content.clone().into(),
@@ -160,7 +179,11 @@ impl WorkflowStep for ThinkStep {
 
         // 1.5. Inject Memory Context (RAG)
         if let Some(last_user_msg) = state.messages.iter().rfind(|m| m.role == "user") {
-            let hits = state.memory.retrieve(&last_user_msg.content).await;
+            // Use as_text() to extract text for vector search
+            let hits = state
+                .memory
+                .retrieve(&last_user_msg.content.as_text())
+                .await;
             if !hits.is_empty() {
                 let ctx = hits
                     .iter()
@@ -219,7 +242,7 @@ impl WorkflowStep for ThinkStep {
 
         state.messages.push(AgentMessage {
             role: "assistant".to_string(),
-            content: assistant_content.clone(),
+            content: AgentContent::text(assistant_content.clone()),
             tool_calls: tool_calls.clone(),
             tool_call_id: None,
         });
@@ -336,9 +359,12 @@ impl WorkflowStep for ActStep {
                 }
             }
 
+            // Convert tool output to proper multimodal content if it's an image
+            let content = tool_output_to_content(final_output);
+
             results.push(AgentMessage {
                 role: "tool".to_string(),
-                content: final_output,
+                content,
                 tool_calls: None,
                 tool_call_id: Some(call.id.clone()),
             });
