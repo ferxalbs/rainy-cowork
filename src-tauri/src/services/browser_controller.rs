@@ -90,8 +90,13 @@ impl BrowserController {
             .await
             .map_err(|e| format!("Failed to create page: {}", e))?;
 
-        // Wait for page to load
-        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+        // Check if navigation happened (URL changed) or wait for load event
+        // chromiumoxide's new_page waits for initial load, but we can add robust waiting
+        // Replacing static sleep with a shorter wait or improved logic
+
+        // Wait for network idle or load event if possible (basic wait for now kept short)
+        // @TODO: Implement stricter wait_for_navigation if needed
+        tokio::time::sleep(tokio::time::Duration::from_secs(4)).await; // Increased slightly to ensure render, but ideally use events
 
         // Get page info
         let current_url = page
@@ -223,6 +228,8 @@ impl BrowserController {
     }
 
     /// Execute JavaScript and return result
+    // @RESERVED for complex interactions requiring JS evaluation
+    #[allow(dead_code)]
     pub async fn evaluate(&self, script: &str) -> Result<String, String> {
         let browser_lock = self.browser.lock().await;
         let browser = browser_lock

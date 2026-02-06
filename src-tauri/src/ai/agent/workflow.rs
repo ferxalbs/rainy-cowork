@@ -304,9 +304,18 @@ impl WorkflowStep for ActStep {
             let params: serde_json::Value = serde_json::from_str(&arguments_str)
                 .map_err(|e| format!("Failed to parse args: {}", e))?;
 
-            // Simple mapping for now
-            let skill = "filesystem";
-            let method = function_name.as_str(); // e.g. "read_file"
+            // Dynamic mapping based on tool name
+            let (skill, method) = match function_name.as_str() {
+                "browse_url" | "click_element" | "screenshot" | "get_page_content" => {
+                    ("browser", function_name.as_str())
+                }
+                "web_search" | "read_web_page" => ("web", function_name.as_str()),
+                "execute_command" => ("shell", "execute_command"),
+                "read_file" | "write_file" | "list_files" | "search_files" | "append_file" => {
+                    ("filesystem", function_name.as_str())
+                }
+                _ => ("filesystem", function_name.as_str()), // Default to fs or pass through
+            };
 
             let command = QueuedCommand {
                 id: uuid::Uuid::new_v4().to_string(),

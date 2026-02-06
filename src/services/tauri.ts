@@ -1336,6 +1336,10 @@ export async function generatePairingCode(): Promise<{
   return invoke("generate_pairing_code");
 }
 
+export async function hasAtmCredentials(): Promise<boolean> {
+  return invoke("has_atm_credentials");
+}
+
 export async function resetNeuralWorkspace(
   masterKey: string,
   userApiKey: string,

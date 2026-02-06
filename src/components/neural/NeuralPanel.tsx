@@ -31,6 +31,7 @@ import {
   respondToAirlock,
   getPendingAirlockApprovals,
   setHeadlessMode,
+  hasAtmCredentials,
   ApprovalRequest,
   WorkspaceAuth,
   SkillManifest,
@@ -42,7 +43,7 @@ import { CreateAgentForm } from "./CreateAgentForm";
 
 const DEFAULT_SKILLS: SkillManifest[] = [
   {
-    name: "file_ops",
+    name: "filesystem",
     version: "1.0.0",
     methods: [
       {
@@ -52,8 +53,42 @@ const DEFAULT_SKILLS: SkillManifest[] = [
         parameters: {
           path: {
             type: "string",
-            description: "Absolute path to file",
+            description: "Path to file",
             required: true,
+          },
+        },
+      },
+      {
+        name: "list_files",
+        description: "List files in a directory",
+        airlockLevel: AirlockLevels.Safe,
+        parameters: {
+          path: {
+            type: "string",
+            description: "Directory path",
+            required: true,
+          },
+        },
+      },
+      {
+        name: "search_files",
+        description: "Search files by query",
+        airlockLevel: AirlockLevels.Safe,
+        parameters: {
+          query: {
+            type: "string",
+            description: "Search query (regex supported)",
+            required: true,
+          },
+          path: {
+            type: "string",
+            description: "Root path to search",
+            required: false,
+          },
+          search_content: {
+            type: "boolean",
+            description: "Search within file contents",
+            required: false,
           },
         },
       },
@@ -64,7 +99,7 @@ const DEFAULT_SKILLS: SkillManifest[] = [
         parameters: {
           path: {
             type: "string",
-            description: "Absolute path to file",
+            description: "Path to file",
             required: true,
           },
           content: {
@@ -74,28 +109,117 @@ const DEFAULT_SKILLS: SkillManifest[] = [
           },
         },
       },
+      {
+        name: "append_file",
+        description: "Append content to file",
+        airlockLevel: AirlockLevels.Sensitive,
+        parameters: {
+          path: {
+            type: "string",
+            description: "Path to file",
+            required: true,
+          },
+          content: {
+            type: "string",
+            description: "Content to append",
+            required: true,
+          },
+        },
+      },
     ],
   },
   {
-    name: "terminal",
+    name: "shell",
     version: "1.0.0",
     methods: [
       {
-        name: "exec",
-        description: "Execute terminal command",
+        name: "execute_command",
+        description: "Execute a shell command",
         airlockLevel: AirlockLevels.Dangerous,
         parameters: {
           command: {
             type: "string",
-            description: "Command to execute",
+            description: "Command to execute (whitelisted)",
             required: true,
           },
-          cwd: {
-            type: "string",
-            description: "Working directory",
-            required: false,
+          args: {
+            type: "array",
+            description: "Command arguments",
+            required: true,
           },
         },
+      },
+    ],
+  },
+  {
+    name: "web",
+    version: "1.0.0",
+    methods: [
+      {
+        name: "web_search",
+        description: "Search the web",
+        airlockLevel: AirlockLevels.Safe,
+        parameters: {
+          query: {
+            type: "string",
+            description: "Search query",
+            required: true,
+          },
+        },
+      },
+      {
+        name: "read_web_page",
+        description: "Read a web page",
+        airlockLevel: AirlockLevels.Safe,
+        parameters: {
+          url: {
+            type: "string",
+            description: "URL to read",
+            required: true,
+          },
+        },
+      },
+    ],
+  },
+  {
+    name: "browser",
+    version: "1.0.0",
+    methods: [
+      {
+        name: "browse_url",
+        description: "Open a URL in the browser",
+        airlockLevel: AirlockLevels.Safe,
+        parameters: {
+          url: {
+            type: "string",
+            description: "URL to open",
+            required: true,
+          },
+        },
+      },
+      {
+        name: "click_element",
+        description: "Click an element by CSS selector",
+        airlockLevel: AirlockLevels.Sensitive,
+        parameters: {
+          selector: {
+            type: "string",
+            description: "CSS selector",
+            required: true,
+          },
+        },
+      },
+      {
+        name: "screenshot",
+        description: "Take a screenshot of the current page",
+        airlockLevel: AirlockLevels.Safe,
+        parameters: {},
+      },
+      {
+        name: "get_page_content",
+        description: "Get HTML content of the current page",
+        airlockLevel: AirlockLevels.Safe,
+        parameters: {},
       },
     ],
   },
@@ -157,10 +281,20 @@ export function NeuralPanel() {
   const [pendingApprovals, setPendingApprovals] = useState<ApprovalRequest[]>(
     [],
   );
+  const [hasAtmKey, setHasAtmKey] = useState<boolean | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     const init = async () => {
+      try {
+        const hasKey = await hasAtmCredentials();
+        if (!cancelled) {
+          setHasAtmKey(hasKey);
+        }
+      } catch (err) {
+        console.error("Failed to check ATM admin key:", err);
+      }
+
       try {
         const hasCredentials = await loadNeuralCredentials();
         if (cancelled) return;
@@ -233,6 +367,7 @@ export function NeuralPanel() {
 
       setWorkspace(ws);
       writeStoredWorkspace(ws);
+      setHasAtmKey(true);
       setState("connected");
       toast.success(`Neural Link Established! Welcome to ${ws.name}`);
     } catch (err: any) {
@@ -285,6 +420,7 @@ export function NeuralPanel() {
         setWorkspace(null);
         setState("idle");
         setPairingCode(null);
+        setHasAtmKey(false);
         clearStoredWorkspace();
         toast.success("Succesfully disconnected");
       } catch (e: any) {
@@ -310,6 +446,24 @@ export function NeuralPanel() {
               <p className="text-muted-foreground text-sm font-medium">
                 Desktop Node Management
               </p>
+              {hasAtmKey !== null && (
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                    ATM Admin Key
+                  </span>
+                  <Chip
+                    size="sm"
+                    variant="soft"
+                    className={
+                      hasAtmKey
+                        ? "bg-green-500/10 text-green-500"
+                        : "bg-red-500/10 text-red-400"
+                    }
+                  >
+                    {hasAtmKey ? "Stored" : "Missing"}
+                  </Chip>
+                </div>
+              )}
             </div>
 
             {state === "connected" && (

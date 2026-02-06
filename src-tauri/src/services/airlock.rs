@@ -154,14 +154,21 @@ impl AirlockService {
         match result {
             Ok(Ok(ApprovalResult::Approved)) => {
                 tracing::info!("Airlock: Command {} APPROVED by user", command.id);
+                // Notify frontend to clear the request from UI
+                let _ = self.app.emit("airlock:approval_resolved", &command.id);
                 Ok(true)
             }
             Ok(Ok(ApprovalResult::Rejected)) => {
                 tracing::info!("Airlock: Command {} REJECTED by user", command.id);
+                // Notify frontend to clear the request from UI
+                let _ = self.app.emit("airlock:approval_resolved", &command.id);
                 Ok(false)
             }
             Ok(Ok(ApprovalResult::Timeout)) | Ok(Err(_)) | Err(_) => {
                 // Timeout or channel closed
+                // Notify frontend to clear the request from UI
+                let _ = self.app.emit("airlock:approval_resolved", &command.id);
+
                 if allow_on_timeout {
                     tracing::info!(
                         "Airlock: Command {} timed out, allowing (sensitive)",

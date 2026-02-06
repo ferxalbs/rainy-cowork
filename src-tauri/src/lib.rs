@@ -169,6 +169,15 @@ pub fn run() {
                 }
             });
 
+            // Load ATM admin key from keychain (best-effort) for session continuity
+            let app_handle3 = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                let client = app_handle3.state::<ATMClient>();
+                if let Err(e) = client.load_credentials_from_keychain().await {
+                    tracing::warn!("Failed to load ATM admin key: {}", e);
+                }
+            });
+
             // Initialize memory manager with app data dir
             let app_data_dir = app
                 .path()
@@ -391,6 +400,7 @@ pub fn run() {
             commands::create_atm_agent,
             commands::list_atm_agents,
             commands::set_atm_credentials,
+            commands::has_atm_credentials,
             commands::generate_pairing_code,
             commands::reset_neural_workspace,
             // Neural System Commands (Desktop Nerve Center)

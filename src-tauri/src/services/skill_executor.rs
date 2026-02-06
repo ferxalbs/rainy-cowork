@@ -150,32 +150,40 @@ impl SkillExecutor {
                 r#type: "function".to_string(),
                 function: crate::ai::provider_types::FunctionDefinition {
                     name: "read_web_page".to_string(),
-                    description: "Read the content of a web page".to_string(),
+                    description: "Read the content of a web page using a headless scraper (good for static text)".to_string(),
                     parameters: serde_json::to_value(schema_for!(ReadWebPageArgs)).unwrap(),
                 },
             },
             crate::ai::provider_types::Tool {
                 r#type: "function".to_string(),
                 function: crate::ai::provider_types::FunctionDefinition {
-                    name: "read_web_page".to_string(),
-                    description: "Read the content of a web page".to_string(),
-                    parameters: serde_json::to_value(schema_for!(ReadWebPageArgs)).unwrap(),
-                },
-            },
-            crate::ai::provider_types::Tool {
-                r#type: "function".to_string(),
-                function: crate::ai::provider_types::FunctionDefinition {
-                    name: "browser_navigate".to_string(),
-                    description: "Navigate browser to a URL (via Chrome DevTools)".to_string(),
+                    name: "browse_url".to_string(),
+                    description: "Open a URL in the visible browser (for dynamic sites). Returns title and content preview.".to_string(),
                     parameters: serde_json::to_value(schema_for!(BrowserNavigateArgs)).unwrap(),
                 },
             },
             crate::ai::provider_types::Tool {
                 r#type: "function".to_string(),
                 function: crate::ai::provider_types::FunctionDefinition {
-                    name: "browser_click".to_string(),
-                    description: "Click an element in the browser".to_string(),
+                    name: "click_element".to_string(),
+                    description: "Click an element in the browser by CSS selector".to_string(),
                     parameters: serde_json::to_value(schema_for!(BrowserClickArgs)).unwrap(),
+                },
+            },
+            crate::ai::provider_types::Tool {
+                r#type: "function".to_string(),
+                function: crate::ai::provider_types::FunctionDefinition {
+                    name: "screenshot".to_string(),
+                    description: "Take a screenshot of the current browser page".to_string(),
+                    parameters: serde_json::json!({ "type": "object", "properties": {} }),
+                },
+            },
+            crate::ai::provider_types::Tool {
+                r#type: "function".to_string(),
+                function: crate::ai::provider_types::FunctionDefinition {
+                    name: "get_page_content".to_string(),
+                    description: "Get the HTML content of the current browser page".to_string(),
+                    parameters: serde_json::json!({ "type": "object", "properties": {} }),
                 },
             },
         ]
@@ -267,7 +275,7 @@ impl SkillExecutor {
         };
 
         match method {
-            "navigate" => {
+            "navigate" | "browse_url" => {
                 let args: BrowserNavigateArgs = match serde_json::from_value(params.clone()) {
                     Ok(a) => a,
                     Err(e) => return self.error(&format!("Invalid parameters: {}", e)),
@@ -309,7 +317,7 @@ impl SkillExecutor {
                     Err(e) => self.error(&e),
                 }
             }
-            "click" => {
+            "click" | "click_element" => {
                 let args: BrowserClickArgs = match serde_json::from_value(params.clone()) {
                     Ok(a) => a,
                     Err(e) => return self.error(&format!("Invalid parameters: {}", e)),
@@ -324,7 +332,7 @@ impl SkillExecutor {
                     Err(e) => self.error(&e),
                 }
             }
-            "get_content" => {
+            "get_content" | "get_page_content" => {
                 // Get page HTML content
                 match self.browser.get_content().await {
                     Ok(content) => CommandResult {

@@ -51,6 +51,11 @@ pub async fn set_atm_credentials(
 }
 
 #[command]
+pub async fn has_atm_credentials(client: State<'_, ATMClient>) -> Result<bool, String> {
+    Ok(client.has_credentials().await)
+}
+
+#[command]
 pub async fn reset_neural_workspace(
     client: State<'_, ATMClient>,
     neural: State<'_, crate::commands::neural::NeuralServiceState>,
@@ -62,6 +67,7 @@ pub async fn reset_neural_workspace(
 
     // 2. Clear local credentials
     neural.0.clear_credentials().await?;
+    client.clear_credentials().await?;
 
     Ok(())
 }

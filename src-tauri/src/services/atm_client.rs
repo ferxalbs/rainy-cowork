@@ -1,3 +1,4 @@
+use crate::ai::keychain::KeychainManager;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -16,6 +17,8 @@ pub struct ATMClient {
     http: Client,
     state: Arc<Mutex<ATMClientState>>,
 }
+
+const ATM_ADMIN_KEYCHAIN_ID: &str = "atm_admin_key";
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BootstrapResponse {
@@ -56,6 +59,39 @@ impl ATMClient {
     pub async fn set_credentials(&self, api_key: String) {
         let mut state = self.state.lock().await;
         state.api_key = Some(api_key);
+
+        // Best-effort persistence to keychain for session continuity
+        let keychain = KeychainManager::new();
+        if let Some(key) = state.api_key.as_ref() {
+            if let Err(e) = keychain.store_key(ATM_ADMIN_KEYCHAIN_ID, key) {
+                eprintln!("[ATMClient] Failed to persist admin key: {}", e);
+            }
+        }
+    }
+
+    pub async fn load_credentials_from_keychain(&self) -> Result<bool, String> {
+        let keychain = KeychainManager::new();
+        let stored = keychain.get_key(ATM_ADMIN_KEYCHAIN_ID)?;
+        if let Some(api_key) = stored {
+            self.set_credentials(api_key).await;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    pub async fn clear_credentials(&self) -> Result<(), String> {
+        let mut state = self.state.lock().await;
+        state.api_key = None;
+
+        let keychain = KeychainManager::new();
+        let _ = keychain.delete_key(ATM_ADMIN_KEYCHAIN_ID);
+        Ok(())
+    }
+
+    pub async fn has_credentials(&self) -> bool {
+        let state = self.state.lock().await;
+        state.api_key.is_some()
     }
 
     pub async fn generate_pairing_code(&self) -> Result<PairingCodeResponse, String> {
@@ -173,6 +209,15 @@ impl ATMClient {
     }
 
     pub async fn list_agents(&self) -> Result<serde_json::Value, String> {
+        // Try to load from keychain if credentials not set (race condition fix)
+        {
+            let state = self.state.lock().await;
+            if state.api_key.is_none() {
+                drop(state); // Release lock before loading
+                let _ = self.load_credentials_from_keychain().await;
+            }
+        }
+
         let state = self.state.lock().await;
         let api_key = state.api_key.as_ref().ok_or("Not authenticated")?;
 

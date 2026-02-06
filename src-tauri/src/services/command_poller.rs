@@ -4,6 +4,7 @@ use crate::ai::router::IntelligentRouter;
 use crate::models::neural::CommandResult;
 use crate::services::airlock::AirlockService;
 use crate::services::neural_service::NeuralService;
+use crate::services::settings::SettingsManager;
 use crate::services::skill_executor::SkillExecutor;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -190,9 +191,23 @@ impl CommandPoller {
                             .clone()
                             .unwrap_or_else(|| "default".to_string());
 
+                        // Extract model from params (Cloud command) or use user's selected model (Local AgentChat)
+                        let model = command
+                            .payload
+                            .params
+                            .as_ref()
+                            .and_then(|p| p.get("model"))
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string())
+                            .unwrap_or_else(|| {
+                                // Local command: use user's selected model from settings
+                                let settings = SettingsManager::new();
+                                settings.get_selected_model().to_string()
+                            });
+
                         println!(
-                            "[CommandPoller] Routing to AgentRuntime: '{}' (workspace: {})",
-                            prompt, workspace_id
+                            "[CommandPoller] Routing to AgentRuntime: '{}' (model: {}, workspace: {})",
+                            prompt, model, workspace_id
                         );
 
                         // Create AgentRuntime on-demand
@@ -206,7 +221,7 @@ impl CommandPoller {
                             // Create config
                             let config = AgentConfig {
                                 name: "Rainy Agent".to_string(),
-                                model: "gemini-2.0-flash".to_string(), // Default model
+                                model, // Use extracted or default model
                                 instructions: format!(
                                     "You are Rainy Agent, an autonomous AI assistant.
 

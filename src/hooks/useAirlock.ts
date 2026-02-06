@@ -8,7 +8,7 @@ export function useAirlock() {
 
   useEffect(() => {
     // Listen for new requests
-    const unlisten = listen<ApprovalRequest>(
+    const unlistenNew = listen<ApprovalRequest>(
       "airlock:approval_required",
       (event) => {
         console.log("Airlock Request:", event.payload);
@@ -18,6 +18,18 @@ export function useAirlock() {
             return prev;
           return [...prev, event.payload];
         });
+      },
+    );
+
+    // Listen for resolved/timed-out requests (cleanup)
+    const unlistenResolved = listen<string>(
+      "airlock:approval_resolved",
+      (event) => {
+        const commandId = event.payload;
+        console.log("Airlock Resolved:", commandId);
+        setPendingRequests((prev) =>
+          prev.filter((r) => r.commandId !== commandId),
+        );
       },
     );
 
@@ -35,7 +47,8 @@ export function useAirlock() {
       .catch((e) => console.error("Failed to check pending approvals:", e));
 
     return () => {
-      unlisten.then((f) => f());
+      unlistenNew.then((f) => f());
+      unlistenResolved.then((f) => f());
     };
   }, []);
 
