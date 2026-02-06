@@ -103,6 +103,46 @@ const DEFAULT_SKILLS: SkillManifest[] = [
 
 type NeuralState = "idle" | "restored" | "connected" | "connecting";
 
+const NEURAL_WORKSPACE_STORAGE_KEY = "rainy-neural-workspace";
+
+type StoredWorkspace = {
+  id: string;
+  name: string;
+};
+
+const readStoredWorkspace = (): StoredWorkspace | null => {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(NEURAL_WORKSPACE_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as StoredWorkspace;
+    if (!parsed?.id || !parsed?.name) return null;
+    return parsed;
+  } catch (err) {
+    console.warn("Failed to parse stored Neural workspace:", err);
+    return null;
+  }
+};
+
+const writeStoredWorkspace = (workspace: WorkspaceAuth) => {
+  if (typeof window === "undefined") return;
+  try {
+    const stored: StoredWorkspace = { id: workspace.id, name: workspace.name };
+    localStorage.setItem(NEURAL_WORKSPACE_STORAGE_KEY, JSON.stringify(stored));
+  } catch (err) {
+    console.warn("Failed to persist Neural workspace:", err);
+  }
+};
+
+const clearStoredWorkspace = () => {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(NEURAL_WORKSPACE_STORAGE_KEY);
+  } catch (err) {
+    console.warn("Failed to clear stored Neural workspace:", err);
+  }
+};
+
 export function NeuralPanel() {
   const [state, setState] = useState<NeuralState>("idle");
   const [workspace, setWorkspace] = useState<WorkspaceAuth | null>(null);
@@ -119,15 +159,41 @@ export function NeuralPanel() {
   );
 
   useEffect(() => {
+    let cancelled = false;
     const init = async () => {
       try {
         const hasCredentials = await loadNeuralCredentials();
+        if (cancelled) return;
         if (hasCredentials) {
           const creds = await getNeuralCredentialsValues();
+          if (cancelled) return;
           if (creds) {
             setPlatformKey(creds[0]);
             setUserApiKey(creds[1]);
-            setState("restored");
+            const storedWorkspace = readStoredWorkspace();
+            if (storedWorkspace) {
+              setWorkspace({
+                id: storedWorkspace.id,
+                name: storedWorkspace.name,
+                apiKey: "",
+              });
+              setState("connecting");
+              try {
+                await setNeuralWorkspaceId(storedWorkspace.id);
+                await registerNode(DEFAULT_SKILLS, []);
+                if (!cancelled) {
+                  setState("connected");
+                }
+              } catch (err) {
+                console.error("Failed to restore Neural session:", err);
+                if (!cancelled) {
+                  setWorkspace(null);
+                  setState("restored");
+                }
+              }
+            } else {
+              setState("restored");
+            }
           }
         }
       } catch (err) {
@@ -142,6 +208,9 @@ export function NeuralPanel() {
       }
     };
     init();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const handleConnect = async () => {
@@ -163,6 +232,7 @@ export function NeuralPanel() {
       await registerNode(DEFAULT_SKILLS, []);
 
       setWorkspace(ws);
+      writeStoredWorkspace(ws);
       setState("connected");
       toast.success(`Neural Link Established! Welcome to ${ws.name}`);
     } catch (err: any) {
@@ -215,6 +285,7 @@ export function NeuralPanel() {
         setWorkspace(null);
         setState("idle");
         setPairingCode(null);
+        clearStoredWorkspace();
         toast.success("Succesfully disconnected");
       } catch (e: any) {
         toast.danger(e?.message || "Logout failed");
@@ -355,7 +426,11 @@ export function NeuralPanel() {
                 </Button>
                 <Button
                   variant="ghost"
-                  onPress={() => setState("idle")}
+                  onPress={() => {
+                    setState("idle");
+                    setWorkspace(null);
+                    clearStoredWorkspace();
+                  }}
                   className="font-medium text-muted-foreground hover:text-foreground w-full"
                 >
                   Use Different Keys
