@@ -19,6 +19,9 @@ pub mod router;
 pub mod mode_selector;
 pub mod unified_model_registry;
 
+// PHASE 1 (Agent Platform): Specs
+pub mod specs;
+
 // Legacy exports (deprecated)
 pub use provider::AIProviderManager;
 
