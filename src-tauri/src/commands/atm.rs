@@ -56,6 +56,11 @@ pub async fn has_atm_credentials(client: State<'_, ATMClient>) -> Result<bool, S
 }
 
 #[command]
+pub async fn ensure_atm_credentials_loaded(client: State<'_, ATMClient>) -> Result<bool, String> {
+    client.ensure_credentials_loaded().await
+}
+
+#[command]
 pub async fn reset_neural_workspace(
     client: State<'_, ATMClient>,
     neural: State<'_, crate::commands::neural::NeuralServiceState>,

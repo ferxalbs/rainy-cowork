@@ -1,7 +1,10 @@
 import { Card, Chip, Button, Spinner } from "@heroui/react";
 import { Bot, RefreshCw, Plus, Sparkles } from "lucide-react";
-import { useEffect, useState } from "react";
-import { listAtmAgents } from "../../services/tauri";
+import { useEffect, useRef, useState } from "react";
+import {
+  listAtmAgents,
+  ensureAtmCredentialsLoaded,
+} from "../../services/tauri";
 import { toast } from "@heroui/react";
 
 interface Agent {
@@ -17,28 +20,63 @@ interface Agent {
   };
 }
 
-export function AgentList({ onCreateClick }: { onCreateClick: () => void }) {
+interface AgentListProps {
+  onCreateClick: () => void;
+  refreshToken: number;
+}
+
+export function AgentList({ onCreateClick, refreshToken }: AgentListProps) {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [authStatus, setAuthStatus] = useState<"unknown" | "ready" | "missing">(
+    "unknown",
+  );
+  const inFlightRef = useRef(false);
 
   const fetchAgents = async () => {
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
     setIsLoading(true);
     try {
+      const hasCreds = await ensureAtmCredentialsLoaded();
+      if (!hasCreds) {
+        setAuthStatus("missing");
+        setAgents([]);
+        return;
+      }
+
+      setAuthStatus("ready");
       const result = await listAtmAgents();
-      // Adjust based on actual API response structure (checking if it matches array directly or nested)
       const agentList = Array.isArray(result) ? result : result.agents || [];
       setAgents(agentList);
     } catch (error) {
       console.error("Failed to fetch agents:", error);
-      toast.danger("Failed to load agents");
+      const message =
+        (error as any)?.message || (error as any)?.toString?.() || "";
+      if (
+        message.includes("Not authenticated") ||
+        message.includes("Unauthorized")
+      ) {
+        setAuthStatus("missing");
+        setAgents([]);
+        toast.danger("ATM admin key missing. Reconnect Neural Link.");
+      } else {
+        toast.danger("Failed to load agents");
+      }
     } finally {
       setIsLoading(false);
+      inFlightRef.current = false;
     }
   };
 
   useEffect(() => {
-    fetchAgents();
+    void fetchAgents();
   }, []);
+
+  useEffect(() => {
+    if (refreshToken <= 0) return;
+    void fetchAgents();
+  }, [refreshToken]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -66,7 +104,15 @@ export function AgentList({ onCreateClick }: { onCreateClick: () => void }) {
         </div>
       </div>
 
-      {isLoading && agents.length === 0 ? (
+      {authStatus === "missing" ? (
+        <Card className="p-8 text-center text-muted-foreground border-dashed">
+          <Bot className="size-10 mx-auto mb-3 opacity-20" />
+          <p>ATM admin key not available.</p>
+          <p className="text-sm mt-1">
+            Reconnect in Neural Link to restore access.
+          </p>
+        </Card>
+      ) : isLoading && agents.length === 0 ? (
         <div className="flex justify-center p-8">
           <Spinner size="lg" />
         </div>

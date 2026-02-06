@@ -1340,6 +1340,10 @@ export async function hasAtmCredentials(): Promise<boolean> {
   return invoke("has_atm_credentials");
 }
 
+export async function ensureAtmCredentialsLoaded(): Promise<boolean> {
+  return invoke("ensure_atm_credentials_loaded");
+}
+
 export async function resetNeuralWorkspace(
   masterKey: string,
   userApiKey: string,

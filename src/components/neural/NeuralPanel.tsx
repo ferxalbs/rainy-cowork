@@ -277,6 +277,7 @@ export function NeuralPanel() {
 
   const [pairingCode, setPairingCode] = useState<string | null>(null);
   const [isCreatingAgent, setIsCreatingAgent] = useState(false);
+  const [agentsRefreshToken, setAgentsRefreshToken] = useState(0);
   const [isHeadless, setIsHeadless] = useState(false);
   const [pendingApprovals, setPendingApprovals] = useState<ApprovalRequest[]>(
     [],
@@ -286,11 +287,10 @@ export function NeuralPanel() {
   useEffect(() => {
     let cancelled = false;
     const init = async () => {
+      let atmKeyPresent: boolean | null = null;
       try {
-        const hasKey = await hasAtmCredentials();
-        if (!cancelled) {
-          setHasAtmKey(hasKey);
-        }
+        atmKeyPresent = await hasAtmCredentials();
+        if (!cancelled) setHasAtmKey(atmKeyPresent);
       } catch (err) {
         console.error("Failed to check ATM admin key:", err);
       }
@@ -302,18 +302,53 @@ export function NeuralPanel() {
           const creds = await getNeuralCredentialsValues();
           if (cancelled) return;
           if (creds) {
-            setPlatformKey(creds[0]);
-            setUserApiKey(creds[1]);
+            const platform = creds[0];
+            const userKey = creds[1];
+            setPlatformKey(platform);
+            setUserApiKey(userKey);
+
             const storedWorkspace = readStoredWorkspace();
-            if (storedWorkspace) {
-              setWorkspace({
+            let effectiveWorkspace: WorkspaceAuth | null = null;
+
+            const shouldBootstrap = !storedWorkspace || !atmKeyPresent;
+            if (shouldBootstrap) {
+              try {
+                const ws = await bootstrapAtm(
+                  platform,
+                  userKey,
+                  storedWorkspace?.name || "Desktop Workspace",
+                );
+                if (!cancelled) {
+                  setHasAtmKey(true);
+                }
+                writeStoredWorkspace(ws);
+                effectiveWorkspace = ws;
+              } catch (err) {
+                console.error("Failed to restore ATM admin key:", err);
+                if (!cancelled) {
+                  setHasAtmKey(false);
+                }
+                if (storedWorkspace) {
+                  effectiveWorkspace = {
+                    id: storedWorkspace.id,
+                    name: storedWorkspace.name,
+                    apiKey: "",
+                  };
+                }
+              }
+            } else if (storedWorkspace) {
+              effectiveWorkspace = {
                 id: storedWorkspace.id,
                 name: storedWorkspace.name,
                 apiKey: "",
-              });
+              };
+            }
+
+            if (effectiveWorkspace) {
+              setWorkspace(effectiveWorkspace);
               setState("connecting");
               try {
-                await setNeuralWorkspaceId(storedWorkspace.id);
+                await setNeuralWorkspaceId(effectiveWorkspace.id);
                 await registerNode(DEFAULT_SKILLS, []);
                 if (!cancelled) {
                   setState("connected");
@@ -716,7 +751,10 @@ export function NeuralPanel() {
               <div className="space-y-6">
                 {/* Agent List Container - Transparent */}
                 <div className="rounded-xl border border-white/5 bg-background/20 backdrop-blur-md overflow-hidden p-1">
-                  <AgentList onCreateClick={() => setIsCreatingAgent(true)} />
+                  <AgentList
+                    onCreateClick={() => setIsCreatingAgent(true)}
+                    refreshToken={agentsRefreshToken}
+                  />
                 </div>
               </div>
 
@@ -812,7 +850,10 @@ export function NeuralPanel() {
                   </Modal.Header>
                   <Modal.Body className="p-8 relative z-[101]">
                     <CreateAgentForm
-                      onSuccess={() => setIsCreatingAgent(false)}
+                      onSuccess={() => {
+                        setIsCreatingAgent(false);
+                        setAgentsRefreshToken((prev) => prev + 1);
+                      }}
                       onCancel={() => setIsCreatingAgent(false)}
                     />
                   </Modal.Body>

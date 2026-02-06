@@ -89,12 +89,26 @@ impl ATMClient {
         Ok(())
     }
 
+    pub async fn ensure_credentials_loaded(&self) -> Result<bool, String> {
+        {
+            let state = self.state.lock().await;
+            if state.api_key.is_some() {
+                return Ok(true);
+            }
+        }
+
+        self.load_credentials_from_keychain().await
+    }
+
     pub async fn has_credentials(&self) -> bool {
-        let state = self.state.lock().await;
-        state.api_key.is_some()
+        self.ensure_credentials_loaded().await.unwrap_or(false)
     }
 
     pub async fn generate_pairing_code(&self) -> Result<PairingCodeResponse, String> {
+        if !self.ensure_credentials_loaded().await? {
+            return Err("Not authenticated".to_string());
+        }
+
         let state = self.state.lock().await;
         let api_key = state.api_key.as_ref().ok_or("Not authenticated")?;
 
@@ -186,6 +200,10 @@ impl ATMClient {
         &self,
         params: CreateAgentParams,
     ) -> Result<serde_json::Value, String> {
+        if !self.ensure_credentials_loaded().await? {
+            return Err("Not authenticated".to_string());
+        }
+
         let state = self.state.lock().await;
         let api_key = state.api_key.as_ref().ok_or("Not authenticated")?;
 
@@ -209,13 +227,8 @@ impl ATMClient {
     }
 
     pub async fn list_agents(&self) -> Result<serde_json::Value, String> {
-        // Try to load from keychain if credentials not set (race condition fix)
-        {
-            let state = self.state.lock().await;
-            if state.api_key.is_none() {
-                drop(state); // Release lock before loading
-                let _ = self.load_credentials_from_keychain().await;
-            }
+        if !self.ensure_credentials_loaded().await? {
+            return Err("Not authenticated".to_string());
         }
 
         let state = self.state.lock().await;

@@ -401,6 +401,7 @@ pub fn run() {
             commands::list_atm_agents,
             commands::set_atm_credentials,
             commands::has_atm_credentials,
+            commands::ensure_atm_credentials_loaded,
             commands::generate_pairing_code,
             commands::reset_neural_workspace,
             // Neural System Commands (Desktop Nerve Center)
