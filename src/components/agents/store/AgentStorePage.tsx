@@ -151,7 +151,7 @@ export function AgentStorePage({
 
   return (
     <div className="h-full min-h-0 flex gap-4">
-      <Card className="w-[340px] shrink-0 h-full min-h-0 bg-content1/50 backdrop-blur-md border border-white/10">
+      <Card className="w-[340px] shrink-0 h-full min-h-0 bg-background/60 dark:bg-background/20 backdrop-blur-2xl border">
         <Card.Header className="flex flex-col items-stretch gap-3 p-4 border-b border-divider">
           <div className="flex items-center justify-between">
             <div>
@@ -222,7 +222,7 @@ export function AgentStorePage({
         </Card.Content>
       </Card>
 
-      <Card className="flex-1 h-full min-h-0 bg-content1/40 backdrop-blur-md border border-white/10">
+      <Card className="flex-1 h-full min-h-0 bg-background/60 dark:bg-background/20 backdrop-blur-2xl border">
         {!draft ? (
           <div className="h-full flex items-center justify-center p-8 text-default-500 text-sm">
             Select an agent from the store to review or edit it.
