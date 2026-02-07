@@ -213,9 +213,30 @@ impl CommandPoller {
                                 settings.get_selected_model().to_string()
                             });
 
+                        // Optional agent identity/profile provided by Rainy-ATM.
+                        // If present, this becomes the primary runtime instruction set.
+                        let agent_name = command
+                            .payload
+                            .params
+                            .as_ref()
+                            .and_then(|p| p.get("agentName"))
+                            .and_then(|v| v.as_str())
+                            .filter(|s| !s.trim().is_empty())
+                            .map(|s| s.to_string())
+                            .unwrap_or_else(|| "Rainy Agent".to_string());
+
+                        let agent_system_prompt = command
+                            .payload
+                            .params
+                            .as_ref()
+                            .and_then(|p| p.get("agentSystemPrompt"))
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.trim().to_string())
+                            .filter(|s| !s.is_empty());
+
                         println!(
-                            "[CommandPoller] Routing to AgentRuntime: '{}' (model: {}, workspace: {})",
-                            prompt, model, workspace_id
+                            "[CommandPoller] Routing to AgentRuntime: agent='{}' (model: {}, workspace: {})",
+                            agent_name, model, workspace_id
                         );
 
                         // Create AgentRuntime on-demand
@@ -227,10 +248,8 @@ impl CommandPoller {
                             );
 
                             // Create config
-                            let config = AgentConfig {
-                                name: "Rainy Agent".to_string(),
-                                model, // Use extracted or default model
-                                instructions: format!(
+                            let base_instructions = agent_system_prompt.unwrap_or_else(|| {
+                                format!(
                                     "You are Rainy Agent, an autonomous AI assistant.
 
 Workspace ID: {}
@@ -238,13 +257,27 @@ Workspace ID: {}
 CAPABILITIES:
 - Read, write, list, and search files in the workspace.
 - Navigate web pages and take screenshots.
-- Perform web research.
+- Perform web research.",
+                                    workspace_id
+                                )
+                            });
+
+                            let config = AgentConfig {
+                                name: agent_name.clone(),
+                                model, // Use extracted or default model
+                                instructions: format!(
+                                    "{}
+
+IDENTITY LOCK (MANDATORY):
+- Your name is \"{}\".
+- Never say you are Gemini, Google, OpenAI, Claude, or any base model/provider.
+- If asked who you are, answer using your configured agent identity.
 
 GUIDELINES:
 1. PLAN: Before executing, briefly state your plan.
 2. EXECUTE: Use the provided tools to carry out the plan.
 3. VERIFY: After critical operations, verify the result.",
-                                    workspace_id
+                                    base_instructions, agent_name
                                 ),
                                 workspace_id: workspace_id.clone(),
                                 max_steps: Some(10),
