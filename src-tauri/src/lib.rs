@@ -16,8 +16,7 @@ use ai::{AIProviderManager, IntelligentRouter, ProviderRegistry};
 use services::{
     ATMClient, BrowserController, CommandPoller, DocumentService, FileManager, FileOperationEngine,
     FolderManager, ImageService, ManagedResearchService, MemoryManager, NeuralService,
-    NodeAuthenticator, ReflectionEngine, SettingsManager, SkillExecutor, WebResearchService,
-    WorkspaceManager,
+    NodeAuthenticator, ReflectionEngine, SettingsManager, SkillExecutor, WorkspaceManager,
 };
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
@@ -44,9 +43,6 @@ pub fn run() {
 
     // Initialize web research service (Phase 3 AI features)
     let managed_research = ManagedResearchService::new(ai_provider.clone());
-
-    // Initialize legacy web scraper service
-    let web_research = WebResearchService::new();
 
     // Initialize document service
     let document_service = DocumentService::new();
@@ -88,10 +84,10 @@ pub fn run() {
     let browser_controller = Arc::new(BrowserController::new());
 
     // Initialize Skill Executor
+    // Note: We removed the legacy web_research service from here
     let skill_executor = Arc::new(SkillExecutor::new(
         workspace_manager.clone(),
         Arc::new(managed_research.clone()),
-        Arc::new(web_research.clone()),
         browser_controller.clone(),
     ));
 
@@ -115,7 +111,6 @@ pub fn run() {
         .manage(task_manager)
         .manage(file_manager)
         .manage(file_ops)
-        .manage(web_research)
         .manage(managed_research) // Manage the new AI research service
         .manage(document_service)
         .manage(image_service)

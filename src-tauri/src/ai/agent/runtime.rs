@@ -50,7 +50,11 @@ pub enum AgentEvent {
     Status(String),
     Thought(String),
     ToolCall(crate::ai::provider_types::ToolCall),
-    ToolResult { id: String, result: String },
+    ToolResult {
+        id: String,
+        result: String,
+    },
+    #[allow(dead_code)]
     Error(String),
 }
 

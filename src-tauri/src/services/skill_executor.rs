@@ -1,7 +1,7 @@
 use crate::models::neural::{CommandResult, QueuedCommand};
 use crate::services::browser_controller::BrowserController;
 use crate::services::workspace::WorkspaceManager;
-use crate::services::{ManagedResearchService, WebResearchService};
+use crate::services::ManagedResearchService;
 use base64::prelude::*;
 use schemars::{schema_for, JsonSchema};
 use serde::{Deserialize, Serialize};
@@ -76,7 +76,6 @@ pub struct BrowserClickArgs {
 pub struct SkillExecutor {
     workspace_manager: Arc<WorkspaceManager>,
     managed_research: Arc<ManagedResearchService>,
-    web_research: Arc<WebResearchService>,
     browser: Arc<BrowserController>,
 }
 
@@ -84,13 +83,11 @@ impl SkillExecutor {
     pub fn new(
         workspace_manager: Arc<WorkspaceManager>,
         managed_research: Arc<ManagedResearchService>,
-        web_research: Arc<WebResearchService>,
         browser: Arc<BrowserController>,
     ) -> Self {
         Self {
             workspace_manager,
             managed_research,
-            web_research,
             browser,
         }
     }
@@ -445,14 +442,26 @@ impl SkillExecutor {
     }
 
     async fn handle_read_web_page(&self, url: &str) -> CommandResult {
-        match self.web_research.fetch_url(url).await {
-            Ok(content) => CommandResult {
-                success: true,
-                output: Some(content.content_markdown), // Return markdown content
-                error: None,
-                exit_code: Some(0),
-            },
-            Err(e) => self.error(&format!("Failed to read web page: {:?}", e.to_string())),
+        // Use native BrowserController instead of legacy WebResearchService
+        match self.browser.navigate(url).await {
+            Ok(nav_result) => {
+                // Get full content if possible, otherwise use preview
+                match self.browser.get_content().await {
+                    Ok(content) => CommandResult {
+                        success: true,
+                        output: Some(content),
+                        error: None,
+                        exit_code: Some(0),
+                    },
+                    Err(_) => CommandResult {
+                        success: true,
+                        output: Some(nav_result.content_preview), // Fallback to preview
+                        error: None,
+                        exit_code: Some(0),
+                    },
+                }
+            }
+            Err(e) => self.error(&format!("Failed to read web page: {}", e)),
         }
     }
 

@@ -426,7 +426,7 @@ mod tests {
     use super::*;
     use crate::ai::AIProviderManager;
     use crate::services::workspace::WorkspaceManager;
-    use crate::services::{BrowserController, ManagedResearchService, WebResearchService};
+    use crate::services::{BrowserController, ManagedResearchService};
 
     #[derive(Debug)]
     struct MockStep {
@@ -491,14 +491,8 @@ mod tests {
             Ok(wm) => {
                 let provider_manager = Arc::new(AIProviderManager::new());
                 let managed_research = Arc::new(ManagedResearchService::new(provider_manager));
-                let web_research = Arc::new(WebResearchService::new());
                 let browser = Arc::new(BrowserController::new());
-                let skills = Arc::new(SkillExecutor::new(
-                    Arc::new(wm),
-                    managed_research,
-                    web_research,
-                    browser,
-                ));
+                let skills = Arc::new(SkillExecutor::new(Arc::new(wm), managed_research, browser));
                 let result = workflow.execute(state, skills, |_| {}).await;
                 assert!(result.is_ok());
 

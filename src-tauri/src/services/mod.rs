@@ -19,7 +19,7 @@ pub mod security;
 pub mod settings;
 pub mod skill_executor;
 pub mod task_manager;
-pub mod web_research;
+
 pub mod workspace;
 
 pub use airlock::AirlockService;
@@ -40,7 +40,7 @@ pub use skill_executor::SkillExecutor;
 
 pub use settings::SettingsManager;
 pub use task_manager::TaskManager;
-pub use web_research::WebResearchService;
+
 pub use workspace::{
     ConfigFormat, PermissionOverride, Workspace, WorkspaceAnalytics, WorkspaceManager,
     WorkspacePermissions, WorkspaceTemplate,

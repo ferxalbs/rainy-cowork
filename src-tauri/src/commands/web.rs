@@ -2,8 +2,9 @@
 // Tauri commands for web content extraction
 // Part of Rainy Cowork Phase 3
 
-use crate::services::WebResearchService;
+use crate::services::BrowserController;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use tauri::{command, State};
 
 /// Response structure for web content
@@ -17,51 +18,46 @@ pub struct WebContentResponse {
     pub size_bytes: usize,
 }
 
-impl From<crate::services::web_research::WebContent> for WebContentResponse {
-    fn from(content: crate::services::web_research::WebContent) -> Self {
-        Self {
-            url: content.url,
-            title: content.title,
-            content_markdown: content.content_markdown,
-            description: content.description,
-            extracted_at: content.extracted_at.to_rfc3339(),
-            size_bytes: content.size_bytes,
-        }
-    }
-}
-
 /// Fetch and extract content from a URL
-/// Returns the page content converted to Markdown
+/// Returns the page content (text/html)
 #[command]
 pub async fn fetch_web_content(
     url: String,
-    service: State<'_, WebResearchService>,
+    state: State<'_, Arc<BrowserController>>,
 ) -> Result<WebContentResponse, String> {
-    service
-        .fetch_url(&url)
-        .await
-        .map(WebContentResponse::from)
-        .map_err(|e| e.to_string())
+    let controller = state.inner();
+
+    // Navigate to the URL
+    // This uses the native CDP browser controller
+    let nav_result = controller.navigate(&url).await?;
+
+    // Try to get the full content, fallback to the preview if get_content fails
+    // In the future we might want to pipe this through a readability library to get clean markdown
+    let content = match controller.get_content().await {
+        Ok(c) => c,
+        Err(_) => nav_result.content_preview.clone(),
+    };
+
+    Ok(WebContentResponse {
+        url: nav_result.url,
+        title: nav_result.title,
+        content_markdown: content.clone(), // Using raw content for now, frontend can parse if needed
+        description: None,
+        extracted_at: chrono::Utc::now().to_rfc3339(),
+        size_bytes: content.len(),
+    })
 }
 
 /// Get cache statistics
+/// Unused in native browser controller implementation
 #[command]
-pub fn get_web_cache_stats(service: State<'_, WebResearchService>) -> (usize, usize) {
-    service.cache_stats()
+pub fn get_web_cache_stats(_state: State<'_, Arc<BrowserController>>) -> (usize, usize) {
+    (0, 0)
 }
 
 /// Clear the web content cache
+/// Unused in native browser controller implementation
 #[command]
-pub fn clear_web_cache(service: State<'_, WebResearchService>) {
-    service.clear_cache();
+pub fn clear_web_cache(_state: State<'_, Arc<BrowserController>>) {
+    // No-op
 }
-
-// Note: search_web deferred to v0.4.0 (Rainy API v2)
-// #[command]
-// pub async fn search_web(
-//     query: String,
-//     max_results: u32,
-// ) -> Result<Vec<SearchResult>, String> {
-//     // Will use rainy-sdk search endpoint
-//     unimplemented!("Web search will be available in v0.4.0 via Rainy API v2")
-// }

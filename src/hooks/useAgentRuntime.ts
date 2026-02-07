@@ -36,7 +36,7 @@ export function useAgentRuntime() {
   useEffect(() => {
     const unlistenPromise = listen<AgentEvent>("agent://event", (event) => {
       const payload = event.payload;
-      console.log("Agent Event:", payload);
+      // console.log("Agent Event:", payload);
 
       const newEvent: AgentLogEvent = {
         id: Date.now().toString() + Math.random().toString().slice(2, 5),
@@ -69,8 +69,8 @@ export function useAgentRuntime() {
       try {
         await invoke("run_agent_workflow", {
           prompt,
-          modelId,
-          workspaceId,
+          model_id: modelId,
+          workspace_id: workspaceId,
         });
 
         setState((prev) => ({ ...prev, status: "completed" }));
@@ -100,7 +100,7 @@ export function useAgentRuntime() {
     try {
       const history = await invoke<Array<[string, string, string]>>(
         "get_chat_history",
-        { chatId },
+        { chat_id: chatId },
       );
 
       // Convert history to events
