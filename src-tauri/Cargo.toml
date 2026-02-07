@@ -64,3 +64,4 @@ chromiumoxide = { version = "0.8.0", features = ["tokio-runtime"], default-featu
 ed25519-dalek = { version = "2.2.0", features = ["rand_core"] }
 tokio-tungstenite = { version = "0.26.1", features = ["native-tls"] }
 futures-util = "0.3"
+sqlx = { version = "0.8.6", features = ["sqlite", "runtime-tokio", "tls-native-tls", "chrono"] }

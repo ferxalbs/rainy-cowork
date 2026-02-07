@@ -12,7 +12,16 @@ pub async fn run_agent_workflow(
     workspace_id: String,
     router: State<'_, IntelligentRouterState>,
     skills: State<'_, Arc<SkillExecutor>>,
+    agent_manager: State<'_, crate::ai::agent::manager::AgentManager>,
 ) -> Result<String, String> {
+    // 0. Ensure Chat Session Exists (Persist Metadata)
+    // We use workspace_id as the chat_id for this simple implementation
+    let chat_id = workspace_id.clone();
+    let _ = agent_manager
+        .ensure_chat_session(&chat_id, "Rainy Agent")
+        .await
+        .map_err(|e| format!("Failed to initialize chat session: {}", e))?;
+
     // 1. Initialize Runtime (Ephemeral for now, persistent later)
     let config = AgentConfig {
         name: "Rainy Agent".to_string(),
@@ -52,14 +61,62 @@ pub async fn run_agent_workflow(
 
     let runtime = AgentRuntime::new(config, router.0.clone(), skills.inner().clone(), memory);
 
-    // 2. Run Workflow
-    // For MVP, this just echoes or does a basic LLM call if wired
+    // 2. Run Workflow with Persistence
     let app_handle_clone = app_handle.clone();
+    let manager = agent_manager.inner().clone();
+    let chat_id_persist = chat_id.clone();
+
+    // Persist Initial User Prompt
+    let _ = manager
+        .save_message(&chat_id_persist, "user", &prompt)
+        .await
+        .map_err(|e| format!("Failed to save user message: {}", e))?;
+
     let response = runtime
         .run(&prompt, move |event| {
-            let _ = app_handle_clone.emit("agent://event", event);
+            // Emit to frontend
+            let _ = app_handle_clone.emit("agent://event", event.clone());
+
+            // Persist relevant events to DB asynchronously
+            let manager = manager.clone();
+            let chat_id = chat_id_persist.clone();
+
+            tauri::async_runtime::spawn(async move {
+                let (role, content) = match event {
+                    crate::ai::agent::runtime::AgentEvent::Thought(thought) => {
+                        (Some("assistant"), Some(thought))
+                    }
+                    crate::ai::agent::runtime::AgentEvent::ToolCall(call) => (
+                        Some("assistant"),
+                        Some(format!(
+                            "Tool Call: {} ({})",
+                            call.function.name, call.function.arguments
+                        )),
+                    ),
+                    crate::ai::agent::runtime::AgentEvent::ToolResult { id: _, result } => {
+                        (Some("tool"), Some(result))
+                    }
+                    crate::ai::agent::runtime::AgentEvent::Error(err) => {
+                        (Some("system"), Some(format!("Error: {}", err)))
+                    }
+                    _ => (None, None),
+                };
+
+                if let (Some(r), Some(c)) = (role, content) {
+                    if let Err(e) = manager.save_message(&chat_id, r, &c).await {
+                        eprintln!("Failed to persist agent event: {}", e);
+                    }
+                }
+            });
         })
         .await?;
+
+    // Persist Final Response
+    // Note: The callback handles intermediate steps.
+    // Ideally, the final response is also just the last Thought/Message.
+    // If run returns a string distinct from events, we should save it.
+    // Looking at runtime.rs, it returns the last message content if assistant.
+    // So it might be redundant if we capture Thoughts, but let's double check.
 
     Ok(response)
 }

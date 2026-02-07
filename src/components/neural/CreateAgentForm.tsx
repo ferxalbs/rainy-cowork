@@ -14,6 +14,7 @@ import {
 import { useState } from "react";
 import { createAtmAgent } from "../../services/tauri";
 import { toast } from "@heroui/react";
+import { invoke } from "@tauri-apps/api/core";
 import {
   Save,
   Eye,
@@ -83,8 +84,19 @@ export function CreateAgentForm({ onSuccess, onCancel }: CreateAgentFormProps) {
 
     setIsSubmitting(true);
     try {
+      // 1. Save locally to SQLite
+      const agentId = crypto.randomUUID();
+      await invoke("save_agent_to_db", {
+        id: agentId,
+        name,
+        description: type, // Using type as description for now
+        soul: prompt,
+      });
+
+      // 2. Deploy to Cloud (ATM)
       await createAtmAgent(name, type, config);
-      toast.success(`Agent "${name}" deployed successfully`);
+
+      toast.success(`Agent "${name}" deployed and saved locally`);
       onSuccess();
     } catch (error) {
       console.error("Failed to create agent:", error);

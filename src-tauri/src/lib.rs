@@ -5,9 +5,12 @@
 mod agents;
 mod ai;
 mod commands;
+pub mod db;
 mod models;
 mod services;
 
+use crate::ai::agent::manager::{self, AgentManager};
+use crate::db::Database;
 use agents::AgentRegistry;
 use ai::{AIProviderManager, IntelligentRouter, ProviderRegistry};
 use services::{
@@ -240,6 +243,21 @@ pub fn run() {
                 app_handle_cb.manage(bridge);
             });
 
+            // Initialize Database and AgentManager (PHASE 3)
+            let app_handle_db = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                match Database::init(&app_handle_db).await {
+                    Ok(db) => {
+                        let agent_manager = AgentManager::new(db.pool);
+                        app_handle_db.manage(agent_manager);
+                        tracing::info!("Database and AgentManager initialized successfully");
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to initialize database: {}", e);
+                    }
+                }
+            });
+
             Ok(())
         })
         // Commands
@@ -443,6 +461,11 @@ pub fn run() {
             commands::agent::run_agent_workflow,
             // Deployment (Phase 1)
             commands::deploy_agent,
+            // Agent Persistence (Phase 3)
+            manager::save_agent_to_db,
+            manager::load_agents_from_db,
+            manager::save_chat_message,
+            manager::get_chat_history,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { toast } from "sonner"; // Use sonner!
+import { toast } from "sonner";
 
 export type AgentEvent =
   | { type: "status"; data: string }
@@ -12,56 +12,45 @@ export type AgentEvent =
 
 export type AgentStatus = "idle" | "running" | "error" | "completed";
 
+export interface AgentLogEvent {
+  id: string;
+  type: "status" | "thought" | "tool_call" | "tool_result" | "error";
+  content: any;
+  timestamp: Date;
+}
+
 export interface AgentState {
   status: AgentStatus;
-  thoughts: string[];
-  toolCalls: any[];
+  events: AgentLogEvent[];
   error: string | null;
 }
 
 export function useAgentRuntime() {
   const [state, setState] = useState<AgentState>({
     status: "idle",
-    thoughts: [],
-    toolCalls: [],
+    events: [],
     error: null,
   });
 
+  // Listen for real-time events from Backend
   useEffect(() => {
     const unlistenPromise = listen<AgentEvent>("agent://event", (event) => {
       const payload = event.payload;
       console.log("Agent Event:", payload);
 
-      setState((prev) => {
-        const newState = { ...prev };
+      const newEvent: AgentLogEvent = {
+        id: Date.now().toString() + Math.random().toString().slice(2, 5),
+        type: payload.type,
+        content: payload.data,
+        timestamp: new Date(),
+      };
 
-        switch (payload.type) {
-          case "status":
-            // Optional: update status text if needed, but "status" field is enum
-            break;
-          case "thought":
-            newState.thoughts = [...prev.thoughts, payload.data];
-            break;
-          case "tool_call":
-            newState.toolCalls = [
-              ...prev.toolCalls,
-              { ...payload.data, status: "pending" },
-            ];
-            break;
-          case "tool_result":
-            newState.toolCalls = prev.toolCalls.map((tc) =>
-              tc.id === payload.data.id
-                ? { ...tc, status: "completed", result: payload.data.result }
-                : tc,
-            );
-            break;
-          case "error":
-            newState.error = payload.data;
-            newState.status = "error";
-            break;
-        }
-        return newState;
-      });
+      setState((prev) => ({
+        ...prev,
+        events: [...prev.events, newEvent],
+        status: payload.type === "error" ? "error" : prev.status,
+        error: payload.type === "error" ? (payload.data as string) : prev.error,
+      }));
     });
 
     return () => {
@@ -71,38 +60,72 @@ export function useAgentRuntime() {
 
   const runAgent = useCallback(
     async (prompt: string, modelId: string, workspaceId: string) => {
-      setState({
+      setState((prev) => ({
         status: "running",
-        thoughts: [],
-        toolCalls: [],
+        events: [], // Clear previous run events
         error: null,
-      });
+      }));
 
       try {
-        const response = await invoke<string>("run_agent_workflow", {
+        await invoke("run_agent_workflow", {
           prompt,
           modelId,
           workspaceId,
         });
 
         setState((prev) => ({ ...prev, status: "completed" }));
-        return response;
       } catch (err: any) {
         console.error("Agent execution failed:", err);
         setState((prev) => ({
           ...prev,
           status: "error",
           error: err.toString(),
+          events: [
+            ...prev.events,
+            {
+              id: Date.now().toString(),
+              type: "error",
+              content: err.toString(),
+              timestamp: new Date(),
+            },
+          ],
         }));
         toast.error(`Agent failed: ${err.toString()}`);
-        throw err;
       }
     },
     [],
   );
 
+  const loadHistory = useCallback(async (chatId: string) => {
+    try {
+      const history = await invoke<Array<[string, string, string]>>(
+        "get_chat_history",
+        { chatId },
+      );
+
+      // Convert history to events
+      const historyEvents: AgentLogEvent[] = history.map(
+        ([id, role, content]) => ({
+          id,
+          type: role === "assistant" ? "thought" : "status", // Simplified mapping
+          content: content,
+          timestamp: new Date(), // We might want to fetch real timestamp
+        }),
+      );
+
+      setState((prev) => ({
+        ...prev,
+        events: historyEvents,
+      }));
+    } catch (err) {
+      console.error("Failed to load history:", err);
+      toast.error("Failed to load history");
+    }
+  }, []);
+
   return {
     state,
     runAgent,
+    loadHistory,
   };
 }

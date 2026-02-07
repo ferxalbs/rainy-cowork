@@ -20,9 +20,16 @@ export function AgentRuntimePanel({
   workspaceId,
   modelId = "gemini-2.0-flash-exp",
 }: AgentRuntimePanelProps) {
-  const { state, runAgent } = useAgentRuntime();
+  const { state, runAgent, loadHistory } = useAgentRuntime();
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Load history on mount or workspace change
+  useEffect(() => {
+    if (workspaceId) {
+      loadHistory(workspaceId);
+    }
+  }, [workspaceId, loadHistory]);
 
   // Auto-scroll to bottom of logs
   useEffect(() => {
@@ -54,7 +61,7 @@ export function AgentRuntimePanel({
           <h2 className="font-semibold text-foreground">Agent Runtime</h2>
           <Chip
             size="sm"
-            variant="flat"
+            variant="soft"
             color={
               state.status === "running"
                 ? "warning"
@@ -175,10 +182,9 @@ export function AgentRuntimePanel({
           <Button
             isIconOnly
             size="sm"
-            variant="flat"
-            color="primary"
+            variant="ghost"
             className="absolute right-2 top-2"
-            onClick={handleRun}
+            onPress={handleRun}
             isLoading={state.status === "running"}
           >
             {!state.status.startsWith("run") && <Play className="w-4 h-4" />}
