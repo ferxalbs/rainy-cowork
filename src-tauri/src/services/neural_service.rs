@@ -71,6 +71,12 @@ impl NeuralService {
         metadata.workspace_id = workspace_id;
         // Reset node_id to force re-registration with new workspace
         metadata.node_id = None;
+
+        // Persist workspace id for auto-reconnect across restarts
+        let keychain = crate::ai::keychain::KeychainManager::new();
+        if let Err(e) = keychain.store_key("neural_workspace_id", &metadata.workspace_id) {
+            eprintln!("Failed to persist neural workspace id: {}", e);
+        }
     }
 
     /// Set authentication credentials (Platform Key + User API Key)
@@ -107,6 +113,7 @@ impl NeuralService {
         // Ignore errors if keys don't exist
         let _ = keychain.delete_key("neural_platform_key");
         let _ = keychain.delete_key("neural_user_api_key");
+        let _ = keychain.delete_key("neural_workspace_id");
 
         Ok(())
     }
@@ -117,11 +124,15 @@ impl NeuralService {
 
         let platform_key = keychain.get_key("neural_platform_key")?;
         let user_api_key = keychain.get_key("neural_user_api_key")?;
+        let workspace_id = keychain.get_key("neural_workspace_id")?;
 
         if let (Some(pk), Some(uk)) = (platform_key, user_api_key) {
             let mut metadata = self.metadata.lock().await;
             metadata.platform_key = Some(pk);
             metadata.user_api_key = Some(uk);
+            if let Some(ws) = workspace_id {
+                metadata.workspace_id = ws;
+            }
             Ok(true)
         } else {
             Ok(false)

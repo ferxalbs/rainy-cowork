@@ -1344,6 +1344,22 @@ export async function ensureAtmCredentialsLoaded(): Promise<boolean> {
   return invoke("ensure_atm_credentials_loaded");
 }
 
+export async function saveAgentSpec(spec: any): Promise<string> {
+  return invoke("save_agent_spec", { spec });
+}
+
+export async function loadAgentSpec(id: string): Promise<any> {
+  return invoke("load_agent_spec", { id });
+}
+
+export async function listAgentSpecs(): Promise<any[]> {
+  return invoke("list_agent_specs");
+}
+
+export async function deployAgentSpec(spec: any): Promise<any> {
+  return invoke("deploy_agent_spec", { spec });
+}
+
 export async function resetNeuralWorkspace(
   masterKey: string,
   userApiKey: string,

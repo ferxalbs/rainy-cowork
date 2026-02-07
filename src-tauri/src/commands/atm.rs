@@ -4,13 +4,23 @@ use tauri::{command, State};
 #[command]
 pub async fn bootstrap_atm(
     client: State<'_, ATMClient>,
+    neural: State<'_, crate::commands::neural::NeuralServiceState>,
     master_key: String,
     user_api_key: String,
     name: String,
 ) -> Result<crate::services::atm_client::WorkspaceAuth, String> {
-    let auth = client.bootstrap(master_key, user_api_key, name).await?;
+    let auth = client
+        .bootstrap(master_key.clone(), user_api_key.clone(), name)
+        .await?;
     // Automatically set credentials in client
     client.set_credentials(auth.api_key.clone()).await;
+    // Keep desktop node bridge aligned with workspace and keys for auto-connect.
+    neural.0.set_workspace_id(auth.id.clone()).await;
+    neural
+        .0
+        .set_credentials(master_key, user_api_key)
+        .await
+        .map_err(|e| format!("Failed to set neural credentials: {}", e))?;
     Ok(auth)
 }
 

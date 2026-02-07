@@ -2,6 +2,7 @@
 // Export all command handlers for registration with Tauri
 
 pub mod agent;
+pub mod agent_builder;
 pub mod agents;
 pub mod ai;
 pub mod ai_providers;
@@ -27,6 +28,7 @@ pub mod web;
 pub mod workspace;
 
 pub use agents::*;
+pub use agent_builder::*;
 pub use ai::*;
 pub use ai_providers::*;
 pub use airlock::*;

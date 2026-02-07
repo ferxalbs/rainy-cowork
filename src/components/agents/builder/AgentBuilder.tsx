@@ -1,7 +1,15 @@
 import { useState } from "react";
 import { Button, Card } from "@heroui/react";
 import { toast } from "sonner";
-import { Save, ArrowLeft, Bot, Shield, Network, Cpu } from "lucide-react";
+import {
+  Save,
+  ArrowLeft,
+  Bot,
+  Shield,
+  Network,
+  Cpu,
+  Rocket,
+} from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { AgentSpec } from "../../../types/agent-spec";
 import { SoulEditor } from "./SoulEditor";
@@ -43,6 +51,7 @@ const DEFAULT_SPEC: AgentSpec = {
 export function AgentBuilder({ onBack, initialSpec }: AgentBuilderProps) {
   const [spec, setSpec] = useState<AgentSpec>(initialSpec || DEFAULT_SPEC);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeploying, setIsDeploying] = useState(false);
   const [activeTab, setActiveTab] = useState<string>("soul");
 
   const handleSave = async () => {
@@ -61,6 +70,27 @@ export function AgentBuilder({ onBack, initialSpec }: AgentBuilderProps) {
 
   const updateSpec = (updates: Partial<AgentSpec>) => {
     setSpec((prev: AgentSpec) => ({ ...prev, ...updates }));
+  };
+
+  const handleDeploy = async () => {
+    setIsDeploying(true);
+    try {
+      const hasCredentials = await invoke<boolean>("ensure_atm_credentials_loaded");
+      if (!hasCredentials) {
+        throw new Error(
+          "Rainy-ATM is not authenticated. Configure ATM credentials first.",
+        );
+      }
+
+      await invoke("deploy_agent_spec", { spec });
+      toast.success("Agent deployed to Rainy-ATM");
+      onBack();
+    } catch (error) {
+      console.error("Failed to deploy agent:", error);
+      toast.error(`Deploy failed: ${error}`);
+    } finally {
+      setIsDeploying(false);
+    }
   };
 
   return (
@@ -83,10 +113,24 @@ export function AgentBuilder({ onBack, initialSpec }: AgentBuilderProps) {
         <div className="flex gap-2">
           {/* Action buttons */}
           <Button
+            variant="secondary"
+            onPress={handleDeploy}
+            className="font-medium"
+            isDisabled={isDeploying || isSaving}
+          >
+            {isDeploying ? (
+              "Deploying..."
+            ) : (
+              <>
+                <Rocket className="size-4 mr-2" /> Deploy
+              </>
+            )}
+          </Button>
+          <Button
             variant="primary"
             onPress={handleSave}
             className="font-medium"
-            isDisabled={isSaving}
+            isDisabled={isSaving || isDeploying}
           >
             {isSaving ? (
               "Saving..."
@@ -166,9 +210,93 @@ export function AgentBuilder({ onBack, initialSpec }: AgentBuilderProps) {
             {activeTab === "memory" && (
               <Card className="p-6">
                 <h3 className="text-lg font-bold mb-4">Memory Configuration</h3>
-                <p className="text-default-500">
-                  Advanced memory settings coming soon.
-                </p>
+                <div className="space-y-4">
+                  <div>
+                    <label
+                      htmlFor="memory-strategy"
+                      className="text-sm font-medium mb-2 block"
+                    >
+                      Strategy
+                    </label>
+                    <select
+                      id="memory-strategy"
+                      className="w-full rounded-xl border border-default-200 bg-content1 px-3 py-2 text-sm"
+                      value={spec.memory_config.strategy}
+                      onChange={(e) =>
+                        updateSpec({
+                          memory_config: {
+                            ...spec.memory_config,
+                            strategy: e.target.value as
+                              | "vector"
+                              | "simple_buffer"
+                              | "hybrid",
+                          },
+                        })
+                      }
+                    >
+                      <option value="hybrid">Hybrid</option>
+                      <option value="vector">Vector</option>
+                      <option value="simple_buffer">Simple Buffer</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="retention-days"
+                      className="text-sm font-medium mb-2 block"
+                    >
+                      Retention (Days)
+                    </label>
+                    <input
+                      id="retention-days"
+                      type="number"
+                      min={1}
+                      max={3650}
+                      className="w-full rounded-xl border border-default-200 bg-content1 px-3 py-2 text-sm"
+                      value={spec.memory_config.retention_days}
+                      onChange={(e) =>
+                        updateSpec({
+                          memory_config: {
+                            ...spec.memory_config,
+                            retention_days: Math.max(
+                              1,
+                              Number.parseInt(e.target.value || "1", 10),
+                            ),
+                          },
+                        })
+                      }
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="max-tokens"
+                      className="text-sm font-medium mb-2 block"
+                    >
+                      Max Tokens
+                    </label>
+                    <input
+                      id="max-tokens"
+                      type="number"
+                      min={512}
+                      max={1000000}
+                      step={512}
+                      className="w-full rounded-xl border border-default-200 bg-content1 px-3 py-2 text-sm"
+                      value={spec.memory_config.max_tokens}
+                      onChange={(e) =>
+                        updateSpec({
+                          memory_config: {
+                            ...spec.memory_config,
+                            max_tokens: Math.max(
+                              512,
+                              Number.parseInt(e.target.value || "512", 10),
+                            ),
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                </div>
               </Card>
             )}
           </div>

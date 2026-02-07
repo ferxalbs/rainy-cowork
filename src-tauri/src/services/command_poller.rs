@@ -95,8 +95,16 @@ impl CommandPoller {
 
         // Check if node is registered (has node_id)
         if !self.neural_service.is_registered().await {
-            // Node not registered yet - silently skip to avoid log spam
-            return Ok(());
+            // Attempt auto-registration for seamless cloud<->desktop connectivity.
+            match self.neural_service.register(Vec::new(), Vec::new()).await {
+                Ok(node_id) => {
+                    println!("[CommandPoller] Auto-registered node: {}", node_id);
+                }
+                Err(e) => {
+                    eprintln!("[CommandPoller] Auto-registration failed: {}", e);
+                    return Ok(());
+                }
+            }
         }
 
         let pending_commands_result: Result<Vec<crate::models::neural::QueuedCommand>, String> =

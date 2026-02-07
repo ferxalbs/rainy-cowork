@@ -56,10 +56,6 @@ impl ATMClient {
         }
     }
 
-    pub async fn get_state(&self) -> ATMClientState {
-        self.state.lock().await.clone()
-    }
-
     pub async fn set_credentials(&self, api_key: String) {
         let mut state = self.state.lock().await;
         state.api_key = Some(api_key);
@@ -256,12 +252,43 @@ impl ATMClient {
         res.json().await.map_err(|e| e.to_string())
     }
 
+    pub async fn verify_authenticated_connection(&self) -> Result<(), String> {
+        if !self.ensure_credentials_loaded().await? {
+            return Err("Not authenticated with Rainy-ATM".to_string());
+        }
+
+        let state = self.state.lock().await;
+        let api_key = state.api_key.as_ref().ok_or("Not authenticated")?;
+        let url = format!("{}/admin/workspace", state.base_url);
+
+        let res = self
+            .http
+            .get(&url)
+            .header("Authorization", format!("Bearer {}", api_key))
+            .send()
+            .await
+            .map_err(|e| format!("Rainy-ATM connection error: {}", e))?;
+
+        if !res.status().is_success() {
+            let status = res.status();
+            let err_text = res.text().await.unwrap_or_default();
+            return Err(format!(
+                "Rainy-ATM auth check failed: {} - {}",
+                status, err_text
+            ));
+        }
+
+        Ok(())
+    }
+
     /// Deploys an AgentSpec v2 to the Cloud, signing it first.
     pub async fn deploy_agent(
         &self,
         mut spec: crate::ai::specs::AgentSpec,
     ) -> Result<serde_json::Value, String> {
         use crate::ai::features::security_service::SecurityService;
+
+        self.verify_authenticated_connection().await?;
 
         // 1. Sign the agent package
         let security = SecurityService::new();

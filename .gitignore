@@ -31,7 +31,7 @@ rainy-atm
 .agent/rules/cowork-architecture.md
 COWORK_INFO.md
 
-docs/*
+#docs/*
 
 DESING_BASE.md
 CLAWDBOT.md

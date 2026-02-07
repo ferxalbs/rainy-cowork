@@ -176,6 +176,15 @@ pub fn run() {
                 }
             });
 
+            // Load Neural credentials/workspace from keychain for cloud<->desktop auto reconnect.
+            let app_handle_neural = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                let neural = app_handle_neural.state::<commands::neural::NeuralServiceState>();
+                if let Err(e) = neural.0.load_credentials_from_keychain().await {
+                    tracing::warn!("Failed to load Neural credentials: {}", e);
+                }
+            });
+
             // Initialize memory manager with app data dir
             let app_data_dir = app
                 .path()
@@ -456,6 +465,10 @@ pub fn run() {
             commands::agent::run_agent_workflow,
             // Deployment (Phase 1)
             commands::deploy_agent,
+            commands::save_agent_spec,
+            commands::load_agent_spec,
+            commands::list_agent_specs,
+            commands::deploy_agent_spec,
             // Agent Persistence (Phase 3)
             manager::save_agent_to_db,
             manager::load_agents_from_db,
