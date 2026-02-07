@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Button, Card } from "@heroui/react";
+// @ts-ignore
+import { Button, Card, Select, ListBox, Label } from "@heroui/react";
 import { toast } from "sonner";
 import {
   Save,
@@ -37,7 +38,9 @@ export function AgentBuilder({
   const [activeTab, setActiveTab] = useState<string>("soul");
 
   useEffect(() => {
-    setSpec(initialSpec ? structuredClone(initialSpec) : createDefaultAgentSpec());
+    setSpec(
+      initialSpec ? structuredClone(initialSpec) : createDefaultAgentSpec(),
+    );
   }, [initialSpec]);
 
   const handleSave = async () => {
@@ -96,7 +99,11 @@ export function AgentBuilder({
         </div>
         <div className="flex gap-2">
           {onOpenStore && (
-            <Button variant="ghost" onPress={onOpenStore} className="font-medium">
+            <Button
+              variant="ghost"
+              onPress={onOpenStore}
+              className="font-medium"
+            >
               <Library className="size-4 mr-2" /> Agent Store
             </Button>
           )}
@@ -135,7 +142,7 @@ export function AgentBuilder({
       {/* Main Content */}
       <div className="flex-1 overflow-hidden flex">
         {/* Sidebar/Tabs - keeping simple layout */}
-        <div className="w-64 border-r border-default-200 p-4 flex flex-col gap-2 bg-content1/30">
+        <div className="w-64 border-r border-default-200 p-4 flex flex-col gap-2 bg-background/30">
           <Button
             variant={activeTab === "soul" ? "primary" : "ghost"}
             className="justify-start"
@@ -197,36 +204,75 @@ export function AgentBuilder({
             )}
 
             {activeTab === "memory" && (
-              <Card className="p-6">
+              <Card className="p-6 bg-background/60 dark:bg-background/20 border ">
                 <h3 className="text-lg font-bold mb-4">Memory Configuration</h3>
                 <div className="space-y-4">
                   <div>
-                    <label
-                      htmlFor="memory-strategy"
-                      className="text-sm font-medium mb-2 block"
+                    <Select
+                      className="w-full group"
+                      selectedKey={spec.memory_config.strategy}
+                      onSelectionChange={(key) => {
+                        if (key) {
+                          updateSpec({
+                            memory_config: {
+                              ...spec.memory_config,
+                              strategy: key as
+                                | "vector"
+                                | "simple_buffer"
+                                | "hybrid",
+                            },
+                          });
+                        }
+                      }}
                     >
-                      Strategy
-                    </label>
-                    <select
-                      id="memory-strategy"
-                      className="w-full rounded-xl border border-default-200 bg-content1 px-3 py-2 text-sm"
-                      value={spec.memory_config.strategy}
-                      onChange={(e) =>
-                        updateSpec({
-                          memory_config: {
-                            ...spec.memory_config,
-                            strategy: e.target.value as
-                              | "vector"
-                              | "simple_buffer"
-                              | "hybrid",
-                          },
-                        })
-                      }
-                    >
-                      <option value="hybrid">Hybrid</option>
-                      <option value="vector">Vector</option>
-                      <option value="simple_buffer">Simple Buffer</option>
-                    </select>
+                      <Label className="text-sm font-medium mb-1.5 block text-foreground ">
+                        Strategy
+                      </Label>
+                      <Select.Trigger className="w-full  flex items-center justify-between rounded-xl border border-default-200 bg-background/60 dark:bg-background/20 px-3 py-2 text-sm shadow-sm hover:bg-content2 transition-colors data-[open=true]:border-primary data-[focus=true]:ring-2 data-[focus=true]:ring-primary/20 cursor-pointer">
+                        <Select.Value className="flex-1 text-left" />
+                        <Select.Indicator className="text-default-400" />
+                      </Select.Trigger>
+                      <Select.Popover className="w-[var(--trigger-width)] rounded-xl bg-background/60 dark:bg-background/20 p-1 border border backdrop-blur-2xl">
+                        <ListBox className="outline-none p-1 gap-1">
+                          <ListBox.Item
+                            key="hybrid"
+                            textValue="Hybrid"
+                            className="rounded-lg px-2 py-1.5 text-sm outline-none data-[hover=true]:bg-default-100 data-[selected=true]:bg-primary/10 data-[selected=true]:text-primary cursor-pointer transition-colors"
+                          >
+                            <div className="flex flex-col">
+                              <span className="font-medium">Hybrid</span>
+                              <span className="text-xs text-default-400">
+                                Vector + Short-term buffer (Recommended)
+                              </span>
+                            </div>
+                          </ListBox.Item>
+                          <ListBox.Item
+                            key="vector"
+                            textValue="Vector"
+                            className="rounded-lg px-2 py-1.5 text-sm outline-none data-[hover=true]:bg-default-100 data-[selected=true]:bg-primary/10 data-[selected=true]:text-primary cursor-pointer transition-colors"
+                          >
+                            <div className="flex flex-col">
+                              <span className="font-medium">Vector Only</span>
+                              <span className="text-xs text-default-400">
+                                Long-term semantic search
+                              </span>
+                            </div>
+                          </ListBox.Item>
+                          <ListBox.Item
+                            key="simple_buffer"
+                            textValue="Simple Buffer"
+                            className="rounded-lg px-2 py-1.5 text-sm outline-none data-[hover=true]:bg-default-100 data-[selected=true]:bg-primary/10 data-[selected=true]:text-primary cursor-pointer transition-colors"
+                          >
+                            <div className="flex flex-col">
+                              <span className="font-medium">Simple Buffer</span>
+                              <span className="text-xs text-default-400">
+                                FIFO context window only
+                              </span>
+                            </div>
+                          </ListBox.Item>
+                        </ListBox>
+                      </Select.Popover>
+                    </Select>
                   </div>
 
                   <div>
