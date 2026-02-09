@@ -48,6 +48,60 @@ pub struct PairingCodeResponse {
     pub expires_at: i64,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ATMCommandSummary {
+    pub id: String,
+    pub intent: String,
+    pub status: String,
+    pub created_at: i64,
+    pub started_at: Option<i64>,
+    pub completed_at: Option<i64>,
+    pub desktop_node_id: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ListCommandsResponse {
+    pub commands: Vec<ATMCommandSummary>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ATMCommandProgressEvent {
+    pub id: String,
+    pub level: String,
+    pub message: String,
+    pub data: Option<serde_json::Value>,
+    pub created_at: i64,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ATMCommandDetails {
+    pub id: String,
+    pub intent: String,
+    pub status: String,
+    pub result: Option<serde_json::Value>,
+    pub created_at: i64,
+    pub started_at: Option<i64>,
+    pub completed_at: Option<i64>,
+    pub desktop_node_id: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CommandDetailsResponse {
+    pub command: ATMCommandDetails,
+    pub progress: Vec<ATMCommandProgressEvent>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct CommandProgressResponse {
+    pub command_id: String,
+    pub progress: Vec<ATMCommandProgressEvent>,
+    pub next_since: i64,
+}
+
 impl ATMClient {
     pub fn new(base_url: String, api_key: Option<String>) -> Self {
         Self {
@@ -279,6 +333,119 @@ impl ATMClient {
         }
 
         Ok(())
+    }
+
+    pub async fn list_commands(
+        &self,
+        limit: Option<usize>,
+        status: Option<String>,
+    ) -> Result<Vec<ATMCommandSummary>, String> {
+        self.verify_authenticated_connection().await?;
+
+        let state = self.state.lock().await;
+        let api_key = state.api_key.as_ref().ok_or("Not authenticated")?;
+        let mut url = format!(
+            "{}/admin/commands?limit={}",
+            state.base_url,
+            limit.unwrap_or(50)
+        );
+        if let Some(s) = status {
+            if !s.trim().is_empty() {
+                url.push_str("&status=");
+                url.push_str(s.trim());
+            }
+        }
+
+        let res = self
+            .http
+            .get(&url)
+            .header("Authorization", format!("Bearer {}", api_key))
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+
+        if !res.status().is_success() {
+            let status = res.status();
+            let err_text = res.text().await.unwrap_or_default();
+            return Err(format!("List commands failed: {} - {}", status, err_text));
+        }
+
+        let body: ListCommandsResponse = res.json().await.map_err(|e| e.to_string())?;
+        Ok(body.commands)
+    }
+
+    pub async fn get_command_details(
+        &self,
+        command_id: String,
+        progress_limit: Option<usize>,
+    ) -> Result<CommandDetailsResponse, String> {
+        self.verify_authenticated_connection().await?;
+
+        let state = self.state.lock().await;
+        let api_key = state.api_key.as_ref().ok_or("Not authenticated")?;
+        let url = format!(
+            "{}/admin/commands/{}?progressLimit={}",
+            state.base_url,
+            command_id,
+            progress_limit.unwrap_or(200)
+        );
+
+        let res = self
+            .http
+            .get(&url)
+            .header("Authorization", format!("Bearer {}", api_key))
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+
+        if !res.status().is_success() {
+            let status = res.status();
+            let err_text = res.text().await.unwrap_or_default();
+            return Err(format!(
+                "Get command details failed: {} - {}",
+                status, err_text
+            ));
+        }
+
+        res.json().await.map_err(|e| e.to_string())
+    }
+
+    pub async fn get_command_progress(
+        &self,
+        command_id: String,
+        since: Option<i64>,
+        limit: Option<usize>,
+    ) -> Result<CommandProgressResponse, String> {
+        self.verify_authenticated_connection().await?;
+
+        let state = self.state.lock().await;
+        let api_key = state.api_key.as_ref().ok_or("Not authenticated")?;
+        let url = format!(
+            "{}/admin/commands/{}/progress?since={}&limit={}",
+            state.base_url,
+            command_id,
+            since.unwrap_or(0),
+            limit.unwrap_or(200)
+        );
+
+        let res = self
+            .http
+            .get(&url)
+            .header("Authorization", format!("Bearer {}", api_key))
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+
+        if !res.status().is_success() {
+            let status = res.status();
+            let err_text = res.text().await.unwrap_or_default();
+            return Err(format!(
+                "Get command progress failed: {} - {}",
+                status, err_text
+            ));
+        }
+
+        res.json().await.map_err(|e| e.to_string())
     }
 
     /// Deploys an AgentSpec v2 to the Cloud, signing it first.

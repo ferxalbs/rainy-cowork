@@ -19,7 +19,7 @@ import {
   Sparkles,
   ExternalLink,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   bootstrapAtm,
@@ -33,6 +33,11 @@ import {
   WorkspaceAuth,
   getNeuralCredentialsValues,
   AirlockLevels,
+  listAtmCommands,
+  getAtmCommandDetails,
+  getAtmCommandProgress,
+  AtmCommandSummary,
+  AtmCommandProgressEvent,
 } from "../../services/tauri";
 import { useAirlock } from "../../hooks/useAirlock";
 import { DEFAULT_NEURAL_SKILLS } from "../../constants/defaultNeuralSkills";
@@ -100,6 +105,14 @@ export function NeuralPanel() {
   const [activeView, setActiveView] = useState<"dashboard" | "runtime">(
     "dashboard",
   );
+  const [recentCommands, setRecentCommands] = useState<AtmCommandSummary[]>([]);
+  const [selectedCommandId, setSelectedCommandId] = useState<string | null>(null);
+  const [commandProgress, setCommandProgress] = useState<AtmCommandProgressEvent[]>(
+    [],
+  );
+  const [isLoadingCommands, setIsLoadingCommands] = useState(false);
+  const [isLoadingProgress, setIsLoadingProgress] = useState(false);
+  const progressSinceRef = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -192,6 +205,92 @@ export function NeuralPanel() {
       cancelled = true;
     };
   }, []);
+
+  const refreshRecentCommands = useCallback(async () => {
+    if (state !== "connected") return;
+    setIsLoadingCommands(true);
+    try {
+      const commands = await listAtmCommands(25);
+      setRecentCommands(commands);
+      if (commands.length === 0) {
+        setSelectedCommandId(null);
+        setCommandProgress([]);
+        progressSinceRef.current = 0;
+        return;
+      }
+      if (!selectedCommandId || !commands.some((c) => c.id === selectedCommandId)) {
+        const active =
+          commands.find((c) => c.status === "running" || c.status === "pending") ||
+          commands[0];
+        setSelectedCommandId(active.id);
+      }
+    } catch (err) {
+      console.error("Failed to load recent commands:", err);
+    } finally {
+      setIsLoadingCommands(false);
+    }
+  }, [selectedCommandId, state]);
+
+  useEffect(() => {
+    if (state !== "connected") return;
+    refreshRecentCommands();
+    const interval = setInterval(() => {
+      refreshRecentCommands();
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [refreshRecentCommands, state]);
+
+  useEffect(() => {
+    if (state !== "connected" || !selectedCommandId) return;
+    let cancelled = false;
+
+    const loadInitial = async () => {
+      setIsLoadingProgress(true);
+      try {
+        const details = await getAtmCommandDetails(selectedCommandId, 200);
+        if (cancelled) return;
+        setCommandProgress(details.progress);
+        const last = details.progress[details.progress.length - 1];
+        progressSinceRef.current = last?.createdAt || 0;
+      } catch (err) {
+        console.error("Failed to load command details:", err);
+      } finally {
+        if (!cancelled) setIsLoadingProgress(false);
+      }
+    };
+
+    const pollProgress = async () => {
+      try {
+        const delta = await getAtmCommandProgress(
+          selectedCommandId,
+          progressSinceRef.current,
+          200,
+        );
+        if (cancelled || delta.progress.length === 0) return;
+
+        setCommandProgress((prev) => {
+          const seen = new Set(prev.map((p) => p.id));
+          const merged = [...prev];
+          for (const event of delta.progress) {
+            if (!seen.has(event.id)) {
+              merged.push(event);
+            }
+          }
+          return merged;
+        });
+        progressSinceRef.current = delta.nextSince;
+      } catch (err) {
+        console.error("Failed to poll command progress:", err);
+      }
+    };
+
+    loadInitial();
+    const interval = setInterval(pollProgress, 2000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [selectedCommandId, state]);
 
   const handleConnect = async () => {
     if (!platformKey.trim() || !userApiKey.trim()) {
@@ -594,6 +693,105 @@ export function NeuralPanel() {
                         refreshToken={agentsRefreshToken}
                       />
                     </div>
+                  </div>
+
+                  {/* Command Stream Section */}
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-semibold flex items-center gap-2">
+                        <RefreshCw className="size-4 text-blue-500" />
+                        Command Stream
+                      </h3>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onPress={refreshRecentCommands}
+                        isDisabled={isLoadingCommands}
+                      >
+                        {isLoadingCommands ? "Refreshing..." : "Refresh"}
+                      </Button>
+                    </div>
+
+                    {recentCommands.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-10 rounded-2xl border border-dashed border-white/10 text-muted-foreground/50">
+                        <span className="text-sm font-medium">
+                          No commands yet
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <div className="rounded-xl border border-white/5 bg-background/20 backdrop-blur-md p-3 max-h-72 overflow-y-auto space-y-2">
+                          {recentCommands.map((cmd) => (
+                            <button
+                              key={cmd.id}
+                              type="button"
+                              onClick={() => setSelectedCommandId(cmd.id)}
+                              className={`w-full text-left p-3 rounded-lg border transition-all ${
+                                selectedCommandId === cmd.id
+                                  ? "border-primary/40 bg-primary/10"
+                                  : "border-white/5 bg-white/5 hover:border-white/10"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-xs font-mono text-foreground/80 truncate">
+                                  {cmd.intent}
+                                </span>
+                                <Chip size="sm" variant="soft">
+                                  {cmd.status}
+                                </Chip>
+                              </div>
+                              <div className="text-[11px] text-muted-foreground mt-1 font-mono">
+                                {cmd.id}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+
+                        <div className="rounded-xl border border-white/5 bg-background/20 backdrop-blur-md p-3 max-h-72 overflow-y-auto">
+                          {selectedCommandId ? (
+                            <div className="space-y-2">
+                              {isLoadingProgress && commandProgress.length === 0 ? (
+                                <div className="text-sm text-muted-foreground">
+                                  Loading progress...
+                                </div>
+                              ) : commandProgress.length === 0 ? (
+                                <div className="text-sm text-muted-foreground">
+                                  No progress events yet.
+                                </div>
+                              ) : (
+                                commandProgress.map((event) => (
+                                  <div
+                                    key={event.id}
+                                    className="p-2 rounded-md bg-white/5 border border-white/5"
+                                  >
+                                    <div className="flex items-center justify-between gap-2">
+                                      <span className="text-xs uppercase tracking-wider text-muted-foreground">
+                                        {event.level}
+                                      </span>
+                                      <span className="text-[11px] text-muted-foreground font-mono">
+                                        {new Date(event.createdAt).toLocaleTimeString()}
+                                      </span>
+                                    </div>
+                                    <p className="text-sm text-foreground/90 mt-1">
+                                      {event.message}
+                                    </p>
+                                    {event.data && (
+                                      <pre className="text-[11px] text-muted-foreground mt-1 whitespace-pre-wrap font-mono">
+                                        {JSON.stringify(event.data, null, 2)}
+                                      </pre>
+                                    )}
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          ) : (
+                            <div className="text-sm text-muted-foreground">
+                              Select a command to inspect progress.
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Airlock Section - Clean Alerts */}

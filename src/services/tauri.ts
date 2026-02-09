@@ -1329,12 +1329,65 @@ export async function listAtmAgents(): Promise<any> {
   return invoke("list_atm_agents");
 }
 
+export interface AtmCommandSummary {
+  id: string;
+  intent: string;
+  status: string;
+  createdAt: number;
+  startedAt?: number | null;
+  completedAt?: number | null;
+  desktopNodeId?: string | null;
+}
+
+export interface AtmCommandProgressEvent {
+  id: string;
+  level: "debug" | "info" | "warn" | "error" | string;
+  message: string;
+  data?: any;
+  createdAt: number;
+}
+
+export interface AtmCommandDetailsResponse {
+  command: AtmCommandSummary & {
+    result?: any;
+  };
+  progress: AtmCommandProgressEvent[];
+}
+
+export interface AtmCommandProgressResponse {
+  commandId: string;
+  progress: AtmCommandProgressEvent[];
+  nextSince: number;
+}
+
 export async function createAtmAgent(
   name: string,
   type: string,
   config: any,
 ): Promise<any> {
   return invoke("create_atm_agent", { name, agentType: type, config });
+}
+
+export async function listAtmCommands(
+  limit = 30,
+  status?: string,
+): Promise<AtmCommandSummary[]> {
+  return invoke("list_atm_commands", { limit, status });
+}
+
+export async function getAtmCommandDetails(
+  commandId: string,
+  progressLimit = 200,
+): Promise<AtmCommandDetailsResponse> {
+  return invoke("get_atm_command_details", { commandId, progressLimit });
+}
+
+export async function getAtmCommandProgress(
+  commandId: string,
+  since = 0,
+  limit = 200,
+): Promise<AtmCommandProgressResponse> {
+  return invoke("get_atm_command_progress", { commandId, since, limit });
 }
 
 // ============ ATM Bootstrap Commands ============

@@ -45,6 +45,34 @@ pub async fn list_atm_agents(client: State<'_, ATMClient>) -> Result<serde_json:
 }
 
 #[command]
+pub async fn list_atm_commands(
+    client: State<'_, ATMClient>,
+    limit: Option<usize>,
+    status: Option<String>,
+) -> Result<Vec<crate::services::atm_client::ATMCommandSummary>, String> {
+    client.list_commands(limit, status).await
+}
+
+#[command]
+pub async fn get_atm_command_details(
+    client: State<'_, ATMClient>,
+    command_id: String,
+    progress_limit: Option<usize>,
+) -> Result<crate::services::atm_client::CommandDetailsResponse, String> {
+    client.get_command_details(command_id, progress_limit).await
+}
+
+#[command]
+pub async fn get_atm_command_progress(
+    client: State<'_, ATMClient>,
+    command_id: String,
+    since: Option<i64>,
+    limit: Option<usize>,
+) -> Result<crate::services::atm_client::CommandProgressResponse, String> {
+    client.get_command_progress(command_id, since, limit).await
+}
+
+#[command]
 pub async fn generate_pairing_code(
     client: State<'_, ATMClient>,
 ) -> Result<crate::services::atm_client::PairingCodeResponse, String> {
