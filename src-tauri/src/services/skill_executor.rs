@@ -6,7 +6,7 @@ use base64::prelude::*;
 use schemars::{schema_for, JsonSchema};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::path::PathBuf;
+use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
@@ -587,10 +587,9 @@ impl SkillExecutor {
         args: Vec<String>,
         cwd: &PathBuf,
     ) -> CommandResult {
-        // Whitelist safe commands
+        // Shell command policy follows AGENTS.md allowed command set.
         let allowed_commands = vec![
-            "npm", "pnpm", "cargo", "git", "ls", "grep", "echo", "cat", "mkdir", "touch", "rm",
-            "cp", "mv", "curl", "wget", "ps", "kill", "node", "bun", "deno",
+            "npm", "cargo", "git", "ls", "grep", "echo", "cat",
         ];
         if !allowed_commands.contains(&command) {
             return self.error(&format!("Command '{}' is not allowed", command));
@@ -622,6 +621,34 @@ impl SkillExecutor {
             Err(e) => self.error(&format!("Failed to execute command: {}", e)),
         }
     }
+    fn normalize_absolute_path(path: &Path) -> Result<PathBuf, String> {
+        if !path.is_absolute() {
+            return Err(format!("Path '{}' must be absolute", path.display()));
+        }
+
+        let mut normalized = PathBuf::from("/");
+        for component in path.components() {
+            match component {
+                Component::RootDir => {}
+                Component::CurDir => {}
+                Component::Normal(part) => normalized.push(part),
+                Component::ParentDir => {
+                    if !normalized.pop() {
+                        return Err(format!("Invalid path '{}'", path.display()));
+                    }
+                }
+                Component::Prefix(_) => {
+                    return Err(format!(
+                        "Unsupported path prefix for '{}'",
+                        path.display()
+                    ));
+                }
+            }
+        }
+
+        Ok(normalized)
+    }
+
     /// Resolve a path within the workspace. First tries to load local workspace,
     /// falls back to using allowed_paths from the command payload (Cloud-provided).
     async fn resolve_path(
@@ -634,6 +661,8 @@ impl SkillExecutor {
 
         // FAST PATH: If the path is absolute, validate it directly
         if path_buf.is_absolute() {
+            let normalized_target = Self::normalize_absolute_path(&path_buf)?;
+
             // Try to load workspace to get allowed paths
             let workspace_allowed = match self.workspace_manager.load_workspace(&workspace_id) {
                 Ok(ws) => ws.allowed_paths,
@@ -643,31 +672,28 @@ impl SkillExecutor {
                         allowed_paths.to_vec()
                     } else {
                         // No restrictions, allow absolute path as-is (bootstrap mode)
-                        return Ok(path_buf);
+                        return Ok(normalized_target);
                     }
                 }
             };
 
             // If we have allowed paths, validate the absolute path is within them
             if !workspace_allowed.is_empty() {
-                // SPECIAL RULE: Allow access to anything under the user's home directory
-                if path_str.starts_with("/Users/") || path_str.starts_with("/home/") {
-                    // Allowed
-                } else {
-                    let is_allowed = workspace_allowed
-                        .iter()
-                        .any(|allowed| path_str.starts_with(allowed));
+                let is_allowed = workspace_allowed.iter().any(|allowed| {
+                    Self::normalize_absolute_path(Path::new(allowed))
+                        .map(|p| normalized_target.starts_with(p))
+                        .unwrap_or(false)
+                });
 
-                    if !is_allowed {
-                        return Err(format!(
-                            "Path '{}' is outside allowed workspace paths",
-                            path_str
-                        ));
-                    }
+                if !is_allowed {
+                    return Err(format!(
+                        "Path '{}' is outside allowed workspace paths",
+                        path_str
+                    ));
                 }
             }
 
-            return Ok(path_buf);
+            return Ok(normalized_target);
         }
 
         // RELATIVE PATH: Resolve against workspace root
@@ -695,11 +721,13 @@ impl SkillExecutor {
         // Build target path
         let target_path = root.join(path_str);
 
-        // Validate path is within allowed paths
-        let target_path_str = target_path.to_string_lossy().to_string();
-        let is_allowed = workspace_allowed_paths
-            .iter()
-            .any(|allowed| target_path_str.starts_with(allowed));
+        // Validate path is within allowed paths using component-aware checks.
+        let normalized_target = Self::normalize_absolute_path(&target_path)?;
+        let is_allowed = workspace_allowed_paths.iter().any(|allowed| {
+            Self::normalize_absolute_path(Path::new(allowed))
+                .map(|p| normalized_target.starts_with(p))
+                .unwrap_or(false)
+        });
 
         if !is_allowed {
             return Err(format!(
@@ -708,7 +736,7 @@ impl SkillExecutor {
             ));
         }
 
-        Ok(target_path)
+        Ok(normalized_target)
     }
 
     async fn handle_read_file(

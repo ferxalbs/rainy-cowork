@@ -185,9 +185,13 @@ export function AgentRuntimePanel({
             variant="ghost"
             className="absolute right-2 top-2"
             onPress={handleRun}
-            isLoading={state.status === "running"}
+            isDisabled={state.status === "running"}
           >
-            {!state.status.startsWith("run") && <Play className="w-4 h-4" />}
+            {state.status === "running" ? (
+              <Spinner size="sm" className="text-primary" />
+            ) : (
+              <Play className="w-4 h-4" />
+            )}
           </Button>
         </div>
       </div>

@@ -83,27 +83,24 @@ impl AirlockService {
                         "Airlock: SENSITIVE command {} requires notification",
                         command.id
                     );
-                    self.request_approval(command, true).await
+                    self.request_approval(command, false).await
                 }
             }
             AirlockLevel::Dangerous => {
                 // Level 2: Execution operations
-                // Prioritize user safety: dangerous commands always require approval unless explicit override (not implemented yet)
-                // Using headless mode for dangerous commands is risky.
-                // For now, treat same as sensitive if user enabled headless mode (means they trust the agent).
+                // Dangerous commands always require explicit approval.
+                // Headless mode never bypasses this gate.
                 if self.is_headless_mode() {
-                    tracing::info!(
-                        "Airlock: Auto-approved DANGEROUS command {} (Headless Mode - HIGH RISK)",
-                        command.id
-                    );
-                    Ok(true)
-                } else {
                     tracing::warn!(
-                        "Airlock: DANGEROUS command {} requires explicit approval",
+                        "Airlock: DANGEROUS command {} still requires explicit approval (headless mode disabled for this level)",
                         command.id
                     );
-                    self.request_approval(command, false).await
                 }
+                tracing::warn!(
+                    "Airlock: DANGEROUS command {} requires explicit approval",
+                    command.id
+                );
+                self.request_approval(command, false).await
             }
         }
     }
@@ -170,18 +167,18 @@ impl AirlockService {
                 let _ = self.app.emit("airlock:approval_resolved", &command.id);
 
                 if allow_on_timeout {
-                    tracing::info!(
-                        "Airlock: Command {} timed out, allowing (sensitive)",
-                        command.id
-                    );
-                    Ok(true)
-                } else {
                     tracing::warn!(
-                        "Airlock: Command {} timed out, denying (dangerous)",
+                        "Airlock: Command {} timed out, allowing due to explicit policy override",
                         command.id
                     );
-                    Ok(false)
+                    return Ok(true);
                 }
+
+                tracing::warn!(
+                    "Airlock: Command {} timed out, denying by default",
+                    command.id
+                );
+                Ok(false)
             }
         }
     }

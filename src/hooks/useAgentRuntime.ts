@@ -60,7 +60,7 @@ export function useAgentRuntime() {
 
   const runAgent = useCallback(
     async (prompt: string, modelId: string, workspaceId: string) => {
-      setState((prev) => ({
+      setState(() => ({
         status: "running",
         events: [], // Clear previous run events
         error: null,
