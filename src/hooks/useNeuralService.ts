@@ -1,199 +1,13 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import {
   registerNode,
   sendHeartbeat,
-  SkillManifest,
   DesktopNodeStatus,
   setHeadlessMode,
-  AirlockLevels,
 } from "../services/tauri";
 import { useAirlock } from "./useAirlock";
+import { DEFAULT_NEURAL_SKILLS } from "../constants/defaultNeuralSkills";
 import { toast } from "@heroui/react";
-
-// Default skills this Desktop Node exposes
-const DEFAULT_SKILLS: SkillManifest[] = [
-  {
-    name: "filesystem",
-    version: "1.0.0",
-    methods: [
-      {
-        name: "read_file",
-        description: "Read file content",
-        airlockLevel: AirlockLevels.Safe,
-        parameters: {
-          path: {
-            type: "string",
-            description: "Path to file",
-            required: true,
-          },
-        },
-      },
-      {
-        name: "list_files",
-        description: "List files in a directory",
-        airlockLevel: AirlockLevels.Safe,
-        parameters: {
-          path: {
-            type: "string",
-            description: "Directory path",
-            required: true,
-          },
-        },
-      },
-      {
-        name: "search_files",
-        description: "Search files by query",
-        airlockLevel: AirlockLevels.Safe,
-        parameters: {
-          query: {
-            type: "string",
-            description: "Search query (regex supported)",
-            required: true,
-          },
-          path: {
-            type: "string",
-            description: "Root path to search",
-            required: false,
-          },
-          search_content: {
-            type: "boolean",
-            description: "Search within file contents",
-            required: false,
-          },
-        },
-      },
-      {
-        name: "write_file",
-        description: "Write content to file",
-        airlockLevel: AirlockLevels.Sensitive,
-        parameters: {
-          path: {
-            type: "string",
-            description: "Path to file",
-            required: true,
-          },
-          content: {
-            type: "string",
-            description: "Content to write",
-            required: true,
-          },
-        },
-      },
-      {
-        name: "append_file",
-        description: "Append content to file",
-        airlockLevel: AirlockLevels.Sensitive,
-        parameters: {
-          path: {
-            type: "string",
-            description: "Path to file",
-            required: true,
-          },
-          content: {
-            type: "string",
-            description: "Content to append",
-            required: true,
-          },
-        },
-      },
-    ],
-  },
-  {
-    name: "shell",
-    version: "1.0.0",
-    methods: [
-      {
-        name: "execute_command",
-        description: "Execute a shell command",
-        airlockLevel: AirlockLevels.Dangerous,
-        parameters: {
-          command: {
-            type: "string",
-            description: "Command to execute (whitelisted)",
-            required: true,
-          },
-          args: {
-            type: "array",
-            description: "Command arguments",
-            required: true,
-          },
-        },
-      },
-    ],
-  },
-  {
-    name: "web",
-    version: "1.0.0",
-    methods: [
-      {
-        name: "web_search",
-        description: "Search the web",
-        airlockLevel: AirlockLevels.Safe,
-        parameters: {
-          query: {
-            type: "string",
-            description: "Search query",
-            required: true,
-          },
-        },
-      },
-      {
-        name: "read_web_page",
-        description: "Read a web page",
-        airlockLevel: AirlockLevels.Safe,
-        parameters: {
-          url: {
-            type: "string",
-            description: "URL to read",
-            required: true,
-          },
-        },
-      },
-    ],
-  },
-  {
-    name: "browser",
-    version: "1.0.0",
-    methods: [
-      {
-        name: "browse_url",
-        description: "Open a URL in the browser",
-        airlockLevel: AirlockLevels.Safe,
-        parameters: {
-          url: {
-            type: "string",
-            description: "URL to open",
-            required: true,
-          },
-        },
-      },
-      {
-        name: "click_element",
-        description: "Click an element by CSS selector",
-        airlockLevel: AirlockLevels.Sensitive,
-        parameters: {
-          selector: {
-            type: "string",
-            description: "CSS selector",
-            required: true,
-          },
-        },
-      },
-      {
-        name: "screenshot",
-        description: "Take a screenshot of the current page",
-        airlockLevel: AirlockLevels.Safe,
-        parameters: {},
-      },
-      {
-        name: "get_page_content",
-        description: "Get HTML content of the current page",
-        airlockLevel: AirlockLevels.Safe,
-        parameters: {},
-      },
-    ],
-  },
-];
 
 export function useNeuralService() {
   const [status, setStatus] = useState<DesktopNodeStatus>("pending-pairing");
@@ -201,12 +15,34 @@ export function useNeuralService() {
   const { pendingRequests: pendingApprovals, respond: respondAirlock } =
     useAirlock();
   const [lastHeartbeat, setLastHeartbeat] = useState<Date | null>(null);
+  const heartbeatIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
+    null,
+  );
+
+  const stopHeartbeat = useCallback(() => {
+    if (heartbeatIntervalRef.current) {
+      clearInterval(heartbeatIntervalRef.current);
+      heartbeatIntervalRef.current = null;
+    }
+  }, []);
+
+  const startHeartbeat = useCallback(() => {
+    stopHeartbeat();
+    heartbeatIntervalRef.current = setInterval(async () => {
+      try {
+        await sendHeartbeat("online");
+        setLastHeartbeat(new Date());
+      } catch (err) {
+        console.error("Heartbeat failed:", err);
+      }
+    }, 5000);
+  }, [stopHeartbeat]);
 
   // Initial Registration / Handshake
   const connect = useCallback(async () => {
     try {
       console.log("Registering Neural Node...");
-      const id = await registerNode(DEFAULT_SKILLS, []);
+      const id = await registerNode(DEFAULT_NEURAL_SKILLS, []);
       setNodeId(id);
       setStatus("connected");
       toast.success("Connected to Neural Network");
@@ -218,21 +54,13 @@ export function useNeuralService() {
       setStatus("error");
       toast.danger("Failed to connect to Neural Network");
     }
-  }, []);
+  }, [startHeartbeat]);
 
-  const startHeartbeat = useCallback(() => {
-    const interval = setInterval(async () => {
-      try {
-        await sendHeartbeat("online");
-        setLastHeartbeat(new Date());
-      } catch (err) {
-        console.error("Heartbeat failed:", err);
-        // Optionally set status to offline if multiple fail
-      }
-    }, 5000); // 5 seconds
-
-    return () => clearInterval(interval);
-  }, []);
+  useEffect(() => {
+    return () => {
+      stopHeartbeat();
+    };
+  }, [stopHeartbeat]);
 
   const respond = useCallback(async (commandId: string, approved: boolean) => {
     try {

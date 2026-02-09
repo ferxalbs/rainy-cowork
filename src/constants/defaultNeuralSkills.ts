@@ -1,0 +1,226 @@
+import { AirlockLevels, SkillManifest } from "../services/tauri";
+
+export const DEFAULT_NEURAL_SKILLS: SkillManifest[] = [
+  {
+    name: "filesystem",
+    version: "1.0.0",
+    methods: [
+      {
+        name: "read_file",
+        description: "Read file content",
+        airlockLevel: AirlockLevels.Safe,
+        parameters: {
+          path: {
+            type: "string",
+            description: "Path to file",
+            required: true,
+          },
+        },
+      },
+      {
+        name: "list_files",
+        description: "List files in a directory",
+        airlockLevel: AirlockLevels.Safe,
+        parameters: {
+          path: {
+            type: "string",
+            description: "Directory path",
+            required: true,
+          },
+        },
+      },
+      {
+        name: "search_files",
+        description: "Search files by query",
+        airlockLevel: AirlockLevels.Safe,
+        parameters: {
+          query: {
+            type: "string",
+            description: "Search query (regex supported)",
+            required: true,
+          },
+          path: {
+            type: "string",
+            description: "Root path to search",
+            required: false,
+          },
+          search_content: {
+            type: "boolean",
+            description: "Search within file contents",
+            required: false,
+          },
+        },
+      },
+      {
+        name: "write_file",
+        description: "Write content to file",
+        airlockLevel: AirlockLevels.Sensitive,
+        parameters: {
+          path: {
+            type: "string",
+            description: "Path to write",
+            required: true,
+          },
+          content: {
+            type: "string",
+            description: "Content to write",
+            required: true,
+          },
+        },
+      },
+      {
+        name: "mkdir",
+        description: "Create directory",
+        airlockLevel: AirlockLevels.Sensitive,
+        parameters: {
+          path: {
+            type: "string",
+            description: "Directory path",
+            required: true,
+          },
+        },
+      },
+      {
+        name: "delete_file",
+        description: "Delete file or directory",
+        airlockLevel: AirlockLevels.Dangerous,
+        parameters: {
+          path: {
+            type: "string",
+            description: "Path to delete",
+            required: true,
+          },
+        },
+      },
+      {
+        name: "move_file",
+        description: "Move or rename file",
+        airlockLevel: AirlockLevels.Sensitive,
+        parameters: {
+          source: {
+            type: "string",
+            description: "Source path",
+            required: true,
+          },
+          destination: {
+            type: "string",
+            description: "Destination path",
+            required: true,
+          },
+        },
+      },
+      {
+        name: "append_file",
+        description: "Append content to file",
+        airlockLevel: AirlockLevels.Sensitive,
+        parameters: {
+          path: {
+            type: "string",
+            description: "Path to file",
+            required: true,
+          },
+          content: {
+            type: "string",
+            description: "Content to append",
+            required: true,
+          },
+        },
+      },
+    ],
+  },
+  {
+    name: "shell",
+    version: "1.0.0",
+    methods: [
+      {
+        name: "execute_command",
+        description: "Execute a shell command",
+        airlockLevel: AirlockLevels.Dangerous,
+        parameters: {
+          command: {
+            type: "string",
+            description: "Command to execute (whitelisted)",
+            required: true,
+          },
+          args: {
+            type: "array",
+            description: "Command arguments",
+            required: true,
+          },
+        },
+      },
+    ],
+  },
+  {
+    name: "web",
+    version: "1.0.0",
+    methods: [
+      {
+        name: "web_search",
+        description: "Search the web",
+        airlockLevel: AirlockLevels.Safe,
+        parameters: {
+          query: {
+            type: "string",
+            description: "Search query",
+            required: true,
+          },
+        },
+      },
+      {
+        name: "read_web_page",
+        description: "Read a web page",
+        airlockLevel: AirlockLevels.Safe,
+        parameters: {
+          url: {
+            type: "string",
+            description: "URL to read",
+            required: true,
+          },
+        },
+      },
+    ],
+  },
+  {
+    name: "browser",
+    version: "1.0.0",
+    methods: [
+      {
+        name: "browse_url",
+        description: "Open a URL in the browser",
+        airlockLevel: AirlockLevels.Safe,
+        parameters: {
+          url: {
+            type: "string",
+            description: "URL to open",
+            required: true,
+          },
+        },
+      },
+      {
+        name: "click_element",
+        description: "Click an element by CSS selector",
+        airlockLevel: AirlockLevels.Sensitive,
+        parameters: {
+          selector: {
+            type: "string",
+            description: "CSS selector",
+            required: true,
+          },
+        },
+      },
+      {
+        name: "screenshot",
+        description: "Take a screenshot of the current page",
+        airlockLevel: AirlockLevels.Safe,
+        parameters: {},
+      },
+      {
+        name: "get_page_content",
+        description: "Get HTML content of the current page",
+        airlockLevel: AirlockLevels.Safe,
+        parameters: {},
+      },
+    ],
+  },
+];

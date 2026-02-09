@@ -13,6 +13,19 @@ use tokio::sync::{Mutex, RwLock};
 use tokio::time::sleep;
 
 const POLL_INTERVAL: Duration = Duration::from_secs(2);
+const MAX_PROGRESS_PREVIEW_CHARS: usize = 300;
+
+fn progress_preview(value: &str) -> String {
+    let trimmed = value.trim();
+    if trimmed.starts_with("data:") {
+        return "[binary content omitted]".to_string();
+    }
+    if trimmed.len() <= MAX_PROGRESS_PREVIEW_CHARS {
+        return trimmed.to_string();
+    }
+    let preview: String = trimmed.chars().take(MAX_PROGRESS_PREVIEW_CHARS).collect();
+    format!("{}...", preview)
+}
 
 use crate::ai::agent::manager::AgentManager;
 
@@ -222,6 +235,15 @@ impl CommandPoller {
                 command.id, e
             );
         }
+        let _ = self
+            .neural_service
+            .report_command_progress(
+                &command.id,
+                "info",
+                &format!("Started {}", command.intent),
+                None,
+            )
+            .await;
 
         // Execute - check if this is an agent.run command for full workflow
         let result = if command.intent.starts_with("agent.") {
@@ -291,6 +313,19 @@ impl CommandPoller {
                             "[CommandPoller] Routing to AgentRuntime: agent='{}' (model: {}, workspace: {})",
                             agent_name, model, workspace_id
                         );
+                    let _ = self
+                        .neural_service
+                        .report_command_progress(
+                            &command.id,
+                            "info",
+                            &format!("Initializing agent runtime for '{}'", agent_name),
+                            Some(serde_json::json!({
+                                "model": model.clone(),
+                                "workspaceId": workspace_id.clone(),
+                                "agentId": agent_id.clone(),
+                            })),
+                        )
+                        .await;
 
                     // Create AgentRuntime on-demand
                     let context_lock = self.agent_context.read().await;
@@ -393,9 +428,26 @@ GUIDELINES:
                         );
 
                         // Run the agent
+                        let neural_service = self.neural_service.clone();
+                        let command_id = command.id.clone();
                         match runtime
-                            .run(prompt, |event| {
+                            .run(prompt, move |event| {
                                 println!("[Agent Event] {:?}", event);
+                                let event_text = format!("{:?}", event);
+                                let service = neural_service.clone();
+                                let cmd = command_id.clone();
+                                tokio::spawn(async move {
+                                    let _ = service
+                                        .report_command_progress(
+                                            &cmd,
+                                            "info",
+                                            "Agent runtime event",
+                                            Some(serde_json::json!({
+                                                "event": event_text,
+                                            })),
+                                        )
+                                        .await;
+                                });
                             })
                             .await
                         {
@@ -438,11 +490,39 @@ GUIDELINES:
                 "[CommandPoller] Execution result for {}: success=true",
                 command.id
             );
+            let output_preview = result
+                .output
+                .as_deref()
+                .map(progress_preview)
+                .unwrap_or_else(|| "Command completed successfully".to_string());
+            let _ = self
+                .neural_service
+                .report_command_progress(
+                    &command.id,
+                    "info",
+                    "Command completed",
+                    Some(serde_json::json!({ "preview": output_preview })),
+                )
+                .await;
         } else {
             println!(
                 "[CommandPoller] Execution result for {}: success=false, error={:?}",
                 command.id, result.error
             );
+            let error_preview = result
+                .error
+                .as_deref()
+                .map(progress_preview)
+                .unwrap_or_else(|| "Command failed".to_string());
+            let _ = self
+                .neural_service
+                .report_command_progress(
+                    &command.id,
+                    "error",
+                    "Command failed",
+                    Some(serde_json::json!({ "error": error_preview })),
+                )
+                .await;
         }
 
         // Report result

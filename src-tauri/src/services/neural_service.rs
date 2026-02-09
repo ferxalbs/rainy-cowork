@@ -331,4 +331,43 @@ impl NeuralService {
 
         Ok(())
     }
+
+    /// Stream incremental command progress to Cloud.
+    pub async fn report_command_progress(
+        &self,
+        command_id: &str,
+        level: &str,
+        message: &str,
+        data: Option<serde_json::Value>,
+    ) -> Result<(), String> {
+        let metadata = self.metadata.lock().await;
+        let node_id = metadata.node_id.as_ref().ok_or("Node not registered")?;
+        let platform_key = metadata.platform_key.as_ref().ok_or("Not authenticated")?;
+
+        let url = format!(
+            "{}/v1/nodes/{}/commands/{}/progress",
+            self.base_url, node_id, command_id
+        );
+
+        let body = serde_json::json!({
+            "level": level,
+            "message": message,
+            "data": data,
+        });
+
+        let res = self
+            .http
+            .post(&url)
+            .header("Authorization", format!("Bearer {}", platform_key))
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+
+        if !res.status().is_success() {
+            return Err(format!("Report progress failed: {}", res.status()));
+        }
+
+        Ok(())
+    }
 }
