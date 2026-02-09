@@ -7,7 +7,58 @@ on:
     branches: [ main, develop ]
 
 jobs:
-  test-tauri:
+  typecheck-and-build:
+    permissions:
+      contents: read
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: TypeScript Type Check
+        run: pnpm run typecheck || pnpm exec tsc --noEmit
+
+      - name: Build
+        run: pnpm run build
+
+  rust-tests:
+    permissions:
+      contents: read
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Rust setup
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin, x86_64-apple-darwin
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Build Rust
+        run: cd src-tauri && cargo build --lib
+
+      - name: Run Rust Tests
+        run: cd src-tauri && cargo test --lib
+
+  tauri-build:
     permissions:
       contents: read
     strategy:
@@ -39,6 +90,11 @@ jobs:
         with:
           node-version: lts/*
 
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
       - name: Rust setup
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -50,7 +106,7 @@ jobs:
           workspaces: './src-tauri -> target'
 
       - name: Install frontend dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
-      - name: Test
-        run: npm run build
+      - name: Tauri Build
+        run: pnpm run tauri build ${{ matrix.args }}

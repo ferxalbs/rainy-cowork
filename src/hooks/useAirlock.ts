@@ -34,15 +34,20 @@ export function useAirlock() {
     );
 
     // Check for existing pending requests on mount
-    invoke<string[]>("get_pending_airlock_approvals")
-      .then((ids) => {
-        if (ids && ids.length > 0) {
-          console.log("Pending approvals detected:", ids);
-          // Note: We don't get the full object here, only IDs.
-          // The event carries the full object.
-          // If the user refreshed the page, they might see an empty list until next event/refresh logic is improved.
-          // Future TODO: Update backend to return full ApprovalRequest objects
-        }
+    invoke<ApprovalRequest[]>("get_pending_airlock_approvals")
+      .then((requests) => {
+        if (!requests || requests.length === 0) return;
+
+        setPendingRequests((prev) => {
+          const existingIds = new Set(prev.map((r) => r.commandId));
+          const next = [...prev];
+          for (const request of requests) {
+            if (!existingIds.has(request.commandId)) {
+              next.push(request);
+            }
+          }
+          return next;
+        });
       })
       .catch((e) => console.error("Failed to check pending approvals:", e));
 

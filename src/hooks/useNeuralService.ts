@@ -264,10 +264,18 @@ export function useNeuralService() {
 
     // Load initial pending approvals
     getPendingAirlockApprovals()
-      .then((ids) => {
-        if (ids.length > 0) {
-          console.log("Pending approval IDs detected:", ids);
-        }
+      .then((requests) => {
+        if (requests.length === 0) return;
+        setPendingApprovals((prev) => {
+          const existingIds = new Set(prev.map((req) => req.commandId));
+          const next = [...prev];
+          for (const request of requests) {
+            if (!existingIds.has(request.commandId)) {
+              next.push(request);
+            }
+          }
+          return next;
+        });
       })
       .catch(console.error);
 

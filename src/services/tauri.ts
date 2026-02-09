@@ -1282,7 +1282,7 @@ export async function respondToAirlock(
   return invoke("respond_to_airlock", { commandId, approved });
 }
 
-export async function getPendingAirlockApprovals(): Promise<string[]> {
+export async function getPendingAirlockApprovals(): Promise<ApprovalRequest[]> {
   return invoke("get_pending_airlock_approvals");
 }
 

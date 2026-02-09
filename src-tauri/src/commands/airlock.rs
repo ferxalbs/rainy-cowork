@@ -29,7 +29,7 @@ pub async fn respond_to_airlock(
 #[command]
 pub async fn get_pending_airlock_approvals(
     state: State<'_, AirlockServiceState>,
-) -> Result<Vec<String>, String> {
+) -> Result<Vec<crate::services::airlock::ApprovalRequest>, String> {
     let guard = state.0.lock().await;
     if let Some(airlock) = guard.as_ref() {
         Ok(airlock.get_pending_approvals().await)

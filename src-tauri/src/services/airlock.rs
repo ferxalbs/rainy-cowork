@@ -36,11 +36,16 @@ pub enum ApprovalResult {
     Timeout,
 }
 
+struct PendingApproval {
+    request: ApprovalRequest,
+    responder: oneshot::Sender<ApprovalResult>,
+}
+
 // Used during command execution
 #[derive(Clone)]
 pub struct AirlockService {
     app: AppHandle,
-    pending_approvals: Arc<Mutex<HashMap<String, oneshot::Sender<ApprovalResult>>>>,
+    pending_approvals: Arc<Mutex<HashMap<String, PendingApproval>>>,
     headless_mode: Arc<AtomicBool>,
 }
 
@@ -111,21 +116,26 @@ impl AirlockService {
         command: &QueuedCommand,
         allow_on_timeout: bool,
     ) -> Result<bool, String> {
-        let (tx, rx) = oneshot::channel::<ApprovalResult>();
-
-        // Store the sender so we can receive the response later
-        {
-            let mut pending = self.pending_approvals.lock().await;
-            pending.insert(command.id.clone(), tx);
-        }
-
-        // Create approval request for frontend
         let request = ApprovalRequest {
             command_id: command.id.clone(),
             intent: command.intent.clone(),
             payload_summary: serde_json::to_string(&command.payload).unwrap_or_default(),
             airlock_level: command.airlock_level,
             timestamp: chrono::Utc::now().timestamp_millis(),
+        };
+
+        let (tx, rx) = oneshot::channel::<ApprovalResult>();
+
+        // Store the pending request and sender so frontend can restore state after reload.
+        {
+            let mut pending = self.pending_approvals.lock().await;
+            pending.insert(
+                command.id.clone(),
+                PendingApproval {
+                    request: request.clone(),
+                    responder: tx,
+                },
+            );
         };
 
         // Emit event to frontend
@@ -191,14 +201,17 @@ impl AirlockService {
     ) -> Result<(), String> {
         let mut pending = self.pending_approvals.lock().await;
 
-        if let Some(tx) = pending.remove(command_id) {
+        if let Some(entry) = pending.remove(command_id) {
             let result = if approved {
                 ApprovalResult::Approved
             } else {
                 ApprovalResult::Rejected
             };
 
-            tx.send(result).map_err(|_| "Channel closed".to_string())?;
+            entry
+                .responder
+                .send(result)
+                .map_err(|_| "Channel closed".to_string())?;
             Ok(())
         } else {
             Err(format!("No pending approval for command {}", command_id))
@@ -206,8 +219,11 @@ impl AirlockService {
     }
 
     /// Get all pending approval requests
-    pub async fn get_pending_approvals(&self) -> Vec<String> {
+    pub async fn get_pending_approvals(&self) -> Vec<ApprovalRequest> {
         let pending = self.pending_approvals.lock().await;
-        pending.keys().cloned().collect()
+        let mut approvals: Vec<ApprovalRequest> =
+            pending.values().map(|entry| entry.request.clone()).collect();
+        approvals.sort_by_key(|request| request.timestamp);
+        approvals
     }
 }

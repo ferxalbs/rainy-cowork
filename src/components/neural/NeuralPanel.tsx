@@ -418,7 +418,16 @@ export function NeuralPanel() {
       try {
         const approvals = await getPendingAirlockApprovals();
         if (approvals.length > 0) {
-          console.log("Pending approval IDs detected:", approvals);
+          setPendingApprovals((prev) => {
+            const existingIds = new Set(prev.map((req) => req.commandId));
+            const next = [...prev];
+            for (const request of approvals) {
+              if (!existingIds.has(request.commandId)) {
+                next.push(request);
+              }
+            }
+            return next;
+          });
         }
       } catch (err) {
         console.error("Failed to load approvals:", err);
