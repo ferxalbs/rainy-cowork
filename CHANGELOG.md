@@ -50,6 +50,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed TypeScript ack payload parsing edge case (`ackedBy` union fallback issue) in ATM admin alert acknowledge flow.
 - Removed dashboard action paths that could execute when policy disallowed the operation.
 
+### Security Fixes
+
+- **SDK Hardening**: Upgraded `rainy-sdk` to v0.6.4 to resolve `bytes` crate vulnerability (RUSTSEC-2026-0007).
+
 ## [0.5.7] - 2026-02-09 - Native Runtime Enhancement (AgentSpec V2)
 
 ### Added - AgentSpec V2 Persistence & Runtime
