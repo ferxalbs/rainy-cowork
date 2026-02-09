@@ -4,6 +4,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use tokio::time::{sleep, Duration};
 
 #[derive(Clone)]
 pub struct NeuralService {
@@ -44,6 +45,27 @@ struct CommandsResponse {
 }
 
 impl NeuralService {
+    async fn get_auth_context(&self) -> Result<(String, String), String> {
+        let metadata = self.metadata.lock().await;
+        let node_id = metadata
+            .node_id
+            .clone()
+            .ok_or("Node not registered".to_string())?;
+        let platform_key = metadata
+            .platform_key
+            .clone()
+            .ok_or("Not authenticated".to_string())?;
+        Ok((node_id, platform_key))
+    }
+
+    async fn get_node_id(&self) -> Result<String, String> {
+        let metadata = self.metadata.lock().await;
+        metadata
+            .node_id
+            .clone()
+            .ok_or("Node not registered".to_string())
+    }
+
     pub fn new(base_url: String, workspace_id: String, authenticator: NodeAuthenticator) -> Self {
         let hostname = std::env::var("HOSTNAME")
             .or_else(|_| std::env::var("COMPUTERNAME"))
@@ -167,19 +189,24 @@ impl NeuralService {
         skills: Vec<SkillManifest>,
         allowed_paths: Vec<String>,
     ) -> Result<String, String> {
-        let mut metadata = self.metadata.lock().await;
+        let (existing_node_id, platform_key, workspace_id, hostname, platform) = {
+            let metadata = self.metadata.lock().await;
+            (
+                metadata.node_id.clone(),
+                metadata
+                    .platform_key
+                    .clone()
+                    .ok_or("Not authenticated: Platform Key required".to_string())?,
+                metadata.workspace_id.clone(),
+                metadata.hostname.clone(),
+                metadata.platform.clone(),
+            )
+        };
 
-        // If already registered, return existing ID (or maybe re-register?)
-        if let Some(id) = &metadata.node_id {
-            return Ok(id.clone());
+        // If already registered, return existing ID.
+        if let Some(id) = existing_node_id {
+            return Ok(id);
         }
-
-        // Check for credentials
-        let platform_key = metadata
-            .platform_key
-            .as_ref()
-            .ok_or("Not authenticated: Platform Key required")?
-            .clone();
 
         let url = format!("{}/v1/nodes/register", self.base_url);
 
@@ -190,9 +217,9 @@ impl NeuralService {
             .unwrap_or_else(|_| "unknown".to_string());
 
         let body = serde_json::json!({
-            "workspaceId": metadata.workspace_id,
-            "hostname": metadata.hostname,
-            "platform": metadata.platform,
+            "workspaceId": workspace_id,
+            "hostname": hostname,
+            "platform": platform,
             "skills": skills,
             "allowedPaths": allowed_paths,
             "fingerprint": fingerprint
@@ -217,6 +244,7 @@ impl NeuralService {
         let data: RegisterResponse = res.json().await.map_err(|e| e.to_string())?;
 
         if data.success {
+            let mut metadata = self.metadata.lock().await;
             metadata.node_id = Some(data.node_id.clone());
             Ok(data.node_id)
         } else {
@@ -226,9 +254,7 @@ impl NeuralService {
 
     /// Sends a heartbeat and checks for pending commands
     pub async fn heartbeat(&self, status: DesktopNodeStatus) -> Result<Vec<QueuedCommand>, String> {
-        let metadata = self.metadata.lock().await;
-        let node_id = metadata.node_id.as_ref().ok_or("Node not registered")?;
-        let platform_key = metadata.platform_key.as_ref().ok_or("Not authenticated")?;
+        let (node_id, platform_key) = self.get_auth_context().await?;
 
         let url = format!("{}/v1/nodes/{}/heartbeat", self.base_url, node_id);
 
@@ -255,8 +281,7 @@ impl NeuralService {
 
     /// Polls specifically for commands
     pub async fn poll_commands(&self) -> Result<Vec<QueuedCommand>, String> {
-        let metadata = self.metadata.lock().await;
-        let node_id = metadata.node_id.as_ref().ok_or("Node not registered")?;
+        let node_id = self.get_node_id().await?;
 
         let url = format!("{}/v1/nodes/{}/commands", self.base_url, node_id);
 
@@ -277,9 +302,7 @@ impl NeuralService {
 
     /// Mark a command as started
     pub async fn start_command(&self, command_id: &str) -> Result<(), String> {
-        let metadata = self.metadata.lock().await;
-        let node_id = metadata.node_id.as_ref().ok_or("Node not registered")?;
-        let platform_key = metadata.platform_key.as_ref().ok_or("Not authenticated")?;
+        let (node_id, platform_key) = self.get_auth_context().await?;
 
         let url = format!(
             "{}/v1/nodes/{}/commands/{}/start",
@@ -307,9 +330,7 @@ impl NeuralService {
         command_id: &str,
         result: CommandResult,
     ) -> Result<(), String> {
-        let metadata = self.metadata.lock().await;
-        let node_id = metadata.node_id.as_ref().ok_or("Node not registered")?;
-        let platform_key = metadata.platform_key.as_ref().ok_or("Not authenticated")?;
+        let (node_id, platform_key) = self.get_auth_context().await?;
 
         let url = format!(
             "{}/v1/nodes/{}/commands/{}/complete",
@@ -340,9 +361,7 @@ impl NeuralService {
         message: &str,
         data: Option<serde_json::Value>,
     ) -> Result<(), String> {
-        let metadata = self.metadata.lock().await;
-        let node_id = metadata.node_id.as_ref().ok_or("Node not registered")?;
-        let platform_key = metadata.platform_key.as_ref().ok_or("Not authenticated")?;
+        let (node_id, platform_key) = self.get_auth_context().await?;
 
         let url = format!(
             "{}/v1/nodes/{}/commands/{}/progress",
@@ -355,19 +374,36 @@ impl NeuralService {
             "data": data,
         });
 
-        let res = self
-            .http
-            .post(&url)
-            .header("Authorization", format!("Bearer {}", platform_key))
-            .json(&body)
-            .send()
-            .await
-            .map_err(|e| e.to_string())?;
+        const MAX_ATTEMPTS: usize = 3;
+        let mut attempt = 0usize;
+        loop {
+            attempt += 1;
+            let res = self
+                .http
+                .post(&url)
+                .header("Authorization", format!("Bearer {}", platform_key))
+                .json(&body)
+                .send()
+                .await;
 
-        if !res.status().is_success() {
-            return Err(format!("Report progress failed: {}", res.status()));
+            match res {
+                Ok(response) if response.status().is_success() => return Ok(()),
+                Ok(response) => {
+                    let status = response.status();
+                    let retryable = status.is_server_error();
+                    if !retryable || attempt >= MAX_ATTEMPTS {
+                        return Err(format!("Report progress failed: {}", status));
+                    }
+                }
+                Err(err) => {
+                    if attempt >= MAX_ATTEMPTS {
+                        return Err(err.to_string());
+                    }
+                }
+            }
+
+            // Exponential backoff (100ms, 200ms, then fail).
+            sleep(Duration::from_millis(100 * (1 << (attempt - 1)) as u64)).await;
         }
-
-        Ok(())
     }
 }

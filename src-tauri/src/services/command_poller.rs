@@ -7,13 +7,17 @@ use crate::services::neural_service::NeuralService;
 use crate::services::settings::SettingsManager;
 use crate::services::skill_executor::SkillExecutor;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
-use std::time::Duration;
-use tokio::sync::{Mutex, RwLock};
+use std::time::{Duration, Instant};
+use tokio::sync::{mpsc, Mutex, RwLock};
 use tokio::time::sleep;
 
 const POLL_INTERVAL: Duration = Duration::from_secs(2);
 const MAX_PROGRESS_PREVIEW_CHARS: usize = 300;
+const AGENT_PROGRESS_CHANNEL_CAPACITY: usize = 128;
+const AGENT_PROGRESS_MIN_INTERVAL: Duration = Duration::from_millis(250);
+const AGENT_PROGRESS_MAX_SUPPRESSED: u32 = 12;
 
 fn progress_preview(value: &str) -> String {
     let trimmed = value.trim();
@@ -67,6 +71,59 @@ fn map_agent_event(event: &AgentEvent) -> (String, serde_json::Value) {
             }),
         ),
     }
+}
+
+#[derive(Default)]
+struct ProgressThrottle {
+    last_emit_at: Option<Instant>,
+    suppressed_count: u32,
+}
+
+async fn report_agent_progress_event(
+    neural_service: &NeuralService,
+    command_id: &str,
+    throttle: &mut ProgressThrottle,
+    message: String,
+    mut data: serde_json::Value,
+    dropped_events: usize,
+) {
+    let now = Instant::now();
+
+    if let Some(last_emit_at) = throttle.last_emit_at {
+        let since_last = now.saturating_duration_since(last_emit_at);
+        if since_last < AGENT_PROGRESS_MIN_INTERVAL
+            && throttle.suppressed_count < AGENT_PROGRESS_MAX_SUPPRESSED
+        {
+            throttle.suppressed_count += 1;
+            return;
+        }
+    }
+
+    if throttle.suppressed_count > 0 || dropped_events > 0 {
+        if !data.is_object() {
+            data = serde_json::json!({ "value": data });
+        }
+        if let Some(obj) = data.as_object_mut() {
+            if throttle.suppressed_count > 0 {
+                obj.insert(
+                    "suppressedCount".to_string(),
+                    serde_json::json!(throttle.suppressed_count),
+                );
+            }
+            if dropped_events > 0 {
+                obj.insert(
+                    "droppedEvents".to_string(),
+                    serde_json::json!(dropped_events),
+                );
+            }
+        }
+        throttle.suppressed_count = 0;
+    }
+
+    throttle.last_emit_at = Some(now);
+    let _ = neural_service
+        .report_command_progress(command_id, "info", &message, Some(data))
+        .await;
 }
 
 use crate::ai::agent::manager::AgentManager;
@@ -469,40 +526,91 @@ GUIDELINES:
                             memory,
                         );
 
-                        // Run the agent
+                        // Run the agent with bounded event streaming to avoid ATM overload under heavy loops.
                         let neural_service = self.neural_service.clone();
                         let command_id = command.id.clone();
+                        let (progress_tx, mut progress_rx) =
+                            mpsc::channel::<(String, serde_json::Value)>(
+                                AGENT_PROGRESS_CHANNEL_CAPACITY,
+                            );
+                        let dropped_events = Arc::new(AtomicUsize::new(0));
+                        let reporter_dropped_events = dropped_events.clone();
+                        let reporter_service = neural_service.clone();
+                        let reporter_command_id = command_id.clone();
+                        let reporter_handle = tokio::spawn(async move {
+                            let mut throttle = ProgressThrottle::default();
+                            while let Some((message, data)) = progress_rx.recv().await {
+                                let dropped_since_last =
+                                    reporter_dropped_events.swap(0, Ordering::Relaxed);
+                                report_agent_progress_event(
+                                    &reporter_service,
+                                    &reporter_command_id,
+                                    &mut throttle,
+                                    message,
+                                    data,
+                                    dropped_since_last,
+                                )
+                                .await;
+                            }
+
+                            let trailing_dropped =
+                                reporter_dropped_events.swap(0, Ordering::Relaxed);
+                            if trailing_dropped > 0 {
+                                let _ = reporter_service
+                                    .report_command_progress(
+                                        &reporter_command_id,
+                                        "warn",
+                                        "Some runtime events were dropped due to backpressure",
+                                        Some(serde_json::json!({
+                                            "droppedEvents": trailing_dropped
+                                        })),
+                                    )
+                                    .await;
+                            }
+                        });
+
+                        let callback_tx = progress_tx.clone();
+                        let callback_dropped_events = dropped_events.clone();
                         match runtime
                             .run(prompt, move |event| {
                                 println!("[Agent Event] {:?}", event);
                                 let (message, data) = map_agent_event(&event);
-                                let service = neural_service.clone();
-                                let cmd = command_id.clone();
-                                tokio::spawn(async move {
-                                    let _ = service
-                                        .report_command_progress(
-                                            &cmd,
-                                            "info",
-                                            &message,
-                                            Some(data),
-                                        )
-                                        .await;
-                                });
+                                if callback_tx.try_send((message, data)).is_err() {
+                                    callback_dropped_events.fetch_add(1, Ordering::Relaxed);
+                                }
                             })
                             .await
                         {
-                            Ok(response) => CommandResult {
-                                success: true,
-                                output: Some(response),
-                                error: None,
-                                exit_code: Some(0),
-                            },
-                            Err(e) => CommandResult {
-                                success: false,
-                                output: None,
-                                error: Some(format!("Agent error: {}", e)),
-                                exit_code: Some(1),
-                            },
+                            Ok(response) => {
+                                drop(progress_tx);
+                                if let Err(e) = reporter_handle.await {
+                                    eprintln!(
+                                        "[CommandPoller] Progress reporter join error for {}: {}",
+                                        command.id, e
+                                    );
+                                }
+                                CommandResult {
+                                    success: true,
+                                    output: Some(response),
+                                    error: None,
+                                    exit_code: Some(0),
+                                }
+                            }
+                            Err(e) => {
+                                drop(progress_tx);
+                                if let Err(join_err) = reporter_handle.await {
+                                    eprintln!(
+                                        "[CommandPoller] Progress reporter join error for {}: {}",
+                                        command.id, join_err
+                                    );
+                                }
+                                CommandResult {
+                                    success: false,
+                                    output: None,
+                                    error: Some(format!("Agent error: {}", e)),
+                                    exit_code: Some(1),
+                                }
+                            }
                         }
                     } else {
                         CommandResult {
