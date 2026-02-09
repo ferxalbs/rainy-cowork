@@ -69,6 +69,8 @@ struct RainyFunction {
 struct RainyToolCall {
     id: String,
     r#type: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    extra_content: Option<serde_json::Value>,
     function: RainyFunctionCall,
 }
 
@@ -313,6 +315,7 @@ impl AIProvider for RainySDKProvider {
                         .map(|tc| RainyToolCall {
                             id: tc.id.clone(),
                             r#type: tc.r#type.clone(),
+                            extra_content: tc.extra_content.clone(),
                             function: RainyFunctionCall {
                                 name: tc.function.name.clone(),
                                 arguments: tc.function.arguments.clone(),
@@ -337,6 +340,37 @@ impl AIProvider for RainySDKProvider {
                 })
                 .collect()
         });
+
+        // Gemini tool-calling relies on thought signatures in tool call metadata.
+        // If signatures are missing from assistant tool calls, the next turn may fail with 400.
+        if model_id.contains("gemini-3") {
+            for msg in &request.messages {
+                if msg.role != "assistant" {
+                    continue;
+                }
+                let Some(calls) = &msg.tool_calls else {
+                    continue;
+                };
+                if calls.is_empty() {
+                    continue;
+                }
+
+                let has_signature = calls.iter().any(|call| {
+                    call.extra_content
+                        .as_ref()
+                        .and_then(|v| v.get("google"))
+                        .and_then(|v| v.get("thought_signature"))
+                        .and_then(|v| v.as_str())
+                        .is_some()
+                });
+
+                if !has_signature {
+                    tracing::warn!(
+                        "[RainySDK] Gemini assistant tool call chain has no thought_signature metadata; provider may reject follow-up turns"
+                    );
+                }
+            }
+        }
 
         // Build OpenAI-compatible request
         let api_request = RainyToolRequest {
@@ -417,6 +451,7 @@ impl AIProvider for RainySDKProvider {
                 .map(|tc| ToolCall {
                     id: tc.id,
                     r#type: tc.r#type,
+                    extra_content: tc.extra_content,
                     function: FunctionCall {
                         name: tc.function.name,
                         arguments: tc.function.arguments,

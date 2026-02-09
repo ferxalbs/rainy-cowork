@@ -161,6 +161,9 @@ pub struct ToolCall {
     pub id: String,
     /// Tool type
     pub r#type: String,
+    /// Provider-specific metadata (e.g., Gemini thought signatures)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extra_content: Option<serde_json::Value>,
     /// Function execution details
     pub function: FunctionCall,
 }
