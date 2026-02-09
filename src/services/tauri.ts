@@ -1255,6 +1255,7 @@ export type DesktopNodeStatus =
   | "connected"
   | "offline"
   | "error";
+export type HeartbeatStatus = "online" | "busy" | "offline";
 
 // ============ Neural System Commands ============
 
@@ -1270,16 +1271,21 @@ export async function setNeuralWorkspaceId(workspaceId: string): Promise<void> {
 }
 
 export async function sendHeartbeat(
-  status: DesktopNodeStatus = "connected",
+  status: HeartbeatStatus = "online",
 ): Promise<void> {
-  return invoke("send_heartbeat", { status });
+  const payload = { status } satisfies { status: HeartbeatStatus };
+  return invoke("send_heartbeat", payload);
 }
 
 export async function respondToAirlock(
   commandId: string,
   approved: boolean,
 ): Promise<void> {
-  return invoke("respond_to_airlock", { commandId, approved });
+  const payload = { commandId, approved } satisfies {
+    commandId: string;
+    approved: boolean;
+  };
+  return invoke("respond_to_airlock", payload);
 }
 
 export async function getPendingAirlockApprovals(): Promise<ApprovalRequest[]> {

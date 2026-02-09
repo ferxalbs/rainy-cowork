@@ -1,7 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { invoke } from "@tauri-apps/api/core";
-import { ApprovalRequest } from "../types";
+import {
+  getPendingAirlockApprovals,
+  respondToAirlock,
+  ApprovalRequest,
+} from "../services/tauri";
 
 export function useAirlock() {
   const [pendingRequests, setPendingRequests] = useState<ApprovalRequest[]>([]);
@@ -34,7 +37,7 @@ export function useAirlock() {
     );
 
     // Check for existing pending requests on mount
-    invoke<ApprovalRequest[]>("get_pending_airlock_approvals")
+    getPendingAirlockApprovals()
       .then((requests) => {
         if (!requests || requests.length === 0) return;
 
@@ -58,14 +61,8 @@ export function useAirlock() {
   }, []);
 
   const respond = useCallback(async (commandId: string, approved: boolean) => {
-    try {
-      await invoke("respond_to_airlock", { commandId, approved });
-      setPendingRequests((prev) =>
-        prev.filter((r) => r.commandId !== commandId),
-      );
-    } catch (e) {
-      console.error("Failed to respond to airlock:", e);
-    }
+    await respondToAirlock(commandId, approved);
+    setPendingRequests((prev) => prev.filter((r) => r.commandId !== commandId));
   }, []);
 
   return {

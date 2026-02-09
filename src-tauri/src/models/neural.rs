@@ -176,3 +176,29 @@ pub struct CommandResult {
     pub error: Option<String>,
     pub exit_code: Option<i32>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::DesktopNodeStatus;
+
+    #[test]
+    fn desktop_node_status_accepts_runtime_values() {
+        let online: DesktopNodeStatus =
+            serde_json::from_str("\"online\"").expect("online should deserialize");
+        let busy: DesktopNodeStatus =
+            serde_json::from_str("\"busy\"").expect("busy should deserialize");
+        let offline: DesktopNodeStatus =
+            serde_json::from_str("\"offline\"").expect("offline should deserialize");
+
+        assert!(matches!(online, DesktopNodeStatus::Online));
+        assert!(matches!(busy, DesktopNodeStatus::Busy));
+        assert!(matches!(offline, DesktopNodeStatus::Offline));
+    }
+
+    #[test]
+    fn desktop_node_status_rejects_ui_status_values() {
+        assert!(serde_json::from_str::<DesktopNodeStatus>("\"connected\"").is_err());
+        assert!(serde_json::from_str::<DesktopNodeStatus>("\"pending-pairing\"").is_err());
+        assert!(serde_json::from_str::<DesktopNodeStatus>("\"error\"").is_err());
+    }
+}

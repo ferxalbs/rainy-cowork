@@ -19,7 +19,6 @@ import {
   Sparkles,
   ExternalLink,
 } from "lucide-react";
-import { listen } from "@tauri-apps/api/event";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -29,16 +28,14 @@ import {
   setNeuralWorkspaceId,
   loadNeuralCredentials,
   registerNode,
-  respondToAirlock,
-  getPendingAirlockApprovals,
   setHeadlessMode,
   hasAtmCredentials,
-  ApprovalRequest,
   WorkspaceAuth,
   SkillManifest,
   getNeuralCredentialsValues,
   AirlockLevels,
 } from "../../services/tauri";
+import { useAirlock } from "../../hooks/useAirlock";
 import { AgentList } from "./AgentList";
 import { CreateAgentForm } from "./CreateAgentForm";
 import { AgentRuntimePanel } from "./AgentRuntimePanel";
@@ -323,9 +320,8 @@ export function NeuralPanel() {
   const [isCreatingAgent, setIsCreatingAgent] = useState(false);
   const [agentsRefreshToken, setAgentsRefreshToken] = useState(0);
   const [isHeadless, setIsHeadless] = useState(false);
-  const [pendingApprovals, setPendingApprovals] = useState<ApprovalRequest[]>(
-    [],
-  );
+  const { pendingRequests: pendingApprovals, respond: respondAirlock } =
+    useAirlock();
   const [hasAtmKey, setHasAtmKey] = useState<boolean | null>(null);
   const [activeView, setActiveView] = useState<"dashboard" | "runtime">(
     "dashboard",
@@ -416,53 +412,10 @@ export function NeuralPanel() {
         console.error("Failed to load credentials:", err);
       }
 
-      try {
-        const approvals = await getPendingAirlockApprovals();
-        if (approvals.length > 0) {
-          setPendingApprovals((prev) => {
-            const existingIds = new Set(prev.map((req) => req.commandId));
-            const next = [...prev];
-            for (const request of approvals) {
-              if (!existingIds.has(request.commandId)) {
-                next.push(request);
-              }
-            }
-            return next;
-          });
-        }
-      } catch (err) {
-        console.error("Failed to load approvals:", err);
-      }
     };
     init();
     return () => {
       cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    const unlistenRequired = listen<ApprovalRequest>(
-      "airlock:approval_required",
-      (event) => {
-        setPendingApprovals((prev) => {
-          if (prev.some((req) => req.commandId === event.payload.commandId)) {
-            return prev;
-          }
-          return [...prev, event.payload];
-        });
-      },
-    );
-
-    const unlistenResolved = listen<string>("airlock:approval_resolved", (event) => {
-      const commandId = event.payload;
-      setPendingApprovals((prev) =>
-        prev.filter((req) => req.commandId !== commandId),
-      );
-    });
-
-    return () => {
-      unlistenRequired.then((f) => f());
-      unlistenResolved.then((f) => f());
     };
   }, []);
 
@@ -517,10 +470,7 @@ export function NeuralPanel() {
 
   const handleAirlockRespond = async (commandId: string, approved: boolean) => {
     try {
-      await respondToAirlock(commandId, approved);
-      setPendingApprovals((prev) =>
-        prev.filter((req) => req.commandId !== commandId),
-      );
+      await respondAirlock(commandId, approved);
       toast.success(approved ? "Request Approved" : "Request Denied");
     } catch (err) {
       toast.error("Failed to process response");

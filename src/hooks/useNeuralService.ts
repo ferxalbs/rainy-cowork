@@ -1,16 +1,13 @@
-import { useState, useEffect, useCallback } from "react";
-import { listen } from "@tauri-apps/api/event";
+import { useState, useCallback } from "react";
 import {
   registerNode,
   sendHeartbeat,
-  respondToAirlock,
-  getPendingAirlockApprovals,
-  ApprovalRequest,
   SkillManifest,
   DesktopNodeStatus,
   setHeadlessMode,
   AirlockLevels,
 } from "../services/tauri";
+import { useAirlock } from "./useAirlock";
 import { toast } from "@heroui/react";
 
 // Default skills this Desktop Node exposes
@@ -201,9 +198,8 @@ const DEFAULT_SKILLS: SkillManifest[] = [
 export function useNeuralService() {
   const [status, setStatus] = useState<DesktopNodeStatus>("pending-pairing");
   const [nodeId, setNodeId] = useState<string | null>(null);
-  const [pendingApprovals, setPendingApprovals] = useState<ApprovalRequest[]>(
-    [],
-  );
+  const { pendingRequests: pendingApprovals, respond: respondAirlock } =
+    useAirlock();
   const [lastHeartbeat, setLastHeartbeat] = useState<Date | null>(null);
 
   // Initial Registration / Handshake
@@ -227,7 +223,7 @@ export function useNeuralService() {
   const startHeartbeat = useCallback(() => {
     const interval = setInterval(async () => {
       try {
-        await sendHeartbeat("connected");
+        await sendHeartbeat("online");
         setLastHeartbeat(new Date());
       } catch (err) {
         console.error("Heartbeat failed:", err);
@@ -238,71 +234,15 @@ export function useNeuralService() {
     return () => clearInterval(interval);
   }, []);
 
-  // Listen for Airlock Events
-  useEffect(() => {
-    const unlistenRequired = listen<ApprovalRequest>(
-      "airlock:approval_required",
-      (event) => {
-        console.log("Airlock Approval Required:", event.payload);
-        setPendingApprovals((prev) => {
-          if (prev.some((req) => req.commandId === event.payload.commandId)) {
-            return prev;
-          }
-          return [...prev, event.payload];
-        });
-        toast("Security Alert", {
-          description: `Permission required for ${event.payload.intent}`,
-          actionProps: {
-            children: "Review",
-            onPress: () => {
-              /* Navigate to review */
-            },
-          },
-        });
-      },
-    );
-    const unlistenResolved = listen<string>("airlock:approval_resolved", (event) => {
-      const commandId = event.payload;
-      setPendingApprovals((prev) =>
-        prev.filter((req) => req.commandId !== commandId),
-      );
-    });
-
-    // Load initial pending approvals
-    getPendingAirlockApprovals()
-      .then((requests) => {
-        if (requests.length === 0) return;
-        setPendingApprovals((prev) => {
-          const existingIds = new Set(prev.map((req) => req.commandId));
-          const next = [...prev];
-          for (const request of requests) {
-            if (!existingIds.has(request.commandId)) {
-              next.push(request);
-            }
-          }
-          return next;
-        });
-      })
-      .catch(console.error);
-
-    return () => {
-      unlistenRequired.then((f) => f());
-      unlistenResolved.then((f) => f());
-    };
-  }, []);
-
   const respond = useCallback(async (commandId: string, approved: boolean) => {
     try {
-      await respondToAirlock(commandId, approved);
-      setPendingApprovals((prev) =>
-        prev.filter((req) => req.commandId !== commandId),
-      );
+      await respondAirlock(commandId, approved);
       toast.success(approved ? "Request Approved" : "Request Denied");
     } catch (error) {
       console.error("Failed to respond to airlock:", error);
       toast.danger("Failed to process response");
     }
-  }, []);
+  }, [respondAirlock]);
 
   const [isHeadless, setIsHeadless] = useState(false);
 
