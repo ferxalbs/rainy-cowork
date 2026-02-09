@@ -100,7 +100,7 @@ const DEFAULT_SKILLS: SkillManifest[] = [
         parameters: {
           path: {
             type: "string",
-            description: "Path to file",
+            description: "Path to write",
             required: true,
           },
           content: {
@@ -110,6 +110,48 @@ const DEFAULT_SKILLS: SkillManifest[] = [
           },
         },
       },
+      {
+        name: "mkdir",
+        description: "Create directory",
+        airlockLevel: AirlockLevels.Sensitive,
+        parameters: {
+          path: {
+            type: "string",
+            description: "Directory path",
+            required: true,
+          },
+        },
+      },
+      {
+        name: "delete_file",
+        description: "Delete file or directory",
+        airlockLevel: AirlockLevels.Dangerous,
+        parameters: {
+          path: {
+            type: "string",
+            description: "Path to delete",
+            required: true,
+          },
+        },
+      },
+      {
+        name: "move_file",
+        description: "Move or rename file",
+        airlockLevel: AirlockLevels.Sensitive,
+        parameters: {
+          source: {
+            type: "string",
+            description: "Source path",
+            required: true,
+          },
+          destination: {
+            type: "string",
+            description: "Destination path",
+            required: true,
+          },
+        },
+      },
+
       {
         name: "append_file",
         description: "Append content to file",

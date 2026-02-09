@@ -51,6 +51,26 @@ pub struct ListFilesArgs {
 }
 
 #[derive(JsonSchema, Serialize, Deserialize)]
+pub struct MakeDirArgs {
+    /// The directory path to create
+    pub path: String,
+}
+
+#[derive(JsonSchema, Serialize, Deserialize)]
+pub struct DeleteFileArgs {
+    /// The path to the file or directory to delete
+    pub path: String,
+}
+
+#[derive(JsonSchema, Serialize, Deserialize)]
+pub struct MoveFileArgs {
+    /// The source path
+    pub source: String,
+    /// The destination path
+    pub destination: String,
+}
+
+#[derive(JsonSchema, Serialize, Deserialize)]
 pub struct SearchFilesArgs {
     /// The regex query to search for
     pub query: String,
@@ -202,6 +222,30 @@ impl SkillExecutor {
                     parameters: serde_json::json!({ "type": "object", "properties": {} }),
                 },
             },
+            crate::ai::provider_types::Tool {
+                r#type: "function".to_string(),
+                function: crate::ai::provider_types::FunctionDefinition {
+                    name: "mkdir".to_string(),
+                    description: "Create a new directory".to_string(),
+                    parameters: serde_json::to_value(schema_for!(MakeDirArgs)).unwrap(),
+                },
+            },
+            crate::ai::provider_types::Tool {
+                r#type: "function".to_string(),
+                function: crate::ai::provider_types::FunctionDefinition {
+                    name: "delete_file".to_string(),
+                    description: "Delete a file or directory".to_string(),
+                    parameters: serde_json::to_value(schema_for!(DeleteFileArgs)).unwrap(),
+                },
+            },
+            crate::ai::provider_types::Tool {
+                r#type: "function".to_string(),
+                function: crate::ai::provider_types::FunctionDefinition {
+                    name: "move_file".to_string(),
+                    description: "Move or rename a file or directory".to_string(),
+                    parameters: serde_json::to_value(schema_for!(MoveFileArgs)).unwrap(),
+                },
+            },
         ]
     }
 
@@ -275,6 +319,18 @@ impl SkillExecutor {
                 self.handle_append_file(workspace_id, params, allowed_paths)
                     .await
             }
+            "mkdir" => {
+                self.handle_make_dir(workspace_id, params, allowed_paths)
+                    .await
+            }
+            "delete_file" => {
+                self.handle_delete_file(workspace_id, params, allowed_paths)
+                    .await
+            }
+            "move_file" => {
+                self.handle_move_file(workspace_id, params, allowed_paths)
+                    .await
+            }
             _ => CommandResult {
                 success: false,
                 output: None,
@@ -326,12 +382,13 @@ impl SkillExecutor {
                 // Take screenshot of current page
                 match self.browser.screenshot().await {
                     Ok(result) => {
-                        // Never return full base64 screenshot in tool text context.
-                        // It can exceed model provider message limits.
+                        // Return full base64 screenshot so the agent can see it.
+                        // Only output fields that are part of the ScreenshotResult struct.
                         let output = serde_json::json!({
                             "summary": "Screenshot captured successfully",
                             "width": result.width,
                             "height": result.height,
+                            "data_uri": result.data_uri, // This is the base64 string
                             "has_image": true,
                         });
                         CommandResult {
@@ -503,7 +560,10 @@ impl SkillExecutor {
         cwd: &PathBuf,
     ) -> CommandResult {
         // Whitelist safe commands
-        let allowed_commands = vec!["npm", "pnpm", "cargo", "git", "ls", "grep", "echo", "cat"];
+        let allowed_commands = vec![
+            "npm", "pnpm", "cargo", "git", "ls", "grep", "echo", "cat", "mkdir", "touch", "rm",
+            "cp", "mv", "curl", "wget", "ps", "kill", "node", "bun", "deno",
+        ];
         if !allowed_commands.contains(&command) {
             return self.error(&format!("Command '{}' is not allowed", command));
         }
@@ -798,27 +858,36 @@ impl SkillExecutor {
                         // Only search text files - simple heuristic
                         if let Some(ext) = path.extension() {
                             let ext_str = ext.to_string_lossy();
-                            if [
-                                "md", "txt", "rs", "ts", "tsx", "js", "json", "toml", "yaml",
-                                "yml", "css", "html",
-                            ]
-                            .contains(&ext_str.as_ref())
-                            {
-                                if let Ok(content) = fs::read_to_string(&path).await {
-                                    if regex.is_match(&content) {
-                                        matches = true;
+                            if matches!(
+                                ext_str.as_ref(),
+                                "txt"
+                                    | "md"
+                                    | "rs"
+                                    | "ts"
+                                    | "tsx"
+                                    | "js"
+                                    | "jsx"
+                                    | "json"
+                                    | "toml"
+                                    | "yml"
+                                    | "yaml"
+                                    | "css"
+                                    | "html"
+                            ) {
+                                match fs::read_to_string(&path).await {
+                                    Ok(content) => {
+                                        if regex.is_match(&content) {
+                                            matches = true;
+                                        }
                                     }
+                                    Err(_) => {}
                                 }
                             }
                         }
                     }
 
                     if matches {
-                        results.push(serde_json::json!({
-                            "name": file_name,
-                            "path": path.to_string_lossy(),
-                            "type": "file"
-                        }));
+                        results.push(path.to_string_lossy().to_string());
                     }
                 }
             }
@@ -910,6 +979,129 @@ impl SkillExecutor {
                 Err(e) => self.error(&format!("Failed to append content: {}", e)),
             },
             Err(e) => self.error(&format!("Failed to open file for appending: {}", e)),
+        }
+    }
+
+    async fn handle_make_dir(
+        &self,
+        workspace_id: String,
+        params: &Value,
+        allowed_paths: &[String],
+    ) -> CommandResult {
+        let args: MakeDirArgs = match serde_json::from_value(params.clone()) {
+            Ok(a) => a,
+            Err(e) => return self.error(&format!("Invalid parameters: {}", e)),
+        };
+
+        let path = match self
+            .resolve_path(workspace_id, &args.path, allowed_paths)
+            .await
+        {
+            Ok(p) => p,
+            Err(e) => return self.error(&e),
+        };
+
+        match fs::create_dir_all(&path).await {
+            Ok(_) => CommandResult {
+                success: true,
+                output: Some(format!("Successfully created directory {}", args.path)),
+                error: None,
+                exit_code: Some(0),
+            },
+            Err(e) => self.error(&format!("Failed to create directory: {}", e)),
+        }
+    }
+
+    async fn handle_delete_file(
+        &self,
+        workspace_id: String,
+        params: &Value,
+        allowed_paths: &[String],
+    ) -> CommandResult {
+        let args: DeleteFileArgs = match serde_json::from_value(params.clone()) {
+            Ok(a) => a,
+            Err(e) => return self.error(&format!("Invalid parameters: {}", e)),
+        };
+
+        let path = match self
+            .resolve_path(workspace_id, &args.path, allowed_paths)
+            .await
+        {
+            Ok(p) => p,
+            Err(e) => return self.error(&e),
+        };
+
+        if path.is_dir() {
+            match fs::remove_dir_all(&path).await {
+                Ok(_) => CommandResult {
+                    success: true,
+                    output: Some(format!("Successfully deleted directory {}", args.path)),
+                    error: None,
+                    exit_code: Some(0),
+                },
+                Err(e) => self.error(&format!("Failed to delete directory: {}", e)),
+            }
+        } else {
+            match fs::remove_file(&path).await {
+                Ok(_) => CommandResult {
+                    success: true,
+                    output: Some(format!("Successfully deleted file {}", args.path)),
+                    error: None,
+                    exit_code: Some(0),
+                },
+                Err(e) => self.error(&format!("Failed to delete file: {}", e)),
+            }
+        }
+    }
+
+    async fn handle_move_file(
+        &self,
+        workspace_id: String,
+        params: &Value,
+        allowed_paths: &[String],
+    ) -> CommandResult {
+        let args: MoveFileArgs = match serde_json::from_value(params.clone()) {
+            Ok(a) => a,
+            Err(e) => return self.error(&format!("Invalid parameters: {}", e)),
+        };
+
+        let source = match self
+            .resolve_path(workspace_id.clone(), &args.source, allowed_paths)
+            .await
+        {
+            Ok(p) => p,
+            Err(e) => return self.error(&e),
+        };
+
+        let destination = match self
+            .resolve_path(workspace_id, &args.destination, allowed_paths)
+            .await
+        {
+            Ok(p) => p,
+            Err(e) => return self.error(&e),
+        };
+
+        // Ensure parent of destination exists
+        if let Some(parent) = destination.parent() {
+            if let Err(e) = fs::create_dir_all(parent).await {
+                return self.error(&format!(
+                    "Failed to create parent directories for destination: {}",
+                    e
+                ));
+            }
+        }
+
+        match fs::rename(&source, &destination).await {
+            Ok(_) => CommandResult {
+                success: true,
+                output: Some(format!(
+                    "Successfully moved {} to {}",
+                    args.source, args.destination
+                )),
+                error: None,
+                exit_code: Some(0),
+            },
+            Err(e) => self.error(&format!("Failed to move file: {}", e)),
         }
     }
 

@@ -70,11 +70,35 @@ impl CommandPoller {
         tokio::spawn(async move {
             println!("[CommandPoller] Started polling loop via NeuralService");
 
+            let mut backoff_failures = 0;
+            const MAX_BACKOFF_SECS: u64 = 60;
+
             while *poller.is_running.lock().await {
-                if let Err(e) = poller.poll_and_execute().await {
-                    eprintln!("[CommandPoller] Error: {}", e);
-                }
-                sleep(POLL_INTERVAL).await;
+                let sleep_duration = match poller.poll_and_execute().await {
+                    Ok(_) => {
+                        // Reset backoff on success
+                        if backoff_failures > 0 {
+                            println!("[CommandPoller] Connection restored.");
+                            backoff_failures = 0;
+                        }
+                        POLL_INTERVAL
+                    }
+                    Err(e) => {
+                        backoff_failures += 1;
+                        let backoff_secs = std::cmp::min(
+                            POLL_INTERVAL.as_secs() * (2u64.pow(backoff_failures.min(6) as u32)),
+                            MAX_BACKOFF_SECS,
+                        );
+
+                        eprintln!(
+                            "[CommandPoller] Error: {}. Retrying in {}s...",
+                            e, backoff_secs
+                        );
+                        Duration::from_secs(backoff_secs)
+                    }
+                };
+
+                sleep(sleep_duration).await;
             }
 
             println!("[CommandPoller] Stopped polling loop");
@@ -112,145 +136,160 @@ impl CommandPoller {
                 .heartbeat(crate::models::neural::DesktopNodeStatus::Online)
                 .await;
 
-        let commands = match pending_commands_result {
-            Ok(cmds) => cmds,
+        match pending_commands_result {
+            Ok(commands) => {
+                // Reset backoff on success
+                // We should ideally have a way to reset the backoff counter in the caller loop
+                // For now, we return Ok(()) which is signal for success
+
+                // 2. Process commands if any
+                for command in commands {
+                    self.process_command(command).await?;
+                }
+                Ok(())
+            }
             Err(e) => {
                 // Only log if it's not a "Node not registered" error (already handled above)
                 if !e.contains("Node not registered") {
                     eprintln!("[CommandPoller] Heartbeat error: {}", e);
+                    Err(Box::new(std::io::Error::new(std::io::ErrorKind::Other, e)))
+                } else {
+                    Ok(())
                 }
-                return Ok(()); // Don't propagate as error to avoid log spam
+            }
+        }
+    }
+
+    async fn process_command(
+        &self,
+        command: crate::models::neural::QueuedCommand,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        println!("[CommandPoller] Received command: {:?}", command.id);
+
+        // AIRLOCK CHECK
+        let allowed = {
+            let lock = self.airlock_service.read().await;
+            if let Some(airlock) = &*lock {
+                match airlock.check_permission(&command).await {
+                    Ok(true) => true,
+                    Ok(false) => false,
+                    Err(e) => {
+                        eprintln!(
+                            "[CommandPoller] Airlock error for command {}: {}",
+                            command.id, e
+                        );
+                        false
+                    }
+                }
+            } else {
+                eprintln!(
+                    "[CommandPoller] Airlock service not initialized! Rejecting command {}",
+                    command.id
+                );
+                false
             }
         };
 
-        // 2. Process commands if any
-        for command in commands {
-            println!("[CommandPoller] Received command: {:?}", command.id);
+        if !allowed {
+            println!(
+                "[CommandPoller] Command {} REJECTED by Airlock or User",
+                command.id
+            );
+            let _ = self
+                .neural_service
+                .complete_command(
+                    &command.id,
+                    CommandResult {
+                        success: false,
+                        output: None,
+                        error: Some("Rejected by Airlock/User".into()),
+                        exit_code: Some(1),
+                    },
+                )
+                .await;
+            return Ok(());
+        }
 
-            // AIRLOCK CHECK
-            let allowed = {
-                let lock = self.airlock_service.read().await;
-                if let Some(airlock) = &*lock {
-                    match airlock.check_permission(&command).await {
-                        Ok(true) => true,
-                        Ok(false) => false,
-                        Err(e) => {
-                            eprintln!(
-                                "[CommandPoller] Airlock error for command {}: {}",
-                                command.id, e
-                            );
-                            false
-                        }
-                    }
-                } else {
-                    eprintln!(
-                        "[CommandPoller] Airlock service not initialized! Rejecting command {}",
-                        command.id
-                    );
-                    false
-                }
-            };
+        // Notify start
+        if let Err(e) = self.neural_service.start_command(&command.id).await {
+            eprintln!(
+                "[CommandPoller] Failed to mark command {} as started: {}",
+                command.id, e
+            );
+        }
 
-            if !allowed {
-                println!(
-                    "[CommandPoller] Command {} REJECTED by Airlock or User",
-                    command.id
-                );
-                let _ = self
-                    .neural_service
-                    .complete_command(
-                        &command.id,
-                        CommandResult {
-                            success: false,
-                            output: None,
-                            error: Some("Rejected by Airlock/User".into()),
-                            exit_code: Some(1),
-                        },
-                    )
-                    .await;
-                continue;
-            }
+        // Execute - check if this is an agent.run command for full workflow
+        let result = if command.intent.starts_with("agent.") {
+            // Route to AgentRuntime for full ReAct workflow
+            match command.intent.as_str() {
+                "agent.run" => {
+                    // Extract prompt from params
+                    let prompt = command
+                        .payload
+                        .params
+                        .as_ref()
+                        .and_then(|p: &serde_json::Value| p.get("prompt"))
+                        .and_then(|v: &serde_json::Value| v.as_str())
+                        .unwrap_or("Hello, what can you help me with?");
 
-            // Notify start
-            if let Err(e) = self.neural_service.start_command(&command.id).await {
-                eprintln!(
-                    "[CommandPoller] Failed to mark command {} as started: {}",
-                    command.id, e
-                );
-            }
+                    // Get workspace_id for this command
+                    let workspace_id = command
+                        .workspace_id
+                        .clone()
+                        .unwrap_or_else(|| "default".to_string());
 
-            // Execute - check if this is an agent.run command for full workflow
-            let result = if command.intent.starts_with("agent.") {
-                // Route to AgentRuntime for full ReAct workflow
-                match command.intent.as_str() {
-                    "agent.run" => {
-                        // Extract prompt from params
-                        let prompt = command
-                            .payload
-                            .params
-                            .as_ref()
-                            .and_then(|p: &serde_json::Value| p.get("prompt"))
-                            .and_then(|v: &serde_json::Value| v.as_str())
-                            .unwrap_or("Hello, what can you help me with?");
+                    // Extract model from params (Cloud command) or use user's selected model (Local AgentChat)
+                    let model = command
+                        .payload
+                        .params
+                        .as_ref()
+                        .and_then(|p| p.get("model"))
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string())
+                        .unwrap_or_else(|| {
+                            // Local command: use user's selected model from settings
+                            let settings = SettingsManager::new();
+                            settings.get_selected_model().to_string()
+                        });
 
-                        // Get workspace_id for this command
-                        let workspace_id = command
-                            .workspace_id
-                            .clone()
-                            .unwrap_or_else(|| "default".to_string());
+                    // Optional agent identity/profile provided by Rainy-ATM.
+                    // If present, this becomes the primary runtime instruction set.
+                    let agent_name = command
+                        .payload
+                        .params
+                        .as_ref()
+                        .and_then(|p| p.get("agentName"))
+                        .and_then(|v| v.as_str())
+                        .filter(|s| !s.trim().is_empty())
+                        .map(|s| s.to_string())
+                        .unwrap_or_else(|| "Rainy Agent".to_string());
 
-                        // Extract model from params (Cloud command) or use user's selected model (Local AgentChat)
-                        let model = command
-                            .payload
-                            .params
-                            .as_ref()
-                            .and_then(|p| p.get("model"))
-                            .and_then(|v| v.as_str())
-                            .map(|s| s.to_string())
-                            .unwrap_or_else(|| {
-                                // Local command: use user's selected model from settings
-                                let settings = SettingsManager::new();
-                                settings.get_selected_model().to_string()
-                            });
+                    let agent_system_prompt = command
+                        .payload
+                        .params
+                        .as_ref()
+                        .and_then(|p| p.get("agentSystemPrompt"))
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.trim().to_string())
+                        .filter(|s| !s.is_empty());
 
-                        // Optional agent identity/profile provided by Rainy-ATM.
-                        // If present, this becomes the primary runtime instruction set.
-                        let agent_name = command
-                            .payload
-                            .params
-                            .as_ref()
-                            .and_then(|p| p.get("agentName"))
-                            .and_then(|v| v.as_str())
-                            .filter(|s| !s.trim().is_empty())
-                            .map(|s| s.to_string())
-                            .unwrap_or_else(|| "Rainy Agent".to_string());
-
-                        let agent_system_prompt = command
-                            .payload
-                            .params
-                            .as_ref()
-                            .and_then(|p| p.get("agentSystemPrompt"))
-                            .and_then(|v| v.as_str())
-                            .map(|s| s.trim().to_string())
-                            .filter(|s| !s.is_empty());
-
-                        println!(
+                    println!(
                             "[CommandPoller] Routing to AgentRuntime: agent='{}' (model: {}, workspace: {})",
                             agent_name, model, workspace_id
                         );
 
-                        // Create AgentRuntime on-demand
-                        let context_lock = self.agent_context.read().await;
-                        if let Some(ctx) = context_lock.as_ref() {
-                            // Create memory for this workspace
-                            let memory = Arc::new(
-                                AgentMemory::new(&workspace_id, ctx.app_data_dir.clone()).await,
-                            );
+                    // Create AgentRuntime on-demand
+                    let context_lock = self.agent_context.read().await;
+                    if let Some(ctx) = context_lock.as_ref() {
+                        // Create memory for this workspace
+                        let memory = Arc::new(
+                            AgentMemory::new(&workspace_id, ctx.app_data_dir.clone()).await,
+                        );
 
-                            // Create config
-                            let base_instructions = agent_system_prompt.unwrap_or_else(|| {
-                                format!(
-                                    "You are Rainy Agent, an autonomous AI assistant.
+                        // Create config
+                        let base_instructions = agent_system_prompt.unwrap_or_else(|| {
+                            format!(
+                                "You are Rainy Agent, an autonomous AI assistant.
 
 Workspace ID: {}
 
@@ -258,15 +297,15 @@ CAPABILITIES:
 - Read, write, list, and search files in the workspace.
 - Navigate web pages and take screenshots.
 - Perform web research.",
-                                    workspace_id
-                                )
-                            });
+                                workspace_id
+                            )
+                        });
 
-                            let config = AgentConfig {
-                                name: agent_name.clone(),
-                                model, // Use extracted or default model
-                                instructions: format!(
-                                    "{}
+                        let config = AgentConfig {
+                            name: agent_name.clone(),
+                            model, // Use extracted or default model
+                            instructions: format!(
+                                "{}
 
 IDENTITY LOCK (MANDATORY):
 - Your name is \"{}\".
@@ -277,84 +316,83 @@ GUIDELINES:
 1. PLAN: Before executing, briefly state your plan.
 2. EXECUTE: Use the provided tools to carry out the plan.
 3. VERIFY: After critical operations, verify the result.",
-                                    base_instructions, agent_name
-                                ),
-                                workspace_id: workspace_id.clone(),
-                                max_steps: Some(10),
-                            };
+                                base_instructions, agent_name
+                            ),
+                            workspace_id: workspace_id.clone(),
+                            max_steps: Some(10),
+                        };
 
-                            // Create runtime
-                            let runtime = AgentRuntime::new(
-                                config,
-                                ctx.router.clone(),
-                                self.skill_executor.clone(),
-                                memory,
-                            );
+                        // Create runtime
+                        let runtime = AgentRuntime::new(
+                            config,
+                            ctx.router.clone(),
+                            self.skill_executor.clone(),
+                            memory,
+                        );
 
-                            // Run the agent
-                            match runtime
-                                .run(prompt, |event| {
-                                    println!("[Agent Event] {:?}", event);
-                                })
-                                .await
-                            {
-                                Ok(response) => CommandResult {
-                                    success: true,
-                                    output: Some(response),
-                                    error: None,
-                                    exit_code: Some(0),
-                                },
-                                Err(e) => CommandResult {
-                                    success: false,
-                                    output: None,
-                                    error: Some(format!("Agent error: {}", e)),
-                                    exit_code: Some(1),
-                                },
-                            }
-                        } else {
-                            CommandResult {
+                        // Run the agent
+                        match runtime
+                            .run(prompt, |event| {
+                                println!("[Agent Event] {:?}", event);
+                            })
+                            .await
+                        {
+                            Ok(response) => CommandResult {
+                                success: true,
+                                output: Some(response),
+                                error: None,
+                                exit_code: Some(0),
+                            },
+                            Err(e) => CommandResult {
                                 success: false,
                                 output: None,
-                                error: Some("Agent context not initialized".into()),
+                                error: Some(format!("Agent error: {}", e)),
                                 exit_code: Some(1),
-                            }
+                            },
+                        }
+                    } else {
+                        CommandResult {
+                            success: false,
+                            output: None,
+                            error: Some("Agent context not initialized".into()),
+                            exit_code: Some(1),
                         }
                     }
-                    _ => CommandResult {
-                        success: false,
-                        output: None,
-                        error: Some(format!("Unknown agent skill: {}", command.intent)),
-                        exit_code: Some(1),
-                    },
                 }
-            } else {
-                // Standard skill execution
-                self.skill_executor.execute(&command).await
-            };
-
-            if result.success {
-                println!(
-                    "[CommandPoller] Execution result for {}: success=true",
-                    command.id
-                );
-            } else {
-                println!(
-                    "[CommandPoller] Execution result for {}: success=false, error={:?}",
-                    command.id, result.error
-                );
+                _ => CommandResult {
+                    success: false,
+                    output: None,
+                    error: Some(format!("Unknown agent skill: {}", command.intent)),
+                    exit_code: Some(1),
+                },
             }
+        } else {
+            // Standard skill execution
+            self.skill_executor.execute(&command).await
+        };
 
-            // Report result
-            if let Err(e) = self
-                .neural_service
-                .complete_command(&command.id, result)
-                .await
-            {
-                eprintln!(
-                    "[CommandPoller] Failed to report completion for {}: {}",
-                    command.id, e
-                );
-            }
+        if result.success {
+            println!(
+                "[CommandPoller] Execution result for {}: success=true",
+                command.id
+            );
+        } else {
+            println!(
+                "[CommandPoller] Execution result for {}: success=false, error={:?}",
+                command.id, result.error
+            );
+        }
+
+        // Report result
+        if let Err(e) = self
+            .neural_service
+            .complete_command(&command.id, result)
+            .await
+        {
+            eprintln!(
+                "[CommandPoller] Failed to report completion for {}: {}",
+                command.id, e
+            );
         }
 
         Ok(())
