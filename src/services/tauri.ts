@@ -1391,6 +1391,32 @@ export interface AtmWorkspaceCommandMetricsResponse {
   averages: AtmCommandTimings;
 }
 
+export interface AtmEndpointMetricsItem {
+  key: string;
+  label: string;
+  requests: number;
+  ratePerSecond?: number | null;
+  successRate?: number | null;
+  errorRate?: number | null;
+  latency: {
+    avgTotalMs?: number | null;
+    p95TotalMs?: number | null;
+    avgRunMs?: number | null;
+    p95RunMs?: number | null;
+  };
+  signals?: {
+    warnEvents?: number | null;
+    errorEvents?: number | null;
+  } | null;
+}
+
+export interface AtmEndpointMetricsResponse {
+  workspaceId: string;
+  windowMs: number;
+  since: number;
+  endpoints: AtmEndpointMetricsItem[];
+}
+
 export async function createAtmAgent(
   name: string,
   type: string,
@@ -1432,6 +1458,13 @@ export async function getAtmWorkspaceCommandMetrics(
   limit = 500,
 ): Promise<AtmWorkspaceCommandMetricsResponse> {
   return invoke("get_atm_workspace_command_metrics", { windowMs, limit });
+}
+
+export async function getAtmEndpointMetrics(
+  windowMs = 60 * 60 * 1000,
+  limit = 2000,
+): Promise<AtmEndpointMetricsResponse> {
+  return invoke("get_atm_endpoint_metrics", { windowMs, limit });
 }
 
 // ============ ATM Bootstrap Commands ============

@@ -152,6 +152,44 @@ pub struct WorkspaceCommandMetricsResponse {
     pub averages: WorkspaceCommandMetricAverages,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct EndpointLatencyMetrics {
+    pub avg_total_ms: Option<i64>,
+    pub p95_total_ms: Option<i64>,
+    pub avg_run_ms: Option<i64>,
+    pub p95_run_ms: Option<i64>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct EndpointSignalMetrics {
+    pub warn_events: Option<i64>,
+    pub error_events: Option<i64>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct EndpointMetricsItem {
+    pub key: String,
+    pub label: String,
+    pub requests: i64,
+    pub rate_per_second: Option<f64>,
+    pub success_rate: Option<f64>,
+    pub error_rate: Option<f64>,
+    pub latency: EndpointLatencyMetrics,
+    pub signals: Option<EndpointSignalMetrics>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct EndpointMetricsResponse {
+    pub workspace_id: String,
+    pub window_ms: i64,
+    pub since: i64,
+    pub endpoints: Vec<EndpointMetricsItem>,
+}
+
 impl ATMClient {
     pub fn new(base_url: String, api_key: Option<String>) -> Self {
         Self {
@@ -557,6 +595,42 @@ impl ATMClient {
             let err_text = res.text().await.unwrap_or_default();
             return Err(format!(
                 "Get workspace command metrics failed: {} - {}",
+                status, err_text
+            ));
+        }
+
+        res.json().await.map_err(|e| e.to_string())
+    }
+
+    pub async fn get_endpoint_metrics(
+        &self,
+        window_ms: Option<i64>,
+        limit: Option<usize>,
+    ) -> Result<EndpointMetricsResponse, String> {
+        self.verify_authenticated_connection().await?;
+
+        let state = self.state.lock().await;
+        let api_key = state.api_key.as_ref().ok_or("Not authenticated")?;
+        let url = format!(
+            "{}/admin/metrics/endpoints?windowMs={}&limit={}",
+            state.base_url,
+            window_ms.unwrap_or(60 * 60 * 1000),
+            limit.unwrap_or(2000)
+        );
+
+        let res = self
+            .http
+            .get(&url)
+            .header("Authorization", format!("Bearer {}", api_key))
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+
+        if !res.status().is_success() {
+            let status = res.status();
+            let err_text = res.text().await.unwrap_or_default();
+            return Err(format!(
+                "Get endpoint metrics failed: {} - {}",
                 status, err_text
             ));
         }

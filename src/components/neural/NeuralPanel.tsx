@@ -38,10 +38,12 @@ import {
   getAtmCommandProgress,
   getAtmCommandMetrics,
   getAtmWorkspaceCommandMetrics,
+  getAtmEndpointMetrics,
   AtmCommandSummary,
   AtmCommandProgressEvent,
   AtmCommandMetricsResponse,
   AtmWorkspaceCommandMetricsResponse,
+  AtmEndpointMetricsResponse,
 } from "../../services/tauri";
 import { useAirlock } from "../../hooks/useAirlock";
 import { DEFAULT_NEURAL_SKILLS } from "../../constants/defaultNeuralSkills";
@@ -118,6 +120,8 @@ export function NeuralPanel() {
     useState<AtmCommandMetricsResponse | null>(null);
   const [workspaceCommandMetrics, setWorkspaceCommandMetrics] =
     useState<AtmWorkspaceCommandMetricsResponse | null>(null);
+  const [endpointMetrics, setEndpointMetrics] =
+    useState<AtmEndpointMetricsResponse | null>(null);
   const [isLoadingCommands, setIsLoadingCommands] = useState(false);
   const [isLoadingProgress, setIsLoadingProgress] = useState(false);
   const [isLoadingMetrics, setIsLoadingMetrics] = useState(false);
@@ -125,6 +129,10 @@ export function NeuralPanel() {
 
   const formatMs = (value?: number | null) =>
     typeof value === "number" ? `${value}ms` : "-";
+  const formatPct = (value?: number | null) =>
+    typeof value === "number" ? `${value.toFixed(1)}%` : "-";
+  const formatRate = (value?: number | null) =>
+    typeof value === "number" ? `${value.toFixed(2)}/s` : "-";
 
   useEffect(() => {
     let cancelled = false;
@@ -222,12 +230,24 @@ export function NeuralPanel() {
     if (state !== "connected") return;
     setIsLoadingCommands(true);
     try {
-      const [commands, metrics] = await Promise.all([
-        listAtmCommands(25),
-        getAtmWorkspaceCommandMetrics(24 * 60 * 60 * 1000, 500),
-      ]);
+      const [commandsResult, workspaceMetricsResult, endpointMetricsResult] =
+        await Promise.allSettled([
+          listAtmCommands(25),
+          getAtmWorkspaceCommandMetrics(24 * 60 * 60 * 1000, 500),
+          getAtmEndpointMetrics(60 * 60 * 1000, 2000),
+        ]);
+
+      if (commandsResult.status !== "fulfilled") {
+        throw commandsResult.reason;
+      }
+      const commands = commandsResult.value;
       setRecentCommands(commands);
-      setWorkspaceCommandMetrics(metrics);
+      if (workspaceMetricsResult.status === "fulfilled") {
+        setWorkspaceCommandMetrics(workspaceMetricsResult.value);
+      }
+      if (endpointMetricsResult.status === "fulfilled") {
+        setEndpointMetrics(endpointMetricsResult.value);
+      }
       if (commands.length === 0) {
         setSelectedCommandId(null);
         setCommandProgress([]);
@@ -788,6 +808,33 @@ export function NeuralPanel() {
                             {formatMs(workspaceCommandMetrics.averages.totalDurationMs)}
                           </div>
                         </div>
+                      </div>
+                    )}
+
+                    {endpointMetrics && endpointMetrics.endpoints.length > 0 && (
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                        {endpointMetrics.endpoints.map((metric) => (
+                          <div
+                            key={metric.key}
+                            className="rounded-xl border border-white/5 bg-background/20 backdrop-blur-md p-3 space-y-1.5"
+                          >
+                            <div className="text-xs uppercase tracking-wider text-muted-foreground">
+                              {metric.label}
+                            </div>
+                            <div className="grid grid-cols-2 gap-1 text-[11px] font-mono text-muted-foreground">
+                              <div>req: {metric.requests}</div>
+                              <div>rate: {formatRate(metric.ratePerSecond)}</div>
+                              <div>ok: {formatPct(metric.successRate)}</div>
+                              <div>err: {formatPct(metric.errorRate)}</div>
+                              <div>
+                                p95: {formatMs(metric.latency.p95TotalMs ?? metric.latency.p95RunMs)}
+                              </div>
+                              <div>
+                                avg: {formatMs(metric.latency.avgTotalMs ?? metric.latency.avgRunMs)}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     )}
 

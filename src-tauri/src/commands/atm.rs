@@ -90,6 +90,15 @@ pub async fn get_atm_workspace_command_metrics(
 }
 
 #[command]
+pub async fn get_atm_endpoint_metrics(
+    client: State<'_, ATMClient>,
+    window_ms: Option<i64>,
+    limit: Option<usize>,
+) -> Result<crate::services::atm_client::EndpointMetricsResponse, String> {
+    client.get_endpoint_metrics(window_ms, limit).await
+}
+
+#[command]
 pub async fn generate_pairing_code(
     client: State<'_, ATMClient>,
 ) -> Result<crate::services::atm_client::PairingCodeResponse, String> {
