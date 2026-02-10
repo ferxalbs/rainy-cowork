@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Button, Card, Chip, Input, Spinner, TextArea } from "@heroui/react";
+import { Button, Card, Input, Spinner, TextArea } from "@heroui/react";
 import { toast } from "sonner";
 import { AgentSpec } from "../../../types/agent-spec";
 import * as tauri from "../../../services/tauri";
@@ -155,14 +155,16 @@ export function AgentStorePage({
         <Card.Header className="flex flex-col items-stretch gap-3 p-4 border-b border-divider">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-base font-semibold">Agents Store</p>
-              <p className="text-xs text-default-500">
+              <div className="flex items-center gap-2">
+                <p className="text-large font-bold">Agents Store</p>
+                <div className="bg-default-100 text-default-600 text-tiny font-bold px-1.5 py-0.5 rounded-full">
+                  {agents.length}
+                </div>
+              </div>
+              <p className="text-tiny text-default-400 mt-1">
                 Review, edit, and deploy saved agents
               </p>
             </div>
-            <Chip variant="soft" size="sm">
-              {agents.length}
-            </Chip>
           </div>
           <Input
             value={search}
@@ -176,10 +178,16 @@ export function AgentStorePage({
               onPress={loadAgents}
               isDisabled={isLoading}
             >
-              <RefreshCw className={`size-4 ${isLoading ? "animate-spin" : ""}`} />
+              <RefreshCw
+                className={`size-4 ${isLoading ? "animate-spin" : ""}`}
+              />
               Refresh
             </Button>
-            <Button variant="primary" className="flex-1" onPress={onCreateAgent}>
+            <Button
+              variant="primary"
+              className="flex-1"
+              onPress={onCreateAgent}
+            >
               <Plus className="size-4" />
               New
             </Button>
@@ -198,24 +206,39 @@ export function AgentStorePage({
             filteredAgents.map((agent) => {
               const isSelected = selectedId === agent.id;
               return (
-                <Button
+                <div
                   key={agent.id}
-                  variant={isSelected ? "secondary" : "ghost"}
-                  className="w-full h-auto p-3 justify-start"
-                  onPress={() => setSelectedId(agent.id)}
+                  className={`w-full p-3 rounded-xl cursor-pointer transition-all duration-200 group ${
+                    isSelected
+                      ? "bg-primary/10 border-primary/20"
+                      : "hover:bg-default-100 dark:hover:bg-white/5 border-transparent"
+                  } border`}
+                  onClick={() => setSelectedId(agent.id)}
                 >
-                  <div className="w-full text-left">
-                    <div className="flex items-center gap-2">
-                      <Bot className="size-4 shrink-0 text-primary" />
-                      <p className="text-sm font-medium truncate">
+                  <div className="flex items-start gap-3">
+                    <div
+                      className={`size-8 rounded-lg flex items-center justify-center shrink-0 ${
+                        isSelected
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-default-200 text-default-500 dark:bg-default-100"
+                      }`}
+                    >
+                      <Bot className="size-4" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p
+                        className={`text-sm font-semibold truncate ${
+                          isSelected ? "text-primary" : "text-foreground"
+                        }`}
+                      >
                         {agent.soul.name || "Untitled Agent"}
                       </p>
+                      <p className="text-xs text-default-400 truncate mt-0.5 line-clamp-2">
+                        {agent.soul.description || "No description"}
+                      </p>
                     </div>
-                    <p className="text-xs text-default-500 truncate mt-1">
-                      {agent.soul.description || "No description"}
-                    </p>
                   </div>
-                </Button>
+                </div>
               );
             })
           )}
@@ -229,136 +252,189 @@ export function AgentStorePage({
           </div>
         ) : (
           <>
-            <Card.Header className="p-5 border-b border-divider flex flex-col gap-4">
-              <div className="flex items-start justify-between gap-4">
-                <div className="space-y-1">
-                  <h2 className="text-xl font-semibold">
-                    {draft.soul.name || "Untitled Agent"}
-                  </h2>
-                  <p className="text-sm text-default-500">
-                    {draft.soul.description || "No description"}
-                  </p>
-                  <div className="flex gap-2 pt-1">
-                    <Chip size="sm" variant="soft">
-                      v{draft.version}
-                    </Chip>
-                    <Chip size="sm" variant="soft">
-                      {draft.memory_config.strategy}
-                    </Chip>
-                    <Chip size="sm" variant="soft">
-                      caps: {draft.skills.capabilities.length}
-                    </Chip>
+            <div className="p-8 border-b border-divider/50">
+              <div className="flex flex-col gap-6">
+                {/* Header Row: Name & Actions */}
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-1">
+                    <h2 className="text-3xl font-bold tracking-tight">
+                      {draft.soul.name || "Untitled Agent"}
+                    </h2>
+                    <p className="text-base text-default-500 max-w-2xl">
+                      {draft.soul.description ||
+                        "No description provided for this agent."}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 bg-default-100 p-1 rounded-lg">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="bg-background shadow-sm hover:translate-y-[-1px] transition-transform"
+                      onPress={() => onEditInBuilder(draft)}
+                      isDisabled={isSaving || isDeploying}
+                    >
+                      <Pencil className="size-3.5 mr-2" />
+                      Builder
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="bg-background shadow-sm hover:translate-y-[-1px] transition-transform"
+                      onPress={handleDeploy}
+                      isDisabled={isSaving || isDeploying}
+                    >
+                      <Rocket className="size-3.5 mr-2" />
+                      {isDeploying ? "Deploying..." : "Deploy"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      className="shadow-md hover:translate-y-[-1px] transition-transform"
+                      onPress={handleSave}
+                      isDisabled={!isDirty || isSaving || isDeploying}
+                    >
+                      <Save className="size-3.5 mr-2" />
+                      {isSaving ? "Saving..." : "Save"}
+                    </Button>
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="secondary"
-                    onPress={() => onEditInBuilder(draft)}
-                    isDisabled={isSaving || isDeploying}
-                  >
-                    <Pencil className="size-4 mr-2" />
-                    Builder
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    onPress={handleDeploy}
-                    isDisabled={isSaving || isDeploying}
-                  >
-                    <Rocket className="size-4 mr-2" />
-                    {isDeploying ? "Deploying..." : "Deploy"}
-                  </Button>
-                  <Button
-                    variant="primary"
-                    onPress={handleSave}
-                    isDisabled={!isDirty || isSaving || isDeploying}
-                  >
-                    <Save className="size-4 mr-2" />
-                    {isSaving ? "Saving..." : "Save"}
-                  </Button>
+
+                {/* Metadata Row: Badges & Tabs */}
+                <div className="flex items-center justify-between">
+                  <div className="flex gap-2">
+                    <div className="px-2.5 py-1 rounded-md bg-default-100 border border-default-200 text-xs font-medium text-default-600">
+                      v{draft.version}
+                    </div>
+                    <div className="px-2.5 py-1 rounded-md bg-default-100 border border-default-200 text-xs font-medium text-default-600">
+                      {draft.memory_config.strategy}
+                    </div>
+                    <div className="px-2.5 py-1 rounded-md bg-default-100 border border-default-200 text-xs font-medium text-default-600">
+                      caps: {draft.skills.capabilities.length}
+                    </div>
+                  </div>
+
+                  {/* Tabs */}
+                  <div className="flex gap-1 bg-default-100/50 p-1 rounded-lg border border-default-200/50">
+                    <Button
+                      size="sm"
+                      variant={activeTab === "review" ? "primary" : "ghost"}
+                      onPress={() => setActiveTab("review")}
+                      className={
+                        activeTab === "review"
+                          ? "font-medium shadow-sm"
+                          : "text-default-500 hover:text-default-700"
+                      }
+                    >
+                      <Eye className="size-3.5 mr-2" />
+                      Review
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={activeTab === "edit" ? "primary" : "ghost"}
+                      onPress={() => setActiveTab("edit")}
+                      className={
+                        activeTab === "edit"
+                          ? "font-medium shadow-sm"
+                          : "text-default-500 hover:text-default-700"
+                      }
+                    >
+                      <Pencil className="size-3.5 mr-2" />
+                      Edit
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={activeTab === "json" ? "primary" : "ghost"}
+                      onPress={() => setActiveTab("json")}
+                      className={
+                        activeTab === "json"
+                          ? "font-medium shadow-sm"
+                          : "text-default-500 hover:text-default-700"
+                      }
+                    >
+                      <FileJson className="size-3.5 mr-2" />
+                      JSON
+                    </Button>
+                  </div>
                 </div>
               </div>
-              <div className="flex gap-2">
-                <Button
-                  variant={activeTab === "review" ? "secondary" : "ghost"}
-                  onPress={() => setActiveTab("review")}
-                >
-                  <Eye className="size-4 mr-2" />
-                  Review
-                </Button>
-                <Button
-                  variant={activeTab === "edit" ? "secondary" : "ghost"}
-                  onPress={() => setActiveTab("edit")}
-                >
-                  <Pencil className="size-4 mr-2" />
-                  Edit
-                </Button>
-                <Button
-                  variant={activeTab === "json" ? "secondary" : "ghost"}
-                  onPress={() => setActiveTab("json")}
-                >
-                  <FileJson className="size-4 mr-2" />
-                  JSON
-                </Button>
-              </div>
-            </Card.Header>
+            </div>
             <Card.Content className="p-5 overflow-auto">
               {activeTab === "review" && (
-                <div className="space-y-4">
-                  <Card className="p-4">
-                    <p className="text-xs uppercase tracking-wide text-default-500 mb-2">
+                <div className="space-y-6 max-w-4xl">
+                  {/* Personality Section */}
+                  <div className="p-6 rounded-2xl bg-default-100/50 border border-default-200/50">
+                    <p className="text-xs font-bold uppercase tracking-wider text-default-500 mb-4">
                       Personality
                     </p>
-                    <p className="text-sm whitespace-pre-wrap">
-                      {draft.soul.personality || "Not defined"}
+                    <p className="text-base leading-relaxed text-default-700 dark:text-default-300">
+                      {draft.soul.personality ||
+                        "No personality traits defined. Click Edit to add personality."}
                     </p>
-                  </Card>
+                  </div>
 
-                  <Card className="p-4">
-                    <p className="text-xs uppercase tracking-wide text-default-500 mb-2">
+                  {/* Soul Content Section */}
+                  <div className="p-6 rounded-2xl bg-default-100/50 border border-default-200/50">
+                    <p className="text-xs font-bold uppercase tracking-wider text-default-500 mb-4">
                       Soul Content
                     </p>
-                    <p className="text-sm whitespace-pre-wrap">
-                      {draft.soul.soul_content || "No soul content"}
-                    </p>
-                  </Card>
+                    <div className="prose prose-sm dark:prose-invert max-w-none">
+                      {/* Simple rendering for now, could use a Markdown component if available */}
+                      <pre className="whitespace-pre-wrap font-sans text-sm text-default-700 dark:text-default-300 leading-relaxed">
+                        {draft.soul.soul_content || "No soul content defined."}
+                      </pre>
+                    </div>
+                  </div>
 
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                    <Card className="p-4">
-                      <p className="text-xs uppercase tracking-wide text-default-500 mb-2">
+                  {/* Settings / Config Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="p-4 rounded-2xl bg-default-50 border border-default-200/50">
+                      <p className="text-xs font-bold uppercase tracking-wider text-default-400 mb-1">
                         Memory
                       </p>
-                      <p className="text-sm">
-                        {draft.memory_config.strategy} •{" "}
-                        {draft.memory_config.retention_days} days
+                      <p className="text-sm font-semibold">
+                        {draft.memory_config.strategy}
                       </p>
-                      <p className="text-sm text-default-500 mt-1">
+                      <p className="text-xs text-default-400">
+                        {draft.memory_config.retention_days} days •{" "}
                         {draft.memory_config.max_tokens} tokens
                       </p>
-                    </Card>
-                    <Card className="p-4">
-                      <p className="text-xs uppercase tracking-wide text-default-500 mb-2">
+                    </div>
+                    <div className="p-4 rounded-2xl bg-default-50 border border-default-200/50">
+                      <p className="text-xs font-bold uppercase tracking-wider text-default-400 mb-1">
                         Connectors
                       </p>
-                      <p className="text-sm">
-                        Telegram:{" "}
-                        {draft.connectors.telegram_enabled ? "Enabled" : "Disabled"}
+                      <p className="text-sm font-semibold">
+                        {draft.connectors.telegram_enabled
+                          ? "Telegram Active"
+                          : "No Connectors"}
                       </p>
-                      <p className="text-sm text-default-500 mt-1">
-                        Auto reply: {draft.connectors.auto_reply ? "On" : "Off"}
+                      <p className="text-xs text-default-400">
+                        Auto-reply: {draft.connectors.auto_reply ? "On" : "Off"}
                       </p>
-                    </Card>
-                    <Card className="p-4">
-                      <p className="text-xs uppercase tracking-wide text-default-500 mb-2">
-                        Skills
+                    </div>
+                    <div className="p-4 rounded-2xl bg-default-50 border border-default-200/50">
+                      <p className="text-xs font-bold uppercase tracking-wider text-default-400 mb-1">
+                        Capabilities
                       </p>
-                      <p className="text-sm">
-                        {draft.skills.capabilities.length} capabilities
+                      <p className="text-sm font-semibold">
+                        {draft.skills.capabilities.length} Enabled
                       </p>
-                      <p className="text-sm text-default-500 mt-1 truncate">
-                        {draft.skills.capabilities.map((c) => c.name).join(", ") ||
-                          "No capabilities selected"}
-                      </p>
-                    </Card>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {draft.skills.capabilities.slice(0, 3).map((c) => (
+                          <span
+                            key={c.name}
+                            className="px-1.5 py-0.5 rounded-md bg-default-200 text-[10px] text-default-600"
+                          >
+                            {c.name}
+                          </span>
+                        ))}
+                        {draft.skills.capabilities.length > 3 && (
+                          <span className="px-1.5 py-0.5 rounded-md bg-default-200 text-[10px] text-default-600">
+                            +{draft.skills.capabilities.length - 3}
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
@@ -483,7 +559,9 @@ export function AgentStorePage({
                       <Input
                         type="number"
                         value={String(draft.memory_config.max_tokens)}
-                        onChange={(e) => setMemoryNumber("max_tokens", e.target.value)}
+                        onChange={(e) =>
+                          setMemoryNumber("max_tokens", e.target.value)
+                        }
                       />
                     </div>
                   </div>
@@ -510,24 +588,31 @@ export function AgentStorePage({
                       <Button
                         className="flex-1"
                         variant={
-                          draft.connectors.telegram_enabled ? "secondary" : "ghost"
+                          draft.connectors.telegram_enabled
+                            ? "secondary"
+                            : "ghost"
                         }
                         onPress={() =>
                           setDraft({
                             ...draft,
                             connectors: {
                               ...draft.connectors,
-                              telegram_enabled: !draft.connectors.telegram_enabled,
+                              telegram_enabled:
+                                !draft.connectors.telegram_enabled,
                             },
                           })
                         }
                       >
                         Telegram{" "}
-                        {draft.connectors.telegram_enabled ? "Enabled" : "Disabled"}
+                        {draft.connectors.telegram_enabled
+                          ? "Enabled"
+                          : "Disabled"}
                       </Button>
                       <Button
                         className="flex-1"
-                        variant={draft.connectors.auto_reply ? "secondary" : "ghost"}
+                        variant={
+                          draft.connectors.auto_reply ? "secondary" : "ghost"
+                        }
                         onPress={() =>
                           setDraft({
                             ...draft,
