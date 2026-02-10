@@ -24,11 +24,18 @@ export function AirlockEvents() {
   }
 
   return (
-    <Modal isOpen={true} onOpenChange={() => {}}>
-      <Modal.Backdrop className="backdrop-blur-xl bg-black/40" />
+    <Modal.Backdrop
+      isOpen={true}
+      onOpenChange={() => {}}
+      className="backdrop-blur-3xl bg-black/60"
+    >
       <Modal.Container>
         <Modal.Dialog
-          className={`border-l-4 ${isDangerous ? "border-l-red-500" : "border-l-yellow-500"}`}
+          className={`border shadow-2xl ${
+            isDangerous
+              ? "border-red-500/20 shadow-[0_0_50px_-12px_rgba(239,68,68,0.3)] bg-zinc-900/90"
+              : "border-yellow-500/20 shadow-[0_0_50px_-12px_rgba(234,179,8,0.2)] bg-zinc-900/90"
+          }`}
         >
           <Modal.Header>
             <div className="flex items-center gap-2">
@@ -52,18 +59,22 @@ export function AirlockEvents() {
                 action:
               </p>
 
-              <div className="bg-muted/50 p-4 rounded-lg space-y-2 border border-border/50">
-                <div className="flex justify-between items-center text-sm text-muted-foreground border-b border-border/50 pb-2">
+              <div className="bg-black/40 p-4 rounded-xl space-y-3 border border-white/5">
+                <div className="flex justify-between items-center text-sm text-foreground/80 border-b border-white/5 pb-2">
                   <span>Command ID:</span>
                   <span className="font-mono text-xs opacity-70">
                     {request.commandId}
                   </span>
                 </div>
 
-                <div className="flex justify-between items-center text-sm text-muted-foreground border-b border-border/50 pb-2">
+                <div className="flex justify-between items-center text-sm text-foreground/80 border-b border-white/5 pb-2">
                   <span>Intent:</span>
                   <span
-                    className={`uppercase font-bold tracking-wider text-xs px-2 py-0.5 rounded ${isDangerous ? "bg-red-500/10 text-red-600" : "bg-blue-500/10 text-blue-600"}`}
+                    className={`uppercase font-bold tracking-wider text-[10px] px-2 py-0.5 rounded border ${
+                      isDangerous
+                        ? "bg-red-500/10 text-red-500 border-red-500/20"
+                        : "bg-blue-500/10 text-blue-400 border-blue-500/20"
+                    }`}
                   >
                     {request.intent}
                   </span>
@@ -73,7 +84,7 @@ export function AirlockEvents() {
                   <p className="text-xs mb-1 text-muted-foreground font-medium ml-1">
                     Payload:
                   </p>
-                  <pre className="w-full whitespace-pre-wrap max-h-60 overflow-y-auto block p-3 text-xs font-mono bg-background rounded-md border border-border/50">
+                  <pre className="w-full whitespace-pre-wrap max-h-60 overflow-y-auto block p-3 text-[10px] leading-relaxed font-mono bg-black/50 text-foreground/90 rounded-lg border border-white/5">
                     {formattedPayload}
                   </pre>
                 </div>
@@ -113,6 +124,6 @@ export function AirlockEvents() {
           </Modal.Footer>
         </Modal.Dialog>
       </Modal.Container>
-    </Modal>
+    </Modal.Backdrop>
   );
 }
