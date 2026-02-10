@@ -1,16 +1,15 @@
 import { useEffect, useState } from "react";
 // @ts-ignore
-import { Button, Card, Select, ListBox, Label } from "@heroui/react";
+import { Button, Select, ListBox, Label } from "@heroui/react";
 import { toast } from "sonner";
 import {
   Save,
-  ArrowLeft,
   Bot,
   Shield,
   Network,
   Cpu,
   Rocket,
-  Library,
+  ArrowLeft,
 } from "lucide-react";
 import { AgentSpec } from "../../../types/agent-spec";
 import { SoulEditor } from "./SoulEditor";
@@ -80,106 +79,160 @@ export function AgentBuilder({
     }
   };
 
-  return (
-    <div className="h-full flex flex-col bg-background">
-      {/* Header */}
-      <div className="h-14 border-b border-divider flex items-center px-4 justify-between bg-content1/50 backdrop-blur">
-        <div className="flex items-center gap-4">
-          <Button isIconOnly variant="ghost" onPress={onBack}>
-            <ArrowLeft className="size-5" />
-          </Button>
+  const NavItem = ({
+    id,
+    icon: Icon,
+    label,
+    description,
+  }: {
+    id: string;
+    icon: any;
+    label: string;
+    description: string;
+  }) => {
+    const isActive = activeTab === id;
+    return (
+      <button
+        onClick={() => setActiveTab(id)}
+        className={`w-full text-left px-4 py-3 rounded-2xl transition-all duration-300 group relative overflow-hidden ${
+          isActive
+            ? "bg-[#bef264] text-black shadow-md shadow-[#bef264]/10"
+            : "hover:bg-white/5 text-zinc-400 hover:text-zinc-200"
+        }`}
+      >
+        <div className="flex items-center gap-3 relative z-10">
+          <div
+            className={`p-1.5 rounded-full ${
+              isActive ? "bg-black/10" : "bg-white/5 group-hover:bg-white/10"
+            }`}
+          >
+            <Icon className="size-4" />
+          </div>
           <div>
-            <h1 className="text-lg font-bold">
-              {initialSpec ? "Edit Agent" : "New Agent"}
-            </h1>
-            <p className="text-xs text-default-500">
-              {spec.soul.name || "Untitled Agent"} • v{spec.version}
-            </p>
+            <span
+              className={`block text-sm font-bold ${isActive ? "text-black" : "text-zinc-200"}`}
+            >
+              {label}
+            </span>
+            <span
+              className={`text-[10px] uppercase tracking-wider ${isActive ? "text-black/60" : "text-zinc-600"}`}
+            >
+              {description}
+            </span>
           </div>
         </div>
-        <div className="flex gap-2">
-          {onOpenStore && (
+      </button>
+    );
+  };
+
+  return (
+    <div
+      className="h-full w-full bg-[#020402] p-3 flex gap-3 overflow-hidden font-sans selection:bg-[#bef264] selection:text-black"
+      data-tauri-drag-region
+    >
+      {/* LEFT PANEL: Navigation */}
+      <aside className="w-[260px] shrink-0 bg-[#0a0a0a] rounded-[1.5rem] border border-white/5 flex flex-col shadow-xl overflow-hidden relative">
+        {/* Header */}
+        <div className="p-6 pb-2" data-tauri-drag-region>
+          <button
+            onClick={onBack}
+            className="flex items-center gap-2 text-zinc-500 hover:text-[#bef264] transition-colors mb-4 group relative z-50"
+          >
+            <ArrowLeft className="size-3 group-hover:-translate-x-1 transition-transform" />
+            <span className="text-xs font-medium tracking-wide uppercase">
+              Back
+            </span>
+          </button>
+          <h1 className="text-xl font-bold text-white tracking-tight leading-tight pointer-events-none">
+            Agent
+            <br />
+            Builder
+          </h1>
+        </div>
+
+        {/* Nav Links */}
+        <div className="flex-1 px-3 space-y-1 overflow-y-auto">
+          <NavItem
+            id="soul"
+            icon={Bot}
+            label="Identity"
+            description="Persona & core"
+          />
+          <NavItem
+            id="skills"
+            icon={Cpu}
+            label="Skills"
+            description="Capabilities"
+          />
+          <NavItem
+            id="memory"
+            icon={Network}
+            label="Memory"
+            description="Knowledge"
+          />
+          <NavItem
+            id="security"
+            icon={Shield}
+            label="Security"
+            description="Permissions"
+          />
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 pt-2" data-tauri-drag-region>
+          <div className="text-[10px] text-zinc-700 font-mono text-center opacity-50 pointer-events-none">
+            Rainy Cowork v{tauri.VERSION || "0.0.0"}
+          </div>
+        </div>
+      </aside>
+
+      {/* RIGHT PANEL: Content Editor */}
+      <main className="flex-1 bg-[#0a0a0a] rounded-[1.5rem] border border-white/5 shadow-xl flex flex-col overflow-hidden relative">
+        {/* Background Gradients */}
+        <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-[#bef264]/[0.01] blur-[100px] rounded-full pointer-events-none" />
+
+        {/* Header */}
+        <header
+          className="h-16 shrink-0 flex items-center justify-between px-8 border-b border-white/5 bg-[#0a0a0a]/50 backdrop-blur-xl z-20"
+          data-tauri-drag-region
+        >
+          <div className="flex items-center gap-3">
+            <h2 className="text-lg font-bold text-white tracking-tight">
+              {spec.soul.name || "Untitled Agent"}
+            </h2>
+            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/5 border border-white/5">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#bef264]" />
+              <span className="text-xs text-zinc-400 font-mono">
+                v{spec.version}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
             <Button
+              onPress={handleSave}
+              isDisabled={isSaving || isDeploying}
               variant="ghost"
-              onPress={onOpenStore}
-              className="font-medium"
+              size="sm"
+              className="text-zinc-500 hover:text-[#bef264] font-medium"
             >
-              <Library className="size-4 mr-2" /> Agent Store
+              <Save className="size-3.5 mr-1.5" />
+              Save Draft
             </Button>
-          )}
-          {/* Action buttons */}
-          <Button
-            variant="secondary"
-            onPress={handleDeploy}
-            className="font-medium"
-            isDisabled={isDeploying || isSaving}
-          >
-            {isDeploying ? (
-              "Deploying..."
-            ) : (
-              <>
-                <Rocket className="size-4 mr-2" /> Deploy
-              </>
-            )}
-          </Button>
-          <Button
-            variant="primary"
-            onPress={handleSave}
-            className="font-medium"
-            isDisabled={isSaving || isDeploying}
-          >
-            {isSaving ? (
-              "Saving..."
-            ) : (
-              <>
-                <Save className="size-4 mr-2" /> Save Agent
-              </>
-            )}
-          </Button>
-        </div>
-      </div>
+            <Button
+              onPress={handleDeploy}
+              isDisabled={isDeploying || isSaving}
+              className="bg-[#bef264] text-black hover:bg-[#a3e635] font-bold px-6 h-8 min-w-0 rounded-full shadow-lg shadow-[#bef264]/10 text-sm"
+            >
+              <Rocket className="size-3.5 mr-1.5" />
+              {isDeploying ? "Deploying..." : "Deploy"}
+            </Button>
+          </div>
+        </header>
 
-      {/* Main Content */}
-      <div className="flex-1 overflow-hidden flex">
-        {/* Sidebar/Tabs - keeping simple layout */}
-        <div className="w-64 border-r border-default-200 p-4 flex flex-col gap-2 bg-background/30">
-          <Button
-            variant={activeTab === "soul" ? "primary" : "ghost"}
-            className="justify-start"
-            onPress={() => setActiveTab("soul")}
-          >
-            <Bot className="size-4 mr-2" />
-            Identity & Soul
-          </Button>
-          <Button
-            variant={activeTab === "skills" ? "primary" : "ghost"}
-            className="justify-start"
-            onPress={() => setActiveTab("skills")}
-          >
-            <Cpu className="size-4 mr-2" />
-            Skills & Tools
-          </Button>
-          <Button
-            variant={activeTab === "memory" ? "primary" : "ghost"}
-            className="justify-start"
-            onPress={() => setActiveTab("memory")}
-          >
-            <Network className="size-4 mr-2" />
-            Memory
-          </Button>
-          <Button
-            variant={activeTab === "security" ? "primary" : "ghost"}
-            className="justify-start h-auto py-2"
-            onPress={() => setActiveTab("security")}
-          >
-            <Shield className="size-4 mr-2 flex-shrink-0" />
-            Security
-          </Button>
-        </div>
-
-        {/* Editor Area */}
-        <div className="flex-1 overflow-auto p-6">
-          <div className="max-w-4xl mx-auto space-y-6">
+        {/* Content Area */}
+        <div className="flex-1 overflow-y-auto p-8 z-10 scrollbar-hide">
+          <div className="max-w-3xl mx-auto pb-16">
             {activeTab === "soul" && (
               <SoulEditor
                 soul={spec.soul}
@@ -204,12 +257,23 @@ export function AgentBuilder({
             )}
 
             {activeTab === "memory" && (
-              <Card className="p-6 bg-background/60 dark:bg-background/20 border ">
-                <h3 className="text-lg font-bold mb-4">Memory Configuration</h3>
-                <div className="space-y-4">
-                  <div>
+              <div className="space-y-8">
+                <div className="flex flex-col gap-1">
+                  <h3 className="text-xl font-bold text-white">
+                    Memory Matrix
+                  </h3>
+                  <p className="text-zinc-500 text-sm">
+                    Configure retention and retrieval.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  {/* Strategy */}
+                  <div className="space-y-3">
+                    <Label className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest">
+                      Retrieval Strategy
+                    </Label>
                     <Select
-                      className="w-full group"
                       selectedKey={spec.memory_config.strategy}
                       onSelectionChange={(key) => {
                         if (key) {
@@ -224,36 +288,39 @@ export function AgentBuilder({
                           });
                         }
                       }}
+                      className="w-full"
                     >
-                      <Label className="text-sm font-medium mb-1.5 block text-foreground ">
-                        Strategy
-                      </Label>
-                      <Select.Trigger className="w-full  flex items-center justify-between rounded-xl border border-default-200 bg-background/60 dark:bg-background/20 px-3 py-2 text-sm shadow-sm hover:bg-content2 transition-colors data-[open=true]:border-primary data-[focus=true]:ring-2 data-[focus=true]:ring-primary/20 cursor-pointer">
-                        <Select.Value className="flex-1 text-left" />
-                        <Select.Indicator className="text-default-400" />
+                      <Label>Select Strategy</Label>
+                      <Select.Trigger className="bg-[#121212] hover:bg-[#1a1a1a] border border-white/5 rounded-xl h-12 px-3 text-zinc-200 transition-all data-[open=true]:border-[#bef264]/50 text-sm">
+                        <Select.Value />
+                        <Select.Indicator />
                       </Select.Trigger>
-                      <Select.Popover className="w-[var(--trigger-width)] rounded-xl bg-background/60 dark:bg-background/20 p-1 border border backdrop-blur-2xl">
-                        <ListBox className="outline-none p-1 gap-1">
+                      <Select.Popover className="bg-[#121212] border border-white/10 dark rounded-xl shadow-xl">
+                        <ListBox>
                           <ListBox.Item
                             key="hybrid"
-                            textValue="Hybrid"
-                            className="rounded-lg px-2 py-1.5 text-sm outline-none data-[hover=true]:bg-default-100 data-[selected=true]:bg-primary/10 data-[selected=true]:text-primary cursor-pointer transition-colors"
+                            textValue="Hybrid Search"
+                            className="data-[hover=true]:bg-white/5 py-2 rounded-lg"
                           >
-                            <div className="flex flex-col">
-                              <span className="font-medium">Hybrid</span>
-                              <span className="text-xs text-default-400">
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-sm font-bold text-white">
+                                Hybrid Search
+                              </span>
+                              <span className="text-[10px] text-zinc-500">
                                 Vector + Short-term buffer (Recommended)
                               </span>
                             </div>
                           </ListBox.Item>
                           <ListBox.Item
                             key="vector"
-                            textValue="Vector"
-                            className="rounded-lg px-2 py-1.5 text-sm outline-none data-[hover=true]:bg-default-100 data-[selected=true]:bg-primary/10 data-[selected=true]:text-primary cursor-pointer transition-colors"
+                            textValue="Vector Only"
+                            className="data-[hover=true]:bg-white/5 py-2 rounded-lg"
                           >
-                            <div className="flex flex-col">
-                              <span className="font-medium">Vector Only</span>
-                              <span className="text-xs text-default-400">
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-sm font-bold text-white">
+                                Vector Only
+                              </span>
+                              <span className="text-[10px] text-zinc-500">
                                 Long-term semantic search
                               </span>
                             </div>
@@ -261,11 +328,13 @@ export function AgentBuilder({
                           <ListBox.Item
                             key="simple_buffer"
                             textValue="Simple Buffer"
-                            className="rounded-lg px-2 py-1.5 text-sm outline-none data-[hover=true]:bg-default-100 data-[selected=true]:bg-primary/10 data-[selected=true]:text-primary cursor-pointer transition-colors"
+                            className="data-[hover=true]:bg-white/5 py-2 rounded-lg"
                           >
-                            <div className="flex flex-col">
-                              <span className="font-medium">Simple Buffer</span>
-                              <span className="text-xs text-default-400">
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-sm font-bold text-white">
+                                Simple Buffer
+                              </span>
+                              <span className="text-[10px] text-zinc-500">
                                 FIFO context window only
                               </span>
                             </div>
@@ -275,68 +344,73 @@ export function AgentBuilder({
                     </Select>
                   </div>
 
-                  <div>
-                    <label
-                      htmlFor="retention-days"
-                      className="text-sm font-medium mb-2 block"
-                    >
-                      Retention (Days)
-                    </label>
-                    <input
-                      id="retention-days"
-                      type="number"
-                      min={1}
-                      max={3650}
-                      className="w-full rounded-xl border border-default-200 bg-content1 px-3 py-2 text-sm"
-                      value={spec.memory_config.retention_days}
-                      onChange={(e) =>
-                        updateSpec({
-                          memory_config: {
-                            ...spec.memory_config,
-                            retention_days: Math.max(
-                              1,
-                              Number.parseInt(e.target.value || "1", 10),
-                            ),
-                          },
-                        })
-                      }
-                    />
-                  </div>
+                  {/* Configs */}
+                  <div className="space-y-6">
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-end">
+                        <Label className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest">
+                          Retention
+                        </Label>
+                        <span className="font-mono text-zinc-300 text-xs">
+                          {spec.memory_config.retention_days} days
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min={1}
+                        max={90}
+                        className="w-full accent-[#bef264] h-1 bg-zinc-800 rounded-lg appearance-none cursor-pointer"
+                        value={spec.memory_config.retention_days}
+                        onChange={(e) =>
+                          updateSpec({
+                            memory_config: {
+                              ...spec.memory_config,
+                              retention_days: Math.max(
+                                1,
+                                parseInt(e.target.value || "1", 10),
+                              ),
+                            },
+                          })
+                        }
+                      />
+                    </div>
 
-                  <div>
-                    <label
-                      htmlFor="max-tokens"
-                      className="text-sm font-medium mb-2 block"
-                    >
-                      Max Tokens
-                    </label>
-                    <input
-                      id="max-tokens"
-                      type="number"
-                      min={512}
-                      max={1000000}
-                      step={512}
-                      className="w-full rounded-xl border border-default-200 bg-content1 px-3 py-2 text-sm"
-                      value={spec.memory_config.max_tokens}
-                      onChange={(e) =>
-                        updateSpec({
-                          memory_config: {
-                            ...spec.memory_config,
-                            max_tokens: Math.max(
-                              512,
-                              Number.parseInt(e.target.value || "512", 10),
-                            ),
-                          },
-                        })
-                      }
-                    />
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-end">
+                        <Label className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest">
+                          Context Window
+                        </Label>
+                        <span className="font-mono text-zinc-300 text-xs">
+                          {spec.memory_config.max_tokens} tokens
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min={512}
+                        max={32000}
+                        step={512}
+                        className="w-full accent-[#bef264] h-1 bg-zinc-800 rounded-lg appearance-none cursor-pointer"
+                        value={spec.memory_config.max_tokens}
+                        onChange={(e) =>
+                          updateSpec({
+                            memory_config: {
+                              ...spec.memory_config,
+                              max_tokens: Math.max(
+                                512,
+                                parseInt(e.target.value || "512", 10),
+                              ),
+                            },
+                          })
+                        }
+                      />
+                    </div>
                   </div>
                 </div>
-              </Card>
+              </div>
             )}
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
