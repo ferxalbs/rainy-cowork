@@ -9,7 +9,6 @@ import {
   ChevronRight,
   MessageSquare,
   FileText,
-  Search,
   Plus,
   LayoutGrid,
   Settings,
@@ -241,21 +240,10 @@ export function AppSidebar({
             icon={MessageSquare}
             colorClass="text-purple-500"
           />
-          <NavItem
-            id="documents"
-            label="Documents"
-            icon={FileText}
-            colorClass="text-blue-500"
-          />
-          <NavItem
-            id="research"
-            label="Research"
-            icon={Search}
-            colorClass="text-green-500"
-          />
+
           <NavItem
             id="neural-link"
-            label="Neural Link"
+            label="Rainy ATM"
             icon={Network}
             colorClass="text-purple-500"
           />
