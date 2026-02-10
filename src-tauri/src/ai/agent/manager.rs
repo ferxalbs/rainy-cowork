@@ -82,10 +82,24 @@ impl AgentManager {
     }
 
     pub async fn clear_history(&self, chat_id: &str) -> Result<(), sqlx::Error> {
+        // Clear chat messages (per session)
         sqlx::query("DELETE FROM messages WHERE chat_id = ?")
             .bind(chat_id)
             .execute(&*self.db)
             .await?;
+
+        // Also clear semantic memories and entities (scoped by workspace_id, which corresponds to chat_id)
+        // This supports "Full Context Reset" requested by user
+        sqlx::query("DELETE FROM memory_entries WHERE workspace_id = ?")
+            .bind(chat_id)
+            .execute(&*self.db)
+            .await?;
+
+        sqlx::query("DELETE FROM agent_entities WHERE workspace_id = ?")
+            .bind(chat_id)
+            .execute(&*self.db)
+            .await?;
+
         Ok(())
     }
 
