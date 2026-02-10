@@ -1,4 +1,4 @@
-import { Tooltip, Avatar, Button, Separator } from "@heroui/react";
+import { Tooltip, Button, Separator } from "@heroui/react";
 import {
   FolderOpen,
   Download,
@@ -17,9 +17,6 @@ import {
   Bot,
   Library,
 } from "lucide-react";
-import { MacOSToggle } from "./MacOSToggle";
-import { useTheme } from "../../hooks/useTheme";
-import { useUserProfile } from "../../hooks/useUserProfile";
 import type { Folder } from "../../types";
 
 interface AppSidebarProps {
@@ -52,9 +49,6 @@ export function AppSidebar({
   onToggleCollapse,
   onSettingsClick,
 }: AppSidebarProps) {
-  const { mode, setMode } = useTheme();
-  const { profile } = useUserProfile();
-
   const NavItem = ({
     id,
     label,
@@ -287,36 +281,12 @@ export function AppSidebar({
         <div className="space-y-1 pt-2">
           <NavItem id="settings-models" label="AI Provider" icon={Sparkles} />
           <NavItem id="settings-appearance" label="Appearance" icon={Palette} />
-          <NavItem id="settings-profile" label="Profile" icon={Settings} />
         </div>
 
         {/* User / Settings Footer */}
         <div
           className={`mt-2 flex items-center transition-all ${isCollapsed ? "flex-col gap-4 py-2" : "px-1 gap-3 py-2"}`}
         >
-          <Avatar size="sm">
-            <Avatar.Image
-              src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(profile.displayName || "Rainy User")}`}
-            />
-          </Avatar>
-          {!isCollapsed && (
-            <div className="flex flex-col min-w-0 flex-1">
-              <span className="text-xs font-semibold truncate">
-                {profile.displayName || "Rainy User"}
-              </span>
-              <span className="text-[10px] text-muted-foreground truncate opacity-70 italic">
-                {profile.role || "Builder"}
-              </span>
-            </div>
-          )}
-
-          <div className="flex items-center gap-1">
-            <MacOSToggle
-              isDark={mode === "dark"}
-              onToggle={(checked) => setMode(checked ? "dark" : "light")}
-            />
-          </div>
-
           <Tooltip delay={0}>
             <Button
               variant="ghost"

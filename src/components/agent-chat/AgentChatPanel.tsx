@@ -21,6 +21,7 @@ import { useTheme } from "../../hooks/useTheme";
 import { MacOSToggle } from "../layout/MacOSToggle";
 
 import { UnifiedModelSelector } from "../ai/UnifiedModelSelector";
+import { AgentSelector } from "./AgentSelector";
 import { MessageBubble } from "./MessageBubble";
 import { AgentSpec } from "../../types/agent-spec";
 
@@ -359,25 +360,11 @@ Click 'Execute Task' when ready."]`
         />
 
         <div className="relative z-10 flex items-center gap-3 p-1.5 pl-3 rounded-full bg-background/60 backdrop-blur-2xl border border-white/10 shadow-lg pointer-events-auto transition-all hover:bg-background/80">
-          <div className="flex items-center gap-2 rounded-full border border-white/10 bg-background/50 px-2 py-1">
-            <span className="text-[10px] uppercase tracking-wide text-muted-foreground/80">
-              Agent
-            </span>
-            <select
-              value={selectedAgentId}
-              onChange={(e) => setSelectedAgentId(e.target.value)}
-              className="bg-transparent text-xs outline-none min-w-[160px]"
-            >
-              {agentSpecs.length === 0 && (
-                <option value="">Default Agent</option>
-              )}
-              {agentSpecs.map((spec) => (
-                <option key={spec.id} value={spec.id}>
-                  {spec.soul.name || "Untitled Agent"}
-                </option>
-              ))}
-            </select>
-          </div>
+          <AgentSelector
+            selectedAgentId={selectedAgentId}
+            onSelect={setSelectedAgentId}
+            agentSpecs={agentSpecs}
+          />
 
           <UnifiedModelSelector
             selectedModelId={currentModelId}

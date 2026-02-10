@@ -287,17 +287,17 @@ export function UnifiedModelSelector({
         </Button>
       </PopoverTrigger>
 
-      <PopoverContent className="w-80 p-0 bg-background/80 backdrop-blur-3xl border border-white/10 shadow-2xl rounded-2xl overflow-hidden">
+      <PopoverContent className="w-80 mt-2 p-0 bg-background/60 backdrop-blur-2xl dark:bg-background/20 border border-white/10 rounded-lg overflow-hidden">
         <div className="flex flex-col">
           {/* Search */}
           <div className="p-3 border-b border-border/10">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4" />
               <Input
                 placeholder="Search models..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="bg-muted/30 w-full pl-9 text-sm h-9 rounded-lg border-transparent focus:border-primary/20 transition-all font-medium"
+                className="bg-background/30 w-full pl-9 h-9 rounded-lg border-transparent focus:border-primary/20 transition-all text-white/50 dark:text-white/50"
               />
             </div>
           </div>
