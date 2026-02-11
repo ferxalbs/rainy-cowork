@@ -41,6 +41,7 @@ mod tests {
                 ..Default::default()
             },
             skills: AgentSkills::default(),
+            airlock: Default::default(),
             memory_config: Default::default(),
             connectors: Default::default(),
             signature: None,

@@ -475,10 +475,11 @@ impl CommandPoller {
                             // Cloud commands often require several think/act cycles.
                             // Keep a bounded ceiling but avoid premature termination.
                             max_steps: Some(30),
-                            allowed_paths: if command.payload.allowed_paths.is_empty() {
-                                None
-                            } else {
+                            // Resolve allowed_paths: payload > spec airlock > None
+                            allowed_paths: if !command.payload.allowed_paths.is_empty() {
                                 Some(command.payload.allowed_paths.clone())
+                            } else {
+                                None // will be resolved after spec is loaded
                             },
                         };
 
@@ -532,16 +533,28 @@ GUIDELINES:
                                     capabilities: vec![],
                                     tools: std::collections::HashMap::new(),
                                 },
+                                airlock: Default::default(),
                                 memory_config: Default::default(),
                                 connectors: Default::default(),
                                 signature: None,
                             }
                         };
 
-                        // Create runtime
+                        // Resolve allowed_paths from spec airlock if not already set by command payload
+                        let final_options = if options.allowed_paths.is_none()
+                            && !spec.airlock.scopes.allowed_paths.is_empty()
+                        {
+                            RuntimeOptions {
+                                allowed_paths: Some(spec.airlock.scopes.allowed_paths.clone()),
+                                ..options
+                            }
+                        } else {
+                            options
+                        };
+
                         let runtime = AgentRuntime::new(
                             spec,
-                            options,
+                            final_options,
                             ctx.router.clone(),
                             self.skill_executor.clone(),
                             memory,

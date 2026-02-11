@@ -353,9 +353,7 @@ impl WorkflowStep for ThinkStep {
         // 2. Prepare tools
         let mut tools = skills.get_tool_definitions();
         if state.allowed_paths.is_empty() {
-            tools.retain(|tool| {
-                !FILESYSTEM_TOOL_NAMES.contains(&tool.function.name.as_str())
-            });
+            tools.retain(|tool| !FILESYSTEM_TOOL_NAMES.contains(&tool.function.name.as_str()));
         }
         let has_tools = !tools.is_empty();
 
@@ -660,6 +658,7 @@ mod tests {
                 capabilities: vec![],
                 tools: std::collections::HashMap::new(),
             },
+            airlock: Default::default(),
             memory_config: Default::default(),
             connectors: Default::default(),
             signature: None,

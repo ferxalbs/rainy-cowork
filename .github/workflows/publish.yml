@@ -12,7 +12,55 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  validate:
+    name: Validate Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate version consistency
+        run: |
+          # Extract version from tag
+          TAG_VERSION=${GITHUB_REF#refs/tags/v}
+          echo "Tag version: $TAG_VERSION"
+
+          # Check package.json version
+          PKG_VERSION=$(grep '"version"' package.json | head -1 | sed 's/.*: *"\([^"]*\)".*/\1/')
+          echo "Package.json version: $PKG_VERSION"
+
+          # Check Cargo.toml version
+          CARGO_VERSION=$(grep '^version = ' src-tauri/Cargo.toml | head -1 | sed 's/.*= *"\([^"]*\)".*/\1/')
+          echo "Cargo.toml version: $CARGO_VERSION"
+
+          # Check tauri.conf.json version
+          TAURI_VERSION=$(grep '"version"' src-tauri/tauri.conf.json | head -1 | sed 's/.*: *"\([^"]*\)".*/\1/')
+          echo "Tauri config version: $TAURI_VERSION"
+
+          # Verify all versions match
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ] || [ "$TAG_VERSION" != "$CARGO_VERSION" ] || [ "$TAG_VERSION" != "$TAURI_VERSION" ]; then
+            echo "::error::Version mismatch! Tag: $TAG_VERSION, Package: $PKG_VERSION, Cargo: $CARGO_VERSION, Tauri: $TAURI_VERSION"
+            exit 1
+          fi
+
+          echo "✅ All versions match: $TAG_VERSION"
+
+      - name: Check signing keys
+        id: check_keys
+        run: |
+          if [ -n "${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}" ]; then
+            echo "Signing key: ✅ Present"
+          else
+            echo "Signing key: ⚠️ Missing (unsigned builds)"
+          fi
+          if [ -n "${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}" ]; then
+            echo "Signing password: ✅ Present"
+          else
+            echo "Signing password: ⚠️ Missing"
+          fi
+
   publish-tauri:
+    needs: validate
     permissions:
       contents: write
     strategy:
@@ -74,3 +122,23 @@ jobs:
           prerelease: false
           args: ${{ matrix.args }}
           includeUpdaterJson: true
+
+  failure-notification:
+    name: Notify on Failure
+    needs: publish-tauri
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report failure
+        run: |
+          echo "::error::Release workflow failed!"
+          echo ""
+          echo "🔧 To fix this issue:"
+          echo "1. Go to https://github.com/ferxalbs/rainy-cowork/settings/secrets/actions"
+          echo "2. Add the following secrets:"
+          echo "   - TAURI_SIGNING_PRIVATE_KEY: Your base64-encoded signing private key"
+          echo "   - TAURI_SIGNING_PRIVATE_KEY_PASSWORD: Your key password"
+          echo ""
+          echo "📖 For signing key setup, see:"
+          echo "   https://v2.tauri.app/distribute/signing/macos/"
+          exit 1

@@ -3,7 +3,7 @@ import { AgentSpec } from "../../../types/agent-spec";
 export function createDefaultAgentSpec(): AgentSpec {
   return {
     id: crypto.randomUUID(),
-    version: "3.0.0",
+    version: "2.0.0",
     soul: {
       name: "",
       description: "",
@@ -23,55 +23,31 @@ export function createDefaultAgentSpec(): AgentSpec {
     },
     airlock: {
       tool_policy: {
-        mode: "allowlist",
-        allow: [
-          "read_file",
-          "list_files",
-          "search_files",
-          "get_page_content",
-          "web_search",
-          "read_web_page",
-          "write_file",
-          "append_file",
-          "mkdir",
-        ],
-        deny: ["delete_file", "execute_command"],
+        mode: "all",
+        allow: [],
+        deny: [],
       },
-      tool_levels: {
-        read_file: 0,
-        list_files: 0,
-        search_files: 0,
-        get_page_content: 0,
-        web_search: 0,
-        read_web_page: 0,
-        write_file: 1,
-        append_file: 1,
-        mkdir: 1,
-        move_file: 1,
-        delete_file: 2,
-        execute_command: 2,
-        browse_url: 2,
-      },
+      tool_levels: {},
       scopes: {
-        allowed_paths: ["/Users/*/Projects"],
-        blocked_paths: ["/etc", "/usr", "~/.ssh", "~/.env"],
-        allowed_domains: ["*"],
+        allowed_paths: [],
+        blocked_paths: [],
+        allowed_domains: [],
         blocked_domains: [],
       },
       rate_limits: {
-        max_requests_per_minute: 30,
-        max_tokens_per_day: 1_000_000,
+        max_requests_per_minute: 0,
+        max_tokens_per_day: 0,
       },
     },
     memory_config: {
       strategy: "hybrid",
       retrieval: {
-        retention_days: 30,
-        max_tokens: 32000,
+        retention_days: 0,
+        max_tokens: 0,
       },
       persistence: {
-        cross_session: true,
-        per_connector_isolation: true,
+        cross_session: false,
+        per_connector_isolation: false,
         session_scope: "per_user",
       },
       knowledge: {

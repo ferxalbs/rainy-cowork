@@ -133,6 +133,7 @@ pub async fn run_agent_workflow(
                             ..Default::default()
                         },
                         skills: AgentSkills::default(),
+                        airlock: Default::default(),
                         memory_config: Default::default(),
                         connectors: Default::default(),
                         signature: None,
@@ -154,17 +155,24 @@ pub async fn run_agent_workflow(
                 ..Default::default()
             },
             skills: AgentSkills::default(),
+            airlock: Default::default(),
             memory_config: Default::default(),
             connectors: Default::default(),
             signature: None,
         }
     };
 
+    // Extract allowed_paths from spec's airlock scopes
+    let airlock_paths = &spec.airlock.scopes.allowed_paths;
     let options = RuntimeOptions {
         model: Some(model_id),
         workspace_id: workspace_id.clone(),
         max_steps: None,
-        allowed_paths: None,
+        allowed_paths: if airlock_paths.is_empty() {
+            None
+        } else {
+            Some(airlock_paths.clone())
+        },
     };
 
     // Initialize Persistent Memory
