@@ -385,6 +385,8 @@ pub fn run() {
             commands::delete_memory,
             commands::get_short_term_memory_size,
             commands::is_short_term_memory_empty,
+            commands::index_knowledge_file,
+            commands::query_agent_memory,
             // Settings commands
             commands::get_user_settings,
             commands::get_selected_model,

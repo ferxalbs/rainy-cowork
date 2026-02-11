@@ -1683,6 +1683,53 @@ export async function deployAgentSpec(spec: any): Promise<any> {
   return invoke("deploy_agent_spec", { spec });
 }
 
+export interface AgentKnowledgeFile {
+  id: string;
+  name: string;
+  path: string;
+  size_bytes: number;
+  indexed_at: number;
+  chunk_count: number;
+}
+
+export interface KnowledgeIndexResult {
+  file: AgentKnowledgeFile;
+  chunks_indexed: number;
+}
+
+export interface AgentMemoryResult {
+  id: string;
+  file_id: string;
+  file_name: string;
+  file_path: string;
+  content: string;
+  score: number;
+}
+
+export async function indexKnowledgeFile(
+  agentId: string,
+  filePath: string,
+): Promise<KnowledgeIndexResult> {
+  return invoke<KnowledgeIndexResult>("index_knowledge_file", {
+    agentId,
+    filePath,
+  });
+}
+
+export async function queryAgentMemory(
+  agentId: string,
+  query: string,
+  strategy?: "vector" | "simple_buffer" | "hybrid",
+  limit?: number,
+): Promise<AgentMemoryResult[]> {
+  return invoke<AgentMemoryResult[]>("query_agent_memory", {
+    agentId,
+    query,
+    strategy,
+    limit,
+  });
+}
+
 export async function resetNeuralWorkspace(
   masterKey: string,
   userApiKey: string,

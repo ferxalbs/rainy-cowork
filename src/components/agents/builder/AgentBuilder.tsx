@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-// @ts-ignore
 import { Button } from "@heroui/react";
 import { toast } from "sonner";
 import { Save, Bot, Shield, Network, Cpu, Rocket, ArrowLeft } from "lucide-react";
@@ -7,6 +6,7 @@ import { AgentSpec } from "../../../types/agent-spec";
 import { SoulEditor } from "./SoulEditor";
 import { SkillsEditor } from "./SkillsEditor";
 import { AirlockPanel } from "./AirlockPanel";
+import { MemoryPanel } from "./MemoryPanel";
 import { createDefaultAgentSpec, normalizeAgentSpec } from "./specDefaults";
 import * as tauri from "../../../services/tauri";
 import { useTheme } from "../../../hooks/useTheme";
@@ -243,180 +243,11 @@ export function AgentBuilder({ onBack, initialSpec }: AgentBuilderProps) {
             )}
 
             {activeTab === "memory" && (
-              <div className="space-y-8 animate-appear">
-                <div className="flex flex-col gap-1 border-b border-border/10 pb-6">
-                  <h3 className="text-2xl font-bold text-foreground tracking-tight">
-                    Memory
-                  </h3>
-                  <p className="text-muted-foreground text-sm">
-                    Configure retrieval, persistence, and session isolation.
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="space-y-3">
-                    <label className="text-muted-foreground text-[10px] font-bold uppercase tracking-widest">
-                      Retrieval Strategy
-                    </label>
-                    <select
-                      value={spec.memory_config.strategy}
-                      onChange={(e) =>
-                        updateSpec({
-                          memory_config: {
-                            ...spec.memory_config,
-                            strategy: e.target.value as
-                              | "vector"
-                              | "simple_buffer"
-                              | "hybrid",
-                          },
-                        })
-                      }
-                      className="w-full bg-card/40 hover:bg-card/60 border border-border/20 rounded-xl h-12 px-3 text-foreground transition-all"
-                    >
-                      <option value="hybrid">Hybrid</option>
-                      <option value="vector">Vector Only</option>
-                      <option value="simple_buffer">Simple Buffer</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-6">
-                    <div className="space-y-3">
-                      <div className="flex justify-between items-end">
-                        <label className="text-muted-foreground text-[10px] font-bold uppercase tracking-widest">
-                          Retention
-                        </label>
-                        <span className="font-mono text-foreground text-xs">
-                          {spec.memory_config.retrieval.retention_days} days
-                        </span>
-                      </div>
-                      <input
-                        type="range"
-                        min={1}
-                        max={90}
-                        className="w-full accent-primary h-1 bg-foreground/10 rounded-lg appearance-none cursor-pointer"
-                        value={spec.memory_config.retrieval.retention_days}
-                        onChange={(e) =>
-                          updateSpec({
-                            memory_config: {
-                              ...spec.memory_config,
-                              retrieval: {
-                                ...spec.memory_config.retrieval,
-                                retention_days: Math.max(
-                                  1,
-                                  parseInt(e.target.value || "1", 10),
-                                ),
-                              },
-                            },
-                          })
-                        }
-                      />
-                    </div>
-
-                    <div className="space-y-3">
-                      <div className="flex justify-between items-end">
-                        <label className="text-muted-foreground text-[10px] font-bold uppercase tracking-widest">
-                          Context Window
-                        </label>
-                        <span className="font-mono text-foreground text-xs">
-                          {spec.memory_config.retrieval.max_tokens} tokens
-                        </span>
-                      </div>
-                      <input
-                        type="range"
-                        min={512}
-                        max={32000}
-                        step={512}
-                        className="w-full accent-primary h-1 bg-foreground/10 rounded-lg appearance-none cursor-pointer"
-                        value={spec.memory_config.retrieval.max_tokens}
-                        onChange={(e) =>
-                          updateSpec({
-                            memory_config: {
-                              ...spec.memory_config,
-                              retrieval: {
-                                ...spec.memory_config.retrieval,
-                                max_tokens: Math.max(
-                                  512,
-                                  parseInt(e.target.value || "512", 10),
-                                ),
-                              },
-                            },
-                          })
-                        }
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <label className="text-sm text-foreground flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={spec.memory_config.persistence.cross_session}
-                      onChange={(e) =>
-                        updateSpec({
-                          memory_config: {
-                            ...spec.memory_config,
-                            persistence: {
-                              ...spec.memory_config.persistence,
-                              cross_session: e.target.checked,
-                            },
-                          },
-                        })
-                      }
-                      className="accent-primary"
-                    />
-                    Cross-session persistence
-                  </label>
-
-                  <label className="text-sm text-foreground flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={spec.memory_config.persistence.per_connector_isolation}
-                      onChange={(e) =>
-                        updateSpec({
-                          memory_config: {
-                            ...spec.memory_config,
-                            persistence: {
-                              ...spec.memory_config.persistence,
-                              per_connector_isolation: e.target.checked,
-                            },
-                          },
-                        })
-                      }
-                      className="accent-primary"
-                    />
-                    Per-connector isolation
-                  </label>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-muted-foreground text-[10px] font-bold uppercase tracking-widest">
-                    Session Scope
-                  </label>
-                  <select
-                    value={spec.memory_config.persistence.session_scope}
-                    onChange={(e) =>
-                      updateSpec({
-                        memory_config: {
-                          ...spec.memory_config,
-                          persistence: {
-                            ...spec.memory_config.persistence,
-                            session_scope: e.target.value as
-                              | "per_user"
-                              | "per_channel"
-                              | "global",
-                          },
-                        },
-                      })
-                    }
-                    className="w-full md:w-[280px] bg-card/40 hover:bg-card/60 border border-border/20 rounded-xl h-11 px-3 text-foreground transition-all"
-                  >
-                    <option value="per_user">Per User</option>
-                    <option value="per_channel">Per Channel</option>
-                    <option value="global">Global</option>
-                  </select>
-                </div>
-              </div>
+              <MemoryPanel
+                agentId={spec.id}
+                memoryConfig={spec.memory_config}
+                onChange={(memoryConfig) => updateSpec({ memory_config: memoryConfig })}
+              />
             )}
           </div>
         </div>
