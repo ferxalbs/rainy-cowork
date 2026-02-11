@@ -1,17 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Button, Card, Input, Spinner, TextArea } from "@heroui/react";
+// @ts-ignore
+import { Button, Spinner } from "@heroui/react";
 import { toast } from "sonner";
 import { AgentSpec } from "../../../types/agent-spec";
 import * as tauri from "../../../services/tauri";
+import { useTheme } from "../../../hooks/useTheme";
 import {
   Bot,
   RefreshCw,
   Rocket,
   Pencil,
-  Eye,
-  FileJson,
   Plus,
   Save,
+  Search,
 } from "lucide-react";
 
 type StoreTab = "review" | "edit" | "json";
@@ -25,6 +26,55 @@ function cloneSpec(spec: AgentSpec): AgentSpec {
   return JSON.parse(JSON.stringify(spec)) as AgentSpec;
 }
 
+// Reusable Raw HTML Input
+const RawInput = ({
+  value,
+  onChange,
+  placeholder,
+  className = "",
+  type = "text",
+}: {
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  placeholder?: string;
+  className?: string;
+  type?: string;
+}) => (
+  <input
+    type={type}
+    value={value}
+    onChange={onChange}
+    placeholder={placeholder}
+    className={`w-full bg-transparent border-b border-border/40 text-sm py-2 px-0 focus:outline-none focus:border-primary transition-colors placeholder:text-muted-foreground/30 ${className}`}
+  />
+);
+
+// Reusable Raw HTML TextArea
+const RawTextArea = ({
+  value,
+  onChange,
+  placeholder,
+  className = "",
+  rows = 3,
+  readOnly = false,
+}: {
+  value: string;
+  onChange?: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+  placeholder?: string;
+  className?: string;
+  rows?: number;
+  readOnly?: boolean;
+}) => (
+  <textarea
+    value={value}
+    onChange={onChange}
+    placeholder={placeholder}
+    rows={rows}
+    readOnly={readOnly}
+    className={`w-full bg-card/40 hover:bg-card/60 backdrop-blur-md rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/50 leading-relaxed border border-border/20 focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all resize-none shadow-sm ${className}`}
+  />
+);
+
 export function AgentStorePage({
   onCreateAgent,
   onEditInBuilder,
@@ -37,15 +87,17 @@ export function AgentStorePage({
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeploying, setIsDeploying] = useState(false);
+  const { mode } = useTheme();
+  const isDark = mode === "dark";
 
   const loadAgents = useCallback(async () => {
     setIsLoading(true);
     try {
       const specs = (await tauri.listAgentSpecs()) as AgentSpec[];
       setAgents(specs);
-      if (specs.length > 0) {
-        setSelectedId((prev) => prev || specs[0].id);
-      } else {
+      if (specs.length > 0 && !selectedId) {
+        setSelectedId(specs[0].id);
+      } else if (specs.length === 0) {
         setSelectedId("");
         setDraft(null);
       }
@@ -55,7 +107,7 @@ export function AgentStorePage({
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [selectedId]);
 
   useEffect(() => {
     loadAgents();
@@ -150,498 +202,407 @@ export function AgentStorePage({
   };
 
   return (
-    <div className="h-full min-h-0 flex gap-4">
-      <Card className="w-[340px] shrink-0 h-full min-h-0 bg-background/60 dark:bg-background/20 backdrop-blur-2xl border">
-        <Card.Header className="flex flex-col items-stretch gap-3 p-4 border-b border-divider">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="flex items-center gap-2">
-                <p className="text-large font-bold">Agents Store</p>
-                <div className="bg-default-100 text-default-600 text-tiny font-bold px-1.5 py-0.5 rounded-full">
-                  {agents.length}
-                </div>
-              </div>
-              <p className="text-tiny text-default-400 mt-1">
-                Review, edit, and deploy saved agents
-              </p>
+    <div className="h-full w-full bg-background p-3 flex gap-3 overflow-hidden font-sans selection:bg-primary selection:text-primary-foreground relative">
+      {/* Draggable Background Layer */}
+      <div
+        className="absolute inset-0 w-full h-full z-0"
+        data-tauri-drag-region
+      />
+
+      {/* LEFT PANEL: List & Search */}
+      <aside
+        className={`w-[260px] shrink-0 rounded-[1.5rem] border border-border/40 flex flex-col shadow-xl overflow-hidden relative z-10 ${isDark ? "bg-card/20" : "bg-card/60"} backdrop-blur-2xl`}
+      >
+        {/* Header - Explicitly Draggable */}
+        <div className="p-6 pb-2" data-tauri-drag-region>
+          <div className="flex items-start justify-between mb-4">
+            <h1 className="text-xl font-bold text-foreground tracking-tight leading-tight pointer-events-none">
+              Agent
+              <br />
+              Store
+            </h1>
+            <div className="flex items-center justify-center bg-primary/10 text-primary font-bold text-[10px] px-2 py-0.5 rounded-full mt-1">
+              {agents.length}
             </div>
           </div>
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name or description"
-          />
-          <div className="flex gap-2">
-            <Button
-              variant="secondary"
-              className="flex-1"
-              onPress={loadAgents}
-              isDisabled={isLoading}
-            >
-              <RefreshCw
-                className={`size-4 ${isLoading ? "animate-spin" : ""}`}
-              />
-              Refresh
-            </Button>
-            <Button
-              variant="primary"
-              className="flex-1"
-              onPress={onCreateAgent}
-            >
-              <Plus className="size-4" />
-              New
-            </Button>
+
+          {/* Search */}
+          <div className="relative group mb-2">
+            <Search className="absolute left-0 top-1/2 -translate-y-1/2 ml-0 size-3.5 text-muted-foreground group-focus-within:text-primary transition-colors" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search..."
+              className="w-full bg-transparent border-b border-border/40 text-xs py-1.5 pl-5 pr-2 focus:outline-none focus:border-primary transition-colors placeholder:text-muted-foreground/40"
+            />
           </div>
-        </Card.Header>
-        <Card.Content className="p-2 overflow-auto space-y-1">
+        </div>
+
+        {/* Toolbar */}
+        <div className="px-3 py-2 space-y-1 relative z-20">
+          <Button
+            variant="ghost"
+            className="w-full justify-start text-muted-foreground hover:text-foreground h-9 px-3"
+            onPress={loadAgents}
+            isDisabled={isLoading}
+          >
+            <RefreshCw
+              className={`size-4 mr-3 ${isLoading ? "animate-spin" : ""}`}
+            />
+            <span className="text-sm font-medium">Refresh List</span>
+          </Button>
+
+          <Button
+            variant="ghost"
+            className="w-full justify-start text-muted-foreground hover:text-foreground h-9 px-3"
+            onPress={onCreateAgent}
+          >
+            <Plus className="size-4 mr-3" />
+            <span className="text-sm font-medium">New Agent</span>
+          </Button>
+        </div>
+
+        {/* Agent List */}
+        <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1 relative z-20">
           {isLoading ? (
-            <div className="py-16 flex items-center justify-center">
-              <Spinner size="lg" />
+            <div className="py-12 flex justify-center">
+              <Spinner size="md" color="current" className="text-primary" />
             </div>
           ) : filteredAgents.length === 0 ? (
-            <div className="py-12 px-4 text-center text-default-500 text-sm">
+            <div className="py-12 px-4 text-center text-muted-foreground text-xs">
               No agents found.
             </div>
           ) : (
             filteredAgents.map((agent) => {
               const isSelected = selectedId === agent.id;
               return (
-                <div
+                <button
                   key={agent.id}
-                  className={`w-full p-3 rounded-xl cursor-pointer transition-all duration-200 group ${
-                    isSelected
-                      ? "bg-primary/10 border-primary/20"
-                      : "hover:bg-default-100 dark:hover:bg-white/5 border-transparent"
-                  } border`}
                   onClick={() => setSelectedId(agent.id)}
+                  className={`w-full text-left px-4 py-3 rounded-2xl transition-all duration-300 group relative overflow-hidden flex items-center gap-3 ${
+                    isSelected
+                      ? "bg-primary text-primary-foreground shadow-md shadow-primary/10"
+                      : "hover:bg-foreground/5 text-muted-foreground hover:text-foreground"
+                  }`}
                 >
-                  <div className="flex items-start gap-3">
+                  {/* Background Selection Indicator (Builder Style) */}
+                  <div className="flex items-center gap-3 relative z-10 w-full">
                     <div
-                      className={`size-8 rounded-lg flex items-center justify-center shrink-0 ${
+                      className={`p-1.5 rounded-full ${
                         isSelected
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-default-200 text-default-500 dark:bg-default-100"
+                          ? "bg-black/10"
+                          : "bg-white/5 group-hover:bg-white/10"
                       }`}
                     >
                       <Bot className="size-4" />
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p
-                        className={`text-sm font-semibold truncate ${
-                          isSelected ? "text-primary" : "text-foreground"
-                        }`}
+                    <div className="min-w-0 flex-1">
+                      <span
+                        className={`block text-sm font-bold truncate ${isSelected ? "text-primary-foreground" : "text-foreground"}`}
                       >
-                        {agent.soul.name || "Untitled Agent"}
-                      </p>
-                      <p className="text-xs text-default-400 truncate mt-0.5 line-clamp-2">
-                        {agent.soul.description || "No description"}
-                      </p>
+                        {agent.soul.name || "Untitled"}
+                      </span>
+                      <span
+                        className={`text-[10px] block truncate uppercase tracking-wider ${isSelected ? "text-primary-foreground/70" : "text-muted-foreground"}`}
+                      >
+                        v{agent.version}
+                      </span>
                     </div>
                   </div>
-                </div>
+                </button>
               );
             })
           )}
-        </Card.Content>
-      </Card>
+        </div>
+      </aside>
 
-      <Card className="flex-1 h-full min-h-0 bg-background/60 dark:bg-background/20 backdrop-blur-2xl border">
+      {/* RIGHT PANEL: Details & Editor */}
+      <main
+        className={`flex-1 rounded-[1.5rem] border border-border/40 shadow-xl flex flex-col overflow-hidden relative z-10 ${isDark ? "bg-card/20" : "bg-card/60"} backdrop-blur-2xl`}
+      >
+        {/* Background Gradients */}
+        <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-primary/[0.03] blur-[100px] rounded-full pointer-events-none z-0" />
+
         {!draft ? (
-          <div className="h-full flex items-center justify-center p-8 text-default-500 text-sm">
-            Select an agent from the store to review or edit it.
+          <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground p-8">
+            <div className="p-4 rounded-full bg-foreground/5 mb-4">
+              <Bot className="size-8 opacity-50" />
+            </div>
+            <p className="text-sm font-medium">
+              Select an agent to view details
+            </p>
           </div>
         ) : (
           <>
-            <div className="p-8 border-b border-divider/50">
-              <div className="flex flex-col gap-6">
-                {/* Header Row: Name & Actions */}
-                <div className="flex items-start justify-between gap-4">
-                  <div className="space-y-1">
-                    <h2 className="text-3xl font-bold tracking-tight">
-                      {draft.soul.name || "Untitled Agent"}
-                    </h2>
-                    <p className="text-base text-default-500 max-w-2xl">
-                      {draft.soul.description ||
-                        "No description provided for this agent."}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 bg-default-100 p-1 rounded-lg">
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      className="bg-background shadow-sm hover:translate-y-[-1px] transition-transform"
-                      onPress={() => onEditInBuilder(draft)}
-                      isDisabled={isSaving || isDeploying}
-                    >
-                      <Pencil className="size-3.5 mr-2" />
-                      Builder
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      className="bg-background shadow-sm hover:translate-y-[-1px] transition-transform"
-                      onPress={handleDeploy}
-                      isDisabled={isSaving || isDeploying}
-                    >
-                      <Rocket className="size-3.5 mr-2" />
-                      {isDeploying ? "Deploying..." : "Deploy"}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="primary"
-                      className="shadow-md hover:translate-y-[-1px] transition-transform"
-                      onPress={handleSave}
-                      isDisabled={!isDirty || isSaving || isDeploying}
-                    >
-                      <Save className="size-3.5 mr-2" />
-                      {isSaving ? "Saving..." : "Save"}
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Metadata Row: Badges & Tabs */}
-                <div className="flex items-center justify-between">
-                  <div className="flex gap-2">
-                    <div className="px-2.5 py-1 rounded-md bg-default-100 border border-default-200 text-xs font-medium text-default-600">
-                      v{draft.version}
-                    </div>
-                    <div className="px-2.5 py-1 rounded-md bg-default-100 border border-default-200 text-xs font-medium text-default-600">
-                      {draft.memory_config.strategy}
-                    </div>
-                    <div className="px-2.5 py-1 rounded-md bg-default-100 border border-default-200 text-xs font-medium text-default-600">
-                      caps: {draft.skills.capabilities.length}
-                    </div>
-                  </div>
-
-                  {/* Tabs */}
-                  <div className="flex gap-1 bg-default-100/50 p-1 rounded-lg border border-default-200/50">
-                    <Button
-                      size="sm"
-                      variant={activeTab === "review" ? "primary" : "ghost"}
-                      onPress={() => setActiveTab("review")}
-                      className={
-                        activeTab === "review"
-                          ? "font-medium shadow-sm"
-                          : "text-default-500 hover:text-default-700"
-                      }
-                    >
-                      <Eye className="size-3.5 mr-2" />
-                      Review
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant={activeTab === "edit" ? "primary" : "ghost"}
-                      onPress={() => setActiveTab("edit")}
-                      className={
-                        activeTab === "edit"
-                          ? "font-medium shadow-sm"
-                          : "text-default-500 hover:text-default-700"
-                      }
-                    >
-                      <Pencil className="size-3.5 mr-2" />
-                      Edit
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant={activeTab === "json" ? "primary" : "ghost"}
-                      onPress={() => setActiveTab("json")}
-                      className={
-                        activeTab === "json"
-                          ? "font-medium shadow-sm"
-                          : "text-default-500 hover:text-default-700"
-                      }
-                    >
-                      <FileJson className="size-3.5 mr-2" />
-                      JSON
-                    </Button>
-                  </div>
+            {/* Header - Explicitly Draggable */}
+            <header
+              className="h-16 shrink-0 flex items-center justify-between px-8 border-b border-border/10 bg-background/20 backdrop-blur-xl z-20 relative"
+              data-tauri-drag-region
+            >
+              <div className="flex items-center gap-3">
+                <h2 className="text-lg font-bold text-foreground tracking-tight">
+                  {draft.soul.name || "Untitled Agent"}
+                </h2>
+                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-foreground/5 border border-foreground/5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+                  <span className="text-xs text-muted-foreground font-mono">
+                    v{draft.version}
+                  </span>
                 </div>
               </div>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  onPress={() => onEditInBuilder(draft)}
+                  isDisabled={isSaving || isDeploying}
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground hover:text-primary font-medium"
+                >
+                  <Pencil className="size-3.5 mr-1.5" />
+                  Edit Visual
+                </Button>
+                <Button
+                  onPress={handleSave}
+                  isDisabled={(!isDirty && !draft) || isSaving || isDeploying}
+                  variant="ghost"
+                  size="sm"
+                  className={`text-muted-foreground hover:text-primary font-medium ${isDirty ? "text-primary" : ""}`}
+                >
+                  <Save className="size-3.5 mr-1.5" />
+                  Save
+                </Button>
+                <Button
+                  onPress={handleDeploy}
+                  isDisabled={isDeploying || isSaving}
+                  className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold px-6 h-8 min-w-0 rounded-full shadow-lg shadow-primary/20 text-sm"
+                >
+                  <Rocket className="size-3.5 mr-1.5" />
+                  {isDeploying ? "Deploying..." : "Deploy"}
+                </Button>
+              </div>
+            </header>
+
+            {/* Tabs */}
+            <div className="px-8 pt-4 pb-0 flex gap-6 border-b border-border/10 bg-background/5 backdrop-blur-sm z-20 relative">
+              {(["review", "edit", "json"] as const).map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`pb-3 text-sm font-medium border-b-2 transition-all ${
+                    activeTab === tab
+                      ? "border-primary text-primary"
+                      : "border-transparent text-muted-foreground hover:text-foreground hover:border-border/50"
+                  }`}
+                >
+                  {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                </button>
+              ))}
             </div>
-            <Card.Content className="p-5 overflow-auto">
-              {activeTab === "review" && (
-                <div className="space-y-6 max-w-4xl">
-                  {/* Personality Section */}
-                  <div className="p-6 rounded-2xl bg-default-100/50 border border-default-200/50">
-                    <p className="text-xs font-bold uppercase tracking-wider text-default-500 mb-4">
-                      Personality
-                    </p>
-                    <p className="text-base leading-relaxed text-default-700 dark:text-default-300">
-                      {draft.soul.personality ||
-                        "No personality traits defined. Click Edit to add personality."}
-                    </p>
-                  </div>
 
-                  {/* Soul Content Section */}
-                  <div className="p-6 rounded-2xl bg-default-100/50 border border-default-200/50">
-                    <p className="text-xs font-bold uppercase tracking-wider text-default-500 mb-4">
-                      Soul Content
-                    </p>
-                    <div className="prose prose-sm dark:prose-invert max-w-none">
-                      {/* Simple rendering for now, could use a Markdown component if available */}
-                      <pre className="whitespace-pre-wrap font-sans text-sm text-default-700 dark:text-default-300 leading-relaxed">
-                        {draft.soul.soul_content || "No soul content defined."}
-                      </pre>
+            {/* Content Area */}
+            <div className="flex-1 overflow-y-auto p-8 z-10 scrollbar-hide">
+              <div className="max-w-3xl mx-auto pb-16">
+                {activeTab === "review" && (
+                  <div className="space-y-8 animate-appear">
+                    {/* Details Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="p-5 rounded-2xl bg-card/40 border border-border/20 backdrop-blur-md">
+                        <h4 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">
+                          Personality
+                        </h4>
+                        <p className="text-sm leading-relaxed text-foreground/80">
+                          {draft.soul.personality || "No personality defined."}
+                        </p>
+                      </div>
+                      <div className="p-5 rounded-2xl bg-card/40 border border-border/20 backdrop-blur-md">
+                        <h4 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">
+                          Config
+                        </h4>
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-xs border-b border-border/10 pb-2">
+                            <span className="text-muted-foreground">
+                              Memory Strategy
+                            </span>
+                            <span className="font-mono text-primary">
+                              {draft.memory_config.strategy}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-xs border-b border-border/10 pb-2">
+                            <span className="text-muted-foreground">
+                              Context Window
+                            </span>
+                            <span className="font-mono text-foreground">
+                              {draft.memory_config.max_tokens} tks
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-xs pt-0.5">
+                            <span className="text-muted-foreground">
+                              Capabilities
+                            </span>
+                            <span className="font-mono text-foreground">
+                              {draft.skills.capabilities.length}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Settings / Config Grid */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="p-4 rounded-2xl bg-default-50 border border-default-200/50">
-                      <p className="text-xs font-bold uppercase tracking-wider text-default-400 mb-1">
-                        Memory
-                      </p>
-                      <p className="text-sm font-semibold">
-                        {draft.memory_config.strategy}
-                      </p>
-                      <p className="text-xs text-default-400">
-                        {draft.memory_config.retention_days} days •{" "}
-                        {draft.memory_config.max_tokens} tokens
-                      </p>
-                    </div>
-                    <div className="p-4 rounded-2xl bg-default-50 border border-default-200/50">
-                      <p className="text-xs font-bold uppercase tracking-wider text-default-400 mb-1">
-                        Connectors
-                      </p>
-                      <p className="text-sm font-semibold">
-                        {draft.connectors.telegram_enabled
-                          ? "Telegram Active"
-                          : "No Connectors"}
-                      </p>
-                      <p className="text-xs text-default-400">
-                        Auto-reply: {draft.connectors.auto_reply ? "On" : "Off"}
-                      </p>
-                    </div>
-                    <div className="p-4 rounded-2xl bg-default-50 border border-default-200/50">
-                      <p className="text-xs font-bold uppercase tracking-wider text-default-400 mb-1">
-                        Capabilities
-                      </p>
-                      <p className="text-sm font-semibold">
-                        {draft.skills.capabilities.length} Enabled
-                      </p>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {draft.skills.capabilities.slice(0, 3).map((c) => (
-                          <span
-                            key={c.name}
-                            className="px-1.5 py-0.5 rounded-md bg-default-200 text-[10px] text-default-600"
-                          >
-                            {c.name}
-                          </span>
-                        ))}
-                        {draft.skills.capabilities.length > 3 && (
-                          <span className="px-1.5 py-0.5 rounded-md bg-default-200 text-[10px] text-default-600">
-                            +{draft.skills.capabilities.length - 3}
-                          </span>
-                        )}
+                    {/* Soul Content Preview */}
+                    <div>
+                      <h4 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">
+                        System Prompt
+                      </h4>
+                      <div className="w-full bg-card/40 rounded-xl border border-border/10 p-4 relative overflow-hidden group">
+                        <div className="absolute top-0 left-0 w-1 h-full bg-primary/20 group-hover:bg-primary/50 transition-colors" />
+                        <pre className="font-mono text-xs leading-relaxed text-foreground/70 whitespace-pre-wrap">
+                          {draft.soul.soul_content ||
+                            "No system prompt defined."}
+                        </pre>
                       </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {activeTab === "edit" && (
-                <div className="space-y-4 max-w-4xl">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <p className="text-xs uppercase tracking-wide text-default-500">
-                        Name
-                      </p>
-                      <Input
-                        value={draft.soul.name}
+                {activeTab === "edit" && (
+                  <div className="space-y-8 animate-appear">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                          Name
+                        </label>
+                        <RawInput
+                          value={draft.soul.name}
+                          onChange={(e) =>
+                            setDraft({
+                              ...draft,
+                              soul: { ...draft.soul, name: e.target.value },
+                            })
+                          }
+                          className="text-lg font-bold"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                          Version
+                        </label>
+                        <RawInput
+                          value={draft.version}
+                          onChange={(e) =>
+                            setDraft({ ...draft, version: e.target.value })
+                          }
+                          className="font-mono text-primary"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                        Description
+                      </label>
+                      <RawTextArea
+                        value={draft.soul.description}
                         onChange={(e) =>
                           setDraft({
                             ...draft,
-                            soul: { ...draft.soul, name: e.target.value },
+                            soul: {
+                              ...draft.soul,
+                              description: e.target.value,
+                            },
                           })
                         }
+                        rows={2}
                       />
                     </div>
-                    <div className="space-y-2">
-                      <p className="text-xs uppercase tracking-wide text-default-500">
-                        Tone
-                      </p>
-                      <Input
-                        value={draft.soul.tone}
+
+                    {/* Memory Configuration (Restored) */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                         <div className="space-y-1">
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                            Retention (Days)
+                            </label>
+                            <RawInput
+                            type="number"
+                            value={draft.memory_config.retention_days.toString()}
+                            onChange={(e) => setMemoryNumber("retention_days", e.target.value)}
+                            className="font-mono text-foreground"
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                            Context Window (Tokens)
+                            </label>
+                            <RawInput
+                            type="number"
+                            value={draft.memory_config.max_tokens.toString()}
+                            onChange={(e) => setMemoryNumber("max_tokens", e.target.value)}
+                            className="font-mono text-foreground"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                        Personality
+                      </label>
+                      <RawTextArea
+                        value={draft.soul.personality}
                         onChange={(e) =>
                           setDraft({
                             ...draft,
-                            soul: { ...draft.soul, tone: e.target.value },
+                            soul: {
+                              ...draft.soul,
+                              personality: e.target.value,
+                            },
                           })
                         }
+                        rows={3}
                       />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                        System Prompt
+                      </label>
+                      <div className="relative">
+                        <div className="absolute top-3 right-3 text-[10px] font-bold text-muted-foreground/40 pointer-events-none">
+                          MARKDOWN
+                        </div>
+                        <RawTextArea
+                          value={draft.soul.soul_content}
+                          onChange={(e) =>
+                            setDraft({
+                              ...draft,
+                              soul: {
+                                ...draft.soul,
+                                soul_content: e.target.value,
+                              },
+                            })
+                          }
+                          rows={12}
+                          className="font-mono text-xs"
+                        />
+                      </div>
                     </div>
                   </div>
+                )}
 
-                  <div className="space-y-2">
-                    <p className="text-xs uppercase tracking-wide text-default-500">
-                      Description
-                    </p>
-                    <Input
-                      value={draft.soul.description}
-                      onChange={(e) =>
-                        setDraft({
-                          ...draft,
-                          soul: { ...draft.soul, description: e.target.value },
-                        })
-                      }
+                {activeTab === "json" && (
+                  <div className="animate-appear">
+                    <RawTextArea
+                      value={JSON.stringify(draft, null, 2)}
+                      readOnly={true}
+                      className="font-mono text-xs text-primary/80 h-[600px]"
+                      rows={30}
                     />
                   </div>
-
-                  <div className="space-y-2">
-                    <p className="text-xs uppercase tracking-wide text-default-500">
-                      Personality
-                    </p>
-                    <TextArea
-                      value={draft.soul.personality}
-                      onChange={(e) =>
-                        setDraft({
-                          ...draft,
-                          soul: { ...draft.soul, personality: e.target.value },
-                        })
-                      }
-                      rows={3}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <p className="text-xs uppercase tracking-wide text-default-500">
-                      Soul Content
-                    </p>
-                    <TextArea
-                      value={draft.soul.soul_content}
-                      onChange={(e) =>
-                        setDraft({
-                          ...draft,
-                          soul: { ...draft.soul, soul_content: e.target.value },
-                        })
-                      }
-                      rows={6}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <p className="text-xs uppercase tracking-wide text-default-500">
-                        Memory Strategy
-                      </p>
-                      <Input
-                        value={draft.memory_config.strategy}
-                        onChange={(e) =>
-                          setDraft({
-                            ...draft,
-                            memory_config: {
-                              ...draft.memory_config,
-                              strategy: e.target.value as
-                                | "hybrid"
-                                | "simple_buffer"
-                                | "vector",
-                            },
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <p className="text-xs uppercase tracking-wide text-default-500">
-                        Retention Days
-                      </p>
-                      <Input
-                        type="number"
-                        value={String(draft.memory_config.retention_days)}
-                        onChange={(e) =>
-                          setMemoryNumber("retention_days", e.target.value)
-                        }
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <p className="text-xs uppercase tracking-wide text-default-500">
-                        Max Tokens
-                      </p>
-                      <Input
-                        type="number"
-                        value={String(draft.memory_config.max_tokens)}
-                        onChange={(e) =>
-                          setMemoryNumber("max_tokens", e.target.value)
-                        }
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <p className="text-xs uppercase tracking-wide text-default-500">
-                        Telegram Channel ID
-                      </p>
-                      <Input
-                        value={draft.connectors.telegram_channel_id || ""}
-                        onChange={(e) =>
-                          setDraft({
-                            ...draft,
-                            connectors: {
-                              ...draft.connectors,
-                              telegram_channel_id: e.target.value || undefined,
-                            },
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="flex items-end gap-2">
-                      <Button
-                        className="flex-1"
-                        variant={
-                          draft.connectors.telegram_enabled
-                            ? "secondary"
-                            : "ghost"
-                        }
-                        onPress={() =>
-                          setDraft({
-                            ...draft,
-                            connectors: {
-                              ...draft.connectors,
-                              telegram_enabled:
-                                !draft.connectors.telegram_enabled,
-                            },
-                          })
-                        }
-                      >
-                        Telegram{" "}
-                        {draft.connectors.telegram_enabled
-                          ? "Enabled"
-                          : "Disabled"}
-                      </Button>
-                      <Button
-                        className="flex-1"
-                        variant={
-                          draft.connectors.auto_reply ? "secondary" : "ghost"
-                        }
-                        onPress={() =>
-                          setDraft({
-                            ...draft,
-                            connectors: {
-                              ...draft.connectors,
-                              auto_reply: !draft.connectors.auto_reply,
-                            },
-                          })
-                        }
-                      >
-                        Auto Reply {draft.connectors.auto_reply ? "On" : "Off"}
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {activeTab === "json" && (
-                <TextArea
-                  value={JSON.stringify(draft, null, 2)}
-                  readOnly
-                  rows={24}
-                  className="font-mono text-xs"
-                />
-              )}
-            </Card.Content>
+                )}
+              </div>
+            </div>
           </>
         )}
-      </Card>
+      </main>
     </div>
   );
 }

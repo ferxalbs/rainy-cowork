@@ -107,6 +107,7 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_process::init())
         // Managed state
         .manage(task_manager)
         .manage(file_manager)
@@ -138,6 +139,11 @@ pub fn run() {
         .setup(move |app| {
             use crate::services::AirlockService;
             use tauri::Manager;
+
+            // Initialize auto-updater plugin (desktop only)
+            #[cfg(desktop)]
+            app.handle()
+                .plugin(tauri_plugin_updater::Builder::new().build())?;
 
             // Initialize folder manager with app data dir
             let app_data_dir = app

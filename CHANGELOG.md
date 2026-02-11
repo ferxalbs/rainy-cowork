@@ -5,6 +5,108 @@ All notable changes to Rainy Cowork will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.13] - 2026-02-10 - Auto-Update System (Beta 1 Production)
+
+### Added - Mandatory Auto-Update System
+
+**Rust Backend (`src-tauri/`)**
+
+- `Cargo.toml` — Added `tauri-plugin-updater` v2 and `tauri-plugin-process` v2 dependencies
+- `src/lib.rs` — Registered updater plugin (desktop-only via `#[cfg(desktop)]`) and process plugin
+- `tauri.conf.json` — Added `createUpdaterArtifacts: true` and `plugins.updater` config with GitHub Release endpoint
+- `capabilities/default.json` — Added `updater:default`, `process:default`, `process:allow-restart` permissions
+
+**Frontend (`src/`)**
+
+- `components/updater/UpdateChecker.tsx` — **NEW** Mandatory update checker:
+  - Non-dismissable overlay (no skip/close buttons)
+  - Shows current vs new version and release notes
+  - Download progress bar with percentage
+  - Auto-relaunch after installation
+  - Retry on error
+  - Dark theme with premium glassmorphism design
+- `App.tsx` — Mounted `UpdateChecker` at root level
+
+**CI/CD (`.github/workflows/`)**
+
+- `publish.yml` — **NEW** Release workflow:
+  - Triggers on push to `release` branch or `workflow_dispatch`
+  - Builds macOS ARM64 (M1+) and x86_64 (Intel) targets
+  - Uses `tauri-apps/tauri-action@v0` for automated GitHub Releases
+  - Generates `latest.json` for updater endpoint
+  - Signs updater artifacts via `TAURI_SIGNING_PRIVATE_KEY` secret
+  - Ad-hoc signing for Beta 1 (Apple code signing deferred to Beta 2)
+  - Linux and Windows targets commented out for future release
+
+**Dependencies**
+
+- `@tauri-apps/plugin-updater` v2.10.0 (frontend)
+- `@tauri-apps/plugin-process` v2.3.1 (frontend)
+
+### Notes
+
+- All updates are mandatory — users cannot skip or dismiss the update overlay
+- Before first release: generate signing keys with `pnpm tauri signer generate`
+- GitHub Secrets required: `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`
+- Apple Developer code signing + notarization will be added in Beta 2
+
+---
+
+## [0.5.11] - 2026-02-10 - Tool Policy Parity, Integrity & Replay Protection (P2)
+
+### Added - Policy Parity Across Cloud + Desktop + UI
+
+**Desktop Runtime (`src-tauri/src/`)**
+
+- Added canonical tool policy mapping service:
+  - `services/tool_policy.rs` (`tool -> skill + airlock level`)
+- Refactored agent workflow to consume canonical mapping:
+  - `ai/agent/workflow.rs`
+- Added second-gate execution enforcement in `SkillExecutor`:
+  - deny-first tool authorization checks before execution
+  - policy hash verification (SHA-256)
+  - stale policy version rejection
+
+**Desktop Settings Persistence (`src-tauri/src/services/settings.rs`)**
+
+- Added persisted per-workspace policy version floor:
+  - survives app restarts
+  - used for anti-replay stale policy rejection
+
+**Desktop ATM Bridge (`src-tauri/src/services/atm_client.rs`, `commands/atm.rs`, `lib.rs`)**
+
+- Added typed support for tool policy state endpoints:
+  - policy payload
+  - policy version
+  - policy hash
+
+**Frontend (`src/`)**
+
+- Added canonical UI-side policy mapping:
+  - `constants/toolPolicy.ts`
+- Refactored `DEFAULT_NEURAL_SKILLS` to resolve Airlock levels from canonical mapping:
+  - `constants/defaultNeuralSkills.ts`
+- Extended Neural Link policy UI:
+  - owner-auth tool policy editor (enabled/mode/allow/deny)
+  - policy metadata visibility (version + hash)
+  - wired via `services/tauri.ts` tool policy state wrappers
+
+### Changed
+
+- Tool policy enforcement is now defense-in-depth:
+  - pre-queue enforcement in cloud runtime
+  - pre-execution enforcement in desktop runtime
+- Policy integrity metadata is now propagated end-to-end and surfaced in UI.
+
+### Validation
+
+- `pnpm exec tsc --noEmit`
+- `cd rainy-atm && bun test`
+- `cd src-tauri && cargo check`
+- `cd src-tauri && cargo test skill_executor::policy_tests -- --nocapture`
+
+All passed with no new Rust warnings in these runs.
+
 ## [0.5.10] - 2026-02-10 - Streaming Runtime & Airlock Enforcement (P1)
 
 ### Added - Streaming Responses & Security Classification

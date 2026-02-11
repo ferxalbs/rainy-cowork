@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
+import { UpdateChecker } from "./components/updater/UpdateChecker";
 import { TahoeLayout, AIDocumentPanel, AIResearchPanel } from "./components";
 import { SettingsPage } from "./components/settings";
 import { AgentChatPanel } from "./components/agent-chat/AgentChatPanel";
@@ -99,6 +100,8 @@ function App() {
 
   return (
     <>
+      {/* Mandatory Update Checker — non-dismissable overlay */}
+      <UpdateChecker />
       <TahoeLayout
         folders={folders}
         activeFolderId={activeFolder?.id}
@@ -171,7 +174,6 @@ function App() {
             <div className="flex-1 h-full min-h-0">
               <AgentBuilder
                 onBack={() => handleNavigate("agent-chat")}
-                onOpenStore={() => handleNavigate("agent-store")}
                 initialSpec={agentBuilderInitialSpec}
               />
             </div>
@@ -179,7 +181,7 @@ function App() {
 
           {/* Agents Store */}
           {activeSection === "agent-store" && (
-            <div className="flex-1 p-6 h-full min-h-0">
+            <div className="flex-1 h-full min-h-0">
               <AgentStorePage
                 onCreateAgent={() => handleOpenAgentBuilder()}
                 onEditInBuilder={(spec) => handleOpenAgentBuilder(spec)}
