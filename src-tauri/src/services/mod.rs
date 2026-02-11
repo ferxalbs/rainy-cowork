@@ -12,6 +12,7 @@ pub mod file_operations;
 pub mod folder_manager;
 pub mod image;
 pub mod managed_research; // Phase 3 AI Research
+pub mod manifest_signing;
 pub mod memory;
 pub mod neural_service;
 pub mod reflection;

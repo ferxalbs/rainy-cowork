@@ -1,4 +1,5 @@
 use crate::models::neural::{CommandResult, DesktopNodeStatus, QueuedCommand, SkillManifest};
+use crate::services::manifest_signing::sign_skills_manifest;
 use crate::services::security::NodeAuthenticator;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -225,11 +226,14 @@ impl NeuralService {
             "fingerprint": fingerprint
         });
 
+        let skills_signature = sign_skills_manifest(&skills, &platform_key);
+
         let res = self
             .http
             .post(&url)
             .header("Authorization", format!("Bearer {}", platform_key))
             .header("X-Device-Fingerprint", fingerprint)
+            .header("x-skills-signature", &skills_signature)
             .json(&body)
             .send()
             .await
