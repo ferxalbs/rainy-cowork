@@ -525,7 +525,7 @@ export const themes: Record<string, Theme> = {
   "high-contrast": {
     name: "high-contrast",
     displayName: "High Contrast",
-    description: "Maximum legibility with strict black and white",
+    description: "Maximum legibility with optimized contrast",
     icon: "👁️",
     colors: {
       light: {
@@ -535,50 +535,54 @@ export const themes: Record<string, Theme> = {
         cardForeground: "oklch(0 0 0)",
         popover: "oklch(1 0 0)",
         popoverForeground: "oklch(0 0 0)",
+        // Stout Black Primary
         primary: "oklch(0 0 0)",
         primaryForeground: "oklch(1 0 0)",
-        secondary: "oklch(0.95 0 0)",
+        secondary: "oklch(0.92 0 0)",
         secondaryForeground: "oklch(0 0 0)",
-        muted: "oklch(0.90 0 0)",
-        mutedForeground: "oklch(0.30 0 0)",
-        accent: "oklch(0 0 0)", // Black accent
+        muted: "oklch(0.92 0 0)",
+        mutedForeground: "oklch(0.25 0 0)",
+        // Electric Blue Accent for visibility
+        accent: "oklch(0.40 0.20 260)",
         accentForeground: "oklch(1 0 0)",
-        destructive: "oklch(0.40 0.20 25)",
+        destructive: "oklch(0.50 0.20 25)",
         destructiveForeground: "oklch(1 0 0)",
-        border: "oklch(0 0 0)", // Black border
-        input: "oklch(0 0 0)",
+        border: "oklch(0.20 0 0)", // Strong borders but not overwhelming
+        input: "oklch(0.20 0 0)",
         ring: "oklch(0 0 0)",
-        sidebar: "oklch(1 0 0)",
+        sidebar: "oklch(0.98 0 0)",
         sidebarForeground: "oklch(0 0 0)",
         sidebarPrimary: "oklch(0 0 0)",
-        sidebarAccent: "oklch(0.90 0 0)",
-        sidebarBorder: "oklch(0 0 0)",
+        sidebarAccent: "oklch(0.92 0 0)",
+        sidebarBorder: "oklch(0.20 0 0)",
       },
       dark: {
         background: "oklch(0 0 0)", // Pure Black
         foreground: "oklch(1 0 0)", // Pure White
-        card: "oklch(0.05 0 0)",
+        card: "oklch(0.08 0 0)", // Dark Grey for depth
         cardForeground: "oklch(1 0 0)",
-        popover: "oklch(0.05 0 0)",
+        popover: "oklch(0.08 0 0)",
         popoverForeground: "oklch(1 0 0)",
-        primary: "oklch(1 0 0)",
+        // Accessibility Yellow
+        primary: "oklch(0.85 0.18 95)",
         primaryForeground: "oklch(0 0 0)",
-        secondary: "oklch(0.15 0 0)",
+        secondary: "oklch(0.20 0 0)",
         secondaryForeground: "oklch(1 0 0)",
-        muted: "oklch(0.15 0 0)",
+        muted: "oklch(0.20 0 0)",
         mutedForeground: "oklch(0.70 0 0)",
-        accent: "oklch(1 0 0)",
+        // Yellow Accent
+        accent: "oklch(0.85 0.18 95)",
         accentForeground: "oklch(0 0 0)",
         destructive: "oklch(0.60 0.20 25)",
-        destructiveForeground: "oklch(1 0 0)",
-        border: "oklch(1 0 0)", // White border
-        input: "oklch(1 0 0)",
-        ring: "oklch(1 0 0)",
+        destructiveForeground: "oklch(0 0 0)",
+        border: "oklch(0.40 0 0)", // Visible Grey Border
+        input: "oklch(0.40 0 0)",
+        ring: "oklch(0.85 0.18 95)",
         sidebar: "oklch(0 0 0)",
         sidebarForeground: "oklch(1 0 0)",
-        sidebarPrimary: "oklch(1 0 0)",
-        sidebarAccent: "oklch(0.15 0 0)",
-        sidebarBorder: "oklch(1 0 0)",
+        sidebarPrimary: "oklch(0.85 0.18 95)",
+        sidebarAccent: "oklch(0.20 0 0)",
+        sidebarBorder: "oklch(0.40 0 0)",
       },
     },
   },

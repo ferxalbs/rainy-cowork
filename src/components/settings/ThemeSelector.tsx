@@ -29,24 +29,39 @@ export function ThemeSelector() {
               Switch between light and dark mode
             </p>
           </div>
-          <Button
-            variant="secondary"
-            size="sm"
-            onPress={toggleMode}
-            className="gap-2"
-          >
-            {mode === "light" ? (
-              <>
-                <Sun className="size-4" />
-                Light
-              </>
-            ) : (
-              <>
-                <Moon className="size-4" />
-                Dark
-              </>
-            )}
-          </Button>
+          {/* Mode Toggle - iOS Segmented Control Style */}
+          <div className="flex bg-background/40 p-1 rounded-full border border-border/20 backdrop-blur-sm shadow-inner transition-all hover:bg-background/50">
+            <Button
+              size="sm"
+              variant="ghost"
+              className={`rounded-full h-7 px-4 text-xs font-medium transition-all duration-300 ${
+                mode === "light"
+                  ? "bg-background/20 text-foreground shadow-sm scale-100"
+                  : "bg-transparent text-muted-foreground/70 hover:text-foreground scale-95 hover:scale-100"
+              }`}
+              onPress={() => mode !== "light" && toggleMode()}
+            >
+              <Sun
+                className={`size-3.5 mr-1.5 ${mode === "light" ? "text-amber-500 fill-amber-500" : ""}`}
+              />
+              Light
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className={`rounded-full h-7 px-4 text-xs font-medium transition-all duration-300 ${
+                mode === "dark"
+                  ? "bg-background text-foreground shadow-sm scale-100"
+                  : "bg-transparent text-muted-foreground/70 hover:text-foreground scale-95 hover:scale-100"
+              }`}
+              onPress={() => mode !== "dark" && toggleMode()}
+            >
+              <Moon
+                className={`size-3.5 mr-1.5 ${mode === "dark" ? "text-indigo-400 fill-indigo-400" : ""}`}
+              />
+              Dark
+            </Button>
+          </div>
         </div>
       </div>
 
