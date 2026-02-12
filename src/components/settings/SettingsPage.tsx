@@ -30,6 +30,7 @@ import {
   Shield,
   Building2,
   Briefcase,
+  Mail,
 } from "lucide-react";
 import * as tauri from "../../services/tauri";
 import { useAIProvider } from "../../hooks";
@@ -644,87 +645,151 @@ export function SettingsPage({
             </Tabs.Panel>
 
             {/* Profile Tab */}
-            <Tabs.Panel id="profile" className="space-y-4">
+            {/* Profile Tab */}
+            <Tabs.Panel id="profile" className="space-y-6 pb-32">
               {isLoadingProfile ? (
-                <div className="flex items-center justify-center py-12">
-                  <Spinner size="lg" />
+                <div className="flex items-center justify-center p-12 text-muted-foreground animate-pulse">
+                  <Spinner size="lg" color="current" />
                 </div>
               ) : (
-                <div className="p-4 rounded-xl border bg-muted/50 border-border/50 space-y-4">
-                  <div>
-                    <h3 className="text-sm font-medium">User Identity</h3>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      This profile is used by the desktop app and cloud bridge.
-                    </p>
+                <div className="p-6 rounded-2xl border bg-card/40 backdrop-blur-md border-border/40 shadow-sm space-y-6 animate-appear">
+                  {/* Header */}
+                  <div className="flex items-start justify-between border-b border-border/30 pb-4">
+                    <div className="space-y-1">
+                      <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
+                        <User className="size-4 text-primary" />
+                        User Identity
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        This profile is used by the desktop app and cloud bridge
+                        for personalization.
+                      </p>
+                    </div>
+                    <div className="hidden sm:block">
+                      <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                        <User className="size-4 text-primary" />
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="grid gap-3">
-                    <TextField
-                      name="profile-display-name"
-                      onChange={(value) =>
-                        updateProfileField("displayName", value)
-                      }
-                    >
-                      <Label className="flex items-center gap-1.5">
-                        <User className="size-3.5" />
+                  {/* Form Grid */}
+                  <div className="grid gap-5">
+                    {/* Display Name - Full Width */}
+                    <div className="space-y-2 group">
+                      <Label className="text-xs font-medium text-muted-foreground ml-1 group-focus-within:text-primary transition-colors">
                         Display Name
                       </Label>
-                      <Input
-                        placeholder="Rainy User"
-                        value={profileForm.displayName}
-                      />
-                    </TextField>
+                      <TextField
+                        name="profile-display-name"
+                        className="w-full"
+                        onChange={(value) =>
+                          updateProfileField("displayName", value)
+                        }
+                      >
+                        <div className="relative">
+                          <User className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground/50 z-10 pointer-events-none" />
+                          <Input
+                            className="w-full h-11 rounded-xl border border-border/40 bg-muted/20 pl-10 pr-4 text-sm outline-none transition-all placeholder:text-muted-foreground/30 focus:border-primary/50 focus:bg-background focus:ring-4 focus:ring-primary/10 hover:bg-muted/30"
+                            placeholder="Create a display name..."
+                            value={profileForm.displayName}
+                          />
+                        </div>
+                      </TextField>
+                    </div>
 
-                    <TextField
-                      name="profile-email"
-                      onChange={(value) => updateProfileField("email", value)}
-                    >
-                      <Label>Email</Label>
-                      <Input
-                        placeholder="you@company.com"
-                        type="email"
-                        value={profileForm.email}
-                      />
-                    </TextField>
-
-                    <TextField
-                      name="profile-organization"
-                      onChange={(value) =>
-                        updateProfileField("organization", value)
-                      }
-                    >
-                      <Label className="flex items-center gap-1.5">
-                        <Building2 className="size-3.5" />
-                        Organization
+                    {/* Email - Full Width */}
+                    <div className="space-y-2 group">
+                      <Label className="text-xs font-medium text-muted-foreground ml-1 group-focus-within:text-primary transition-colors">
+                        Email Address
                       </Label>
-                      <Input
-                        placeholder="Enosis Labs"
-                        value={profileForm.organization}
-                      />
-                    </TextField>
+                      <TextField
+                        name="profile-email"
+                        className="w-full"
+                        onChange={(value) => updateProfileField("email", value)}
+                      >
+                        <div className="relative">
+                          <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground/50 z-10 pointer-events-none" />
+                          <Input
+                            className="w-full h-11 rounded-xl border border-border/40 bg-muted/20 pl-10 pr-4 text-sm outline-none transition-all placeholder:text-muted-foreground/30 focus:border-primary/50 focus:bg-background focus:ring-4 focus:ring-primary/10 hover:bg-muted/30"
+                            placeholder="name@company.com"
+                            type="email"
+                            value={profileForm.email}
+                          />
+                        </div>
+                      </TextField>
+                    </div>
 
-                    <TextField
-                      name="profile-role"
-                      onChange={(value) => updateProfileField("role", value)}
-                    >
-                      <Label className="flex items-center gap-1.5">
-                        <Briefcase className="size-3.5" />
-                        Role
-                      </Label>
-                      <Input placeholder="Builder" value={profileForm.role} />
-                    </TextField>
+                    {/* Org & Role - 2 Cols on Tablet+ */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                      <div className="space-y-2 group">
+                        <Label className="text-xs font-medium text-muted-foreground ml-1 group-focus-within:text-primary transition-colors">
+                          Organization
+                        </Label>
+                        <TextField
+                          name="profile-organization"
+                          className="w-full"
+                          onChange={(value) =>
+                            updateProfileField("organization", value)
+                          }
+                        >
+                          <div className="relative">
+                            <Building2 className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground/50 z-10 pointer-events-none" />
+                            <Input
+                              className="w-full h-11 rounded-xl border border-border/40 bg-muted/20 pl-10 pr-4 text-sm outline-none transition-all placeholder:text-muted-foreground/30 focus:border-primary/50 focus:bg-background focus:ring-4 focus:ring-primary/10 hover:bg-muted/30"
+                              placeholder="Company Name"
+                              value={profileForm.organization}
+                            />
+                          </div>
+                        </TextField>
+                      </div>
+
+                      <div className="space-y-2 group">
+                        <Label className="text-xs font-medium text-muted-foreground ml-1 group-focus-within:text-primary transition-colors">
+                          Role
+                        </Label>
+                        <TextField
+                          name="profile-role"
+                          className="w-full"
+                          onChange={(value) =>
+                            updateProfileField("role", value)
+                          }
+                        >
+                          <div className="relative">
+                            <Briefcase className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground/50 z-10 pointer-events-none" />
+                            <Input
+                              className="w-full h-11 rounded-xl border border-border/40 bg-muted/20 pl-10 pr-4 text-sm outline-none transition-all placeholder:text-muted-foreground/30 focus:border-primary/50 focus:bg-background focus:ring-4 focus:ring-primary/10 hover:bg-muted/30"
+                              placeholder="e.g. Developer"
+                              value={profileForm.role}
+                            />
+                          </div>
+                        </TextField>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs text-muted-foreground">
-                      Saved locally to encrypted desktop settings.
+                  {/* Actions Footer */}
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 border-t border-border/30">
+                    <p className="text-xs text-muted-foreground flex items-center gap-1.5 opacity-70">
+                      <div className="size-1.5 rounded-full bg-emerald-500/50" />
+                      Changes are encrypted locally
                     </p>
                     <Button
                       variant="primary"
+                      className="w-full sm:w-auto min-w-[140px] rounded-xl font-medium shadow-lg shadow-primary/20 hover:shadow-primary/30 active:scale-95 transition-all h-10"
                       onPress={handleSaveProfile}
                       isDisabled={isSavingProfile}
                     >
-                      {isSavingProfile ? "Saving..." : "Save Profile"}
+                      {isSavingProfile ? (
+                        <>
+                          <Spinner size="sm" color="current" className="mr-2" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          Save Changes
+                          <Check className="size-4 ml-2" />
+                        </>
+                      )}
                     </Button>
                   </div>
                 </div>
