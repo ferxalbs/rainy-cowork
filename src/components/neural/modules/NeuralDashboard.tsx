@@ -115,9 +115,18 @@ export function NeuralDashboard({
                   Remote Access
                 </span>
               </div>
-              <p className="text-sm text-muted-foreground">
-                Connect via Telegram
-              </p>
+              <div className="text-sm text-muted-foreground">
+                Connect via{" "}
+                <a
+                  href="https://t.me/RainyAMTBot"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-400 hover:text-blue-300 hover:underline transition-colors inline-flex items-center gap-1"
+                >
+                  Telegram Bot
+                  <ExternalLink className="size-3" />
+                </a>
+              </div>
             </div>
 
             {/* Status Indicator (Only visual when code exists) */}
