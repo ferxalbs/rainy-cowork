@@ -1,6 +1,5 @@
 import { Button } from "@heroui/react";
 import { Plus } from "lucide-react";
-import { useState } from "react";
 import { AgentList } from "../AgentList";
 
 interface NeuralAgentsProps {
@@ -8,8 +7,6 @@ interface NeuralAgentsProps {
 }
 
 export function NeuralAgents({ onNavigate }: NeuralAgentsProps) {
-  const [refreshToken, setRefreshToken] = useState(0);
-
   return (
     <div className="space-y-8 animate-appear">
       <div className="flex items-center justify-between border-b border-border/10 pb-6">
@@ -31,10 +28,7 @@ export function NeuralAgents({ onNavigate }: NeuralAgentsProps) {
       </div>
 
       <div className="rounded-2xl border border-border/20 bg-card/20 backdrop-blur-md overflow-hidden p-1">
-        <AgentList
-          onCreateClick={() => onNavigate?.("agent-builder")}
-          refreshToken={refreshToken}
-        />
+        <AgentList onCreateClick={() => onNavigate?.("agent-builder")} />
       </div>
     </div>
   );

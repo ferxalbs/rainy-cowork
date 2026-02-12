@@ -92,6 +92,7 @@ export function UnifiedModelSelector({
 
   const filteredModels = useMemo(() => {
     return models.filter((model) => {
+      const displayName = getDisplayModelName(model.name).toLowerCase();
       // Hide OpenAI, Claude, and Astronomer models as requested
       const normalizedProvider = model.provider.toLowerCase();
       const normalizedId = model.id.toLowerCase();
@@ -115,6 +116,7 @@ export function UnifiedModelSelector({
       if (
         searchQuery &&
         !model.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
+        !displayName.includes(searchQuery.toLowerCase()) &&
         !model.provider.toLowerCase().includes(searchQuery.toLowerCase())
       ) {
         return false;
@@ -272,6 +274,48 @@ export function UnifiedModelSelector({
     return null;
   };
 
+  // Normalize slug-like model names for display (e.g. gemini-3-pro-high -> Gemini 3 Pro (High))
+  function getDisplayModelName(modelName: string): string {
+    const name = modelName.trim();
+    if (!/[-_]/.test(name)) return name;
+
+    const suffixes = new Set(["minimal", "low", "medium", "high", "preview", "latest"]);
+    const tokens = name
+      .split(/[-_]+/)
+      .map((token) => token.trim())
+      .filter(Boolean);
+
+    if (!tokens.length) return name;
+
+    let suffix: string | null = null;
+    const lastToken = tokens[tokens.length - 1]?.toLowerCase();
+    if (lastToken && suffixes.has(lastToken) && tokens.length > 1) {
+      suffix = tokens.pop() || null;
+    }
+
+    const formattedBase = tokens
+      .map((token) => {
+        if (/^\d+(\.\d+)?$/.test(token)) return token;
+        return token.charAt(0).toUpperCase() + token.slice(1).toLowerCase();
+      })
+      .join(" ");
+
+    if (!formattedBase) return name;
+
+    if (!suffix) return formattedBase;
+    return `${formattedBase} (${suffix.charAt(0).toUpperCase()}${suffix.slice(1).toLowerCase()})`;
+  }
+
+  function formatContextWindow(maxContext: number): string {
+    if (maxContext >= 1000000) {
+      const inMillions = maxContext / 1000000;
+      return Number.isInteger(inMillions) ? `${inMillions}M` : `${inMillions.toFixed(1)}M`;
+    }
+
+    const inThousands = maxContext / 1000;
+    return Number.isInteger(inThousands) ? `${inThousands}k` : `${inThousands.toFixed(1)}k`;
+  }
+
   return (
     <Popover isOpen={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
       <PopoverTrigger>
@@ -292,7 +336,7 @@ export function UnifiedModelSelector({
                 </div>
                 <div className="flex flex-col items-start">
                   <span className="text-xs font-medium leading-tight text-foreground/90">
-                    {selectedModel.name}
+                    {getDisplayModelName(selectedModel.name)}
                   </span>
                 </div>
               </div>
@@ -347,7 +391,7 @@ export function UnifiedModelSelector({
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium truncate">
-                          {model.name}
+                          {getDisplayModelName(model.name)}
                         </span>
                         {model.processing_mode === "cowork" && (
                           <Sparkles className="size-3 text-purple-500" />
@@ -355,8 +399,7 @@ export function UnifiedModelSelector({
                       </div>
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className="text-[10px] text-muted-foreground/80 truncate font-medium">
-                          {(model.capabilities.max_context / 1000).toString()}k
-                          context
+                          {formatContextWindow(model.capabilities.max_context)} context
                         </span>
                         {model.capabilities.web_search && (
                           <span className="flex items-center gap-0.5 text-[10px] text-blue-500 bg-blue-500/10 px-1.5 py-px rounded-md font-medium">

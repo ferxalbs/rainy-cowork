@@ -22,10 +22,9 @@ interface Agent {
 
 interface AgentListProps {
   onCreateClick: () => void;
-  refreshToken: number;
 }
 
-export function AgentList({ onCreateClick, refreshToken }: AgentListProps) {
+export function AgentList({ onCreateClick }: AgentListProps) {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [authStatus, setAuthStatus] = useState<"unknown" | "ready" | "missing">(
@@ -72,11 +71,6 @@ export function AgentList({ onCreateClick, refreshToken }: AgentListProps) {
   useEffect(() => {
     void fetchAgents();
   }, []);
-
-  useEffect(() => {
-    if (refreshToken <= 0) return;
-    void fetchAgents();
-  }, [refreshToken]);
 
   return (
     <div className="flex flex-col gap-4">

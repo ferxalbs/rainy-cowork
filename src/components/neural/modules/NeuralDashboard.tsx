@@ -1,5 +1,5 @@
 import { Button } from "@heroui/react";
-import { ExternalLink, Shield, Smartphone } from "lucide-react";
+import { Copy, ExternalLink, Send, Shield, Smartphone } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { generatePairingCode, setHeadlessMode } from "../../../services/tauri";
@@ -40,6 +40,13 @@ export function NeuralDashboard({
       }
     } catch (err) {
       toast.error("Failed to generate pairing code");
+    }
+  };
+
+  const handleCopyCode = async () => {
+    if (pairingCode) {
+      await navigator.clipboard.writeText(pairingCode);
+      toast.success("Pairing code copied to clipboard");
     }
   };
 
@@ -124,26 +131,34 @@ export function NeuralDashboard({
             />
           </div>
 
-          {/* Mobile Link */}
+          {/* Mobile & Telegram Link */}
           <div className="flex items-center justify-between gap-4 p-5 rounded-2xl bg-card/20 hover:bg-card/30 transition-all border border-border/20 group">
             <div className="flex items-center gap-4">
-              <div className="size-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400 group-hover:scale-110 transition-transform">
-                <Smartphone className="size-5" />
+              <div className="size-10 rounded-xl bg-blue-500/10 flex items-center justify-center gap-1 text-blue-400 group-hover:scale-110 transition-transform">
+                <Smartphone className="size-4" />
+                <Send className="size-4" />
               </div>
               <div className="flex flex-col gap-0.5">
                 <span className="text-sm font-semibold text-foreground">
-                  Mobile Link
+                  Remote & Telegram
                 </span>
                 <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
-                  Remote Access
+                  Link Device
                 </span>
               </div>
             </div>
             {pairingCode ? (
               <div className="flex flex-col items-end">
-                <span className="font-mono text-xl font-bold text-blue-400 tracking-widest">
-                  {pairingCode}
-                </span>
+                <div
+                  className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
+                  onClick={handleCopyCode}
+                  title="Click to copy"
+                >
+                  <span className="font-mono text-xl font-bold text-blue-400 tracking-widest">
+                    {pairingCode}
+                  </span>
+                  <Copy className="size-4 text-muted-foreground" />
+                </div>
                 <span className="text-[10px] text-muted-foreground">
                   Expires in 5m
                 </span>
@@ -154,7 +169,7 @@ export function NeuralDashboard({
                 className="bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 font-semibold"
                 onPress={handleGeneratePairingCode}
               >
-                Generate
+                Generate Code
               </Button>
             )}
           </div>
