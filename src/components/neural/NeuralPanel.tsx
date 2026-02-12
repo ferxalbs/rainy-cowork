@@ -73,7 +73,6 @@ export function NeuralPanel({ onNavigate }: NeuralPanelProps) {
   const [platformKey, setPlatformKey] = useState("");
   const [userApiKey, setUserApiKey] = useState("");
   const [workspaceName, setWorkspaceName] = useState("");
-  const [isHeadless, setIsHeadless] = useState(false);
   const [activeTab, setActiveTab] = useState("dashboard");
   const [showPlatformKey, setShowPlatformKey] = useState(false);
   const [showUserKey, setShowUserKey] = useState(false);
@@ -405,11 +404,7 @@ export function NeuralPanel({ onNavigate }: NeuralPanelProps) {
       }
     >
       {activeTab === "dashboard" && workspace && (
-        <NeuralDashboard
-          workspace={workspace}
-          isHeadless={isHeadless}
-          onToggleHeadless={setIsHeadless}
-        />
+        <NeuralDashboard workspace={workspace} />
       )}
       {activeTab === "agents" && <NeuralAgents onNavigate={onNavigate} />}
       {activeTab === "activity" && <NeuralActivity />}
