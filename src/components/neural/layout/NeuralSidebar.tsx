@@ -1,22 +1,12 @@
-import {
-  Activity,
-  LayoutDashboard,
-  // Settings, // @TODO: Remove
-  // ShieldAlert, // @TODO: Remove
-  Users,
-} from "lucide-react";
+import { Activity, LayoutDashboard, Users } from "lucide-react";
+import { Button } from "@heroui/react";
 
 interface NeuralSidebarProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
-  isDark?: boolean;
 }
 
-export function NeuralSidebar({
-  activeTab,
-  onTabChange,
-  isDark = true,
-}: NeuralSidebarProps) {
+export function NeuralSidebar({ activeTab, onTabChange }: NeuralSidebarProps) {
   const NavItem = ({
     id,
     icon: Icon,
@@ -29,47 +19,45 @@ export function NeuralSidebar({
     description: string;
   }) => {
     const isActive = activeTab === id;
+
     return (
-      <button
-        onClick={() => onTabChange(id)}
-        className={`w-full text-left px-4 py-3 rounded-2xl transition-all duration-300 group relative overflow-hidden ${
+      <Button
+        variant={isActive ? "secondary" : "ghost"}
+        className={`w-full justify-start gap-3 h-auto py-3 px-3 transition-all duration-200 group relative mb-1 ${
           isActive
-            ? "bg-primary text-primary-foreground shadow-md shadow-primary/10"
-            : "hover:bg-foreground/5 text-muted-foreground hover:text-foreground"
+            ? "bg-primary/10 text-primary font-medium shadow-sm"
+            : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
         }`}
+        onPress={() => onTabChange(id)}
       >
-        <div className="flex items-center gap-3 relative z-10">
-          <div
-            className={`p-1.5 rounded-full ${
-              isActive ? "bg-black/10" : "bg-white/5 group-hover:bg-white/10"
-            }`}
-          >
-            <Icon className="size-4" />
-          </div>
-          <div>
-            <span
-              className={`block text-sm font-bold ${isActive ? "text-primary-foreground" : "text-foreground"}`}
-            >
-              {label}
-            </span>
-            <span
-              className={`text-[10px] uppercase tracking-wider ${isActive ? "text-primary-foreground/70" : "text-muted-foreground"}`}
-            >
-              {description}
-            </span>
-          </div>
+        <div
+          className={`p-1 rounded-lg shrink-0 transition-colors ${
+            isActive
+              ? "bg-primary/10 text-primary"
+              : "bg-transparent group-hover:bg-muted"
+          }`}
+        >
+          <Icon className="size-5" />
         </div>
-      </button>
+
+        <div className="flex flex-col items-start min-w-0 text-left">
+          <span
+            className={`text-sm font-medium ${isActive ? "text-primary" : "text-foreground"}`}
+          >
+            {label}
+          </span>
+          <span className="text-[10px] text-muted-foreground/80 font-normal truncate w-full">
+            {description}
+          </span>
+        </div>
+      </Button>
     );
   };
 
   return (
-    <aside
-      className={`w-[260px] shrink-0 rounded-[1.5rem] border border-border/40 flex flex-col shadow-xl overflow-hidden relative z-10 ${
-        isDark ? "bg-card/20" : "bg-card/60"
-      } backdrop-blur-2xl`}
-    >
-      <div className="p-4 flex items-center gap-3 mb-5" data-tauri-drag-region>
+    <aside className="flex flex-col h-full border-r border-border/50 bg-sidebar w-[260px] pb-4 transition-all duration-300">
+      {/* Sidebar Header */}
+      <div className="p-6 pb-6 flex items-center gap-3" data-tauri-drag-region>
         <div
           className="w-10 h-10 bg-foreground shrink-0"
           style={{
@@ -90,7 +78,14 @@ export function NeuralSidebar({
         </h1>
       </div>
 
-      <div className="flex-1 px-3 space-y-1 overflow-y-auto relative z-20">
+      {/* Navigation */}
+      <div className="flex-1 px-3 space-y-1 overflow-y-auto scrollbar-hide">
+        <div className="px-3 py-2 mb-1">
+          <span className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest">
+            Modules
+          </span>
+        </div>
+
         <NavItem
           id="dashboard"
           icon={LayoutDashboard}
@@ -109,24 +104,16 @@ export function NeuralSidebar({
           label="Activity"
           description="Command History"
         />
-        {/* @TODO: Remove in next version - Legacy panels */}
-        {/* <NavItem
-          id="health"
-          icon={ShieldAlert}
-          label="Health"
-          description="Metrics & SLOs"
-        />
-        <NavItem
-          id="settings"
-          icon={Settings}
-          label="Settings"
-          description="Admin & Policy"
-        /> */}
       </div>
 
-      <div className="p-4 pt-2">
-        <div className="text-[10px] text-muted-foreground font-mono text-center opacity-50 pointer-events-none">
-          Rainy Cowork
+      {/* Footer / Info */}
+      <div className="p-4 mt-auto">
+        <div className="px-3 py-2 rounded-xl bg-muted/30 border border-border/50">
+          <div className="text-[10px] text-muted-foreground font-mono text-center opacity-70">
+            Rainy Cowork
+            <span className="mx-1">•</span>
+            v2.1.0
+          </div>
         </div>
       </div>
     </aside>

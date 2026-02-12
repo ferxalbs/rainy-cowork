@@ -10,7 +10,6 @@ import {
   MessageSquare,
   FileText,
   Plus,
-  LayoutGrid,
   Settings,
   Network,
   Bot,
@@ -122,9 +121,19 @@ export function AppSidebar({
         data-tauri-drag-region
         className={`mt-8 px-4 pb-4 flex items-center shrink-0 overflow-hidden ${isCollapsed ? "justify-center" : "gap-3"}`}
       >
-        <div className="size-8 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/20 shrink-0">
-          <LayoutGrid className="size-5 text-white" />
-        </div>
+        <div
+          className="size-8 bg-foreground shrink-0"
+          style={{
+            maskImage: `url(/whale-dnf.png)`,
+            maskSize: "contain",
+            maskRepeat: "no-repeat",
+            maskPosition: "center",
+            WebkitMaskImage: `url(/whale-dnf.png)`,
+            WebkitMaskSize: "contain",
+            WebkitMaskRepeat: "no-repeat",
+            WebkitMaskPosition: "center",
+          }}
+        />
         {!isCollapsed && (
           <div className="flex flex-col min-w-0">
             <span className="font-bold text-sm tracking-tight truncate">
