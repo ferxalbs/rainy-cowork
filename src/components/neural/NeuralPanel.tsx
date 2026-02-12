@@ -1,5 +1,5 @@
 import { Button } from "@heroui/react";
-import { Shield, Sparkles } from "lucide-react";
+import { Shield, Sparkles, ExternalLink, Eye, EyeOff } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -75,6 +75,8 @@ export function NeuralPanel({ onNavigate }: NeuralPanelProps) {
   const [workspaceName, setWorkspaceName] = useState("");
   const [isHeadless, setIsHeadless] = useState(false);
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [showPlatformKey, setShowPlatformKey] = useState(false);
+  const [showUserKey, setShowUserKey] = useState(false);
 
   // Styles for native inputs in login form
   const loginInputClass =
@@ -227,10 +229,8 @@ export function NeuralPanel({ onNavigate }: NeuralPanelProps) {
         <div className="absolute inset-0 overflow-y-auto w-full h-full scrollbar-none z-10 flex flex-col items-center justify-center p-6">
           <div className="w-full max-w-md space-y-8 animate-appear">
             <div className="text-center space-y-2">
-              <div className="flex justify-center mb-4">
-                <div className="size-16 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-lg shadow-primary/20">
-                  <Shield className="size-8" />
-                </div>
+              <div className="flex justify-center mb-6">
+                <Shield className="size-12 text-primary animate-pulse-slow" />
               </div>
               <h1 className="text-3xl font-bold tracking-tight text-foreground">
                 Neural Link
@@ -262,7 +262,7 @@ export function NeuralPanel({ onNavigate }: NeuralPanelProps) {
                 </div>
                 <Button
                   size="lg"
-                  className="w-full font-bold shadow-lg shadow-primary/20 bg-primary text-primary-foreground hover:bg-primary/90"
+                  className="w-full font-bold bg-primary text-primary-foreground hover:bg-primary/90"
                   onPress={handleConnect}
                 >
                   Restore Connection
@@ -284,27 +284,68 @@ export function NeuralPanel({ onNavigate }: NeuralPanelProps) {
               <div className="space-y-6">
                 <div>
                   <label className={labelClass}>Platform API Key</label>
-                  <input
-                    type="password"
-                    placeholder="rk_live_..."
-                    value={platformKey}
-                    onChange={(e) => setPlatformKey(e.target.value)}
-                    className={loginInputClass}
-                  />
-                  <p className="text-xs mt-1.5 ml-1 text-muted-foreground/60">
-                    Available at platform.rainymate.com
-                  </p>
+                  <div className="relative">
+                    <input
+                      type={showPlatformKey ? "text" : "password"}
+                      placeholder="rk_live_..."
+                      value={platformKey}
+                      onChange={(e) => setPlatformKey(e.target.value)}
+                      className={`${loginInputClass} pr-10`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPlatformKey(!showPlatformKey)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-foreground transition-colors"
+                    >
+                      {showPlatformKey ? (
+                        <EyeOff className="size-4" />
+                      ) : (
+                        <Eye className="size-4" />
+                      )}
+                    </button>
+                  </div>
+                  <a
+                    href="https://app.rainy-mate.com"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs mt-2 ml-1 text-primary hover:underline flex items-center gap-1"
+                  >
+                    Get Platform Key at app.rainy-mate.com
+                    <ExternalLink className="size-3" />
+                  </a>
                 </div>
 
                 <div>
                   <label className={labelClass}>Creator API Key</label>
-                  <input
-                    type="password"
-                    placeholder="rny_..."
-                    value={userApiKey}
-                    onChange={(e) => setUserApiKey(e.target.value)}
-                    className={loginInputClass}
-                  />
+                  <div className="relative">
+                    <input
+                      type={showUserKey ? "text" : "password"}
+                      placeholder="rny_..."
+                      value={userApiKey}
+                      onChange={(e) => setUserApiKey(e.target.value)}
+                      className={`${loginInputClass} pr-10`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowUserKey(!showUserKey)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-foreground transition-colors"
+                    >
+                      {showUserKey ? (
+                        <EyeOff className="size-4" />
+                      ) : (
+                        <Eye className="size-4" />
+                      )}
+                    </button>
+                  </div>
+                  <a
+                    href="https://app.rainy-mate.com"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs mt-2 ml-1 text-primary hover:underline flex items-center gap-1"
+                  >
+                    Get Creator Key at app.rainy-mate.com
+                    <ExternalLink className="size-3" />
+                  </a>
                 </div>
 
                 <div>
@@ -321,7 +362,7 @@ export function NeuralPanel({ onNavigate }: NeuralPanelProps) {
 
                 <Button
                   size="lg"
-                  className="w-full font-bold shadow-lg shadow-primary/20 mt-2 bg-primary text-primary-foreground hover:bg-primary/90"
+                  className="w-full font-bold mt-2 bg-primary text-primary-foreground hover:bg-primary/90"
                   onPress={handleConnect}
                 >
                   Connect Node
@@ -347,7 +388,7 @@ export function NeuralPanel({ onNavigate }: NeuralPanelProps) {
               {workspace?.name}
             </h2>
             <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-foreground/5 border border-foreground/5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]" />
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
               <span className="text-xs text-muted-foreground font-mono">
                 Connected
               </span>
