@@ -63,7 +63,11 @@ const clearStoredWorkspace = () => {
   }
 };
 
-export function NeuralPanel() {
+interface NeuralPanelProps {
+  onNavigate?: (section: string) => void;
+}
+
+export function NeuralPanel({ onNavigate }: NeuralPanelProps) {
   const [state, setState] = useState<NeuralState>("idle");
   const [workspace, setWorkspace] = useState<WorkspaceAuth | null>(null);
   const [platformKey, setPlatformKey] = useState("");
@@ -198,8 +202,11 @@ export function NeuralPanel() {
       )
     ) {
       try {
-        const { resetNeuralWorkspace } = await import("../../services/tauri");
+        const { resetNeuralWorkspace, clearNeuralCredentials } =
+          await import("../../services/tauri");
         await resetNeuralWorkspace(platformKey, userApiKey);
+        // Explicit frontend credential cleanup for defense-in-depth
+        await clearNeuralCredentials().catch(() => {});
         setPlatformKey("");
         setUserApiKey("");
         setWorkspace(null);
@@ -363,7 +370,7 @@ export function NeuralPanel() {
           onToggleHeadless={setIsHeadless}
         />
       )}
-      {activeTab === "agents" && <NeuralAgents />}
+      {activeTab === "agents" && <NeuralAgents onNavigate={onNavigate} />}
       {activeTab === "activity" && <NeuralActivity />}
       {/* @TODO: Remove in next version - Legacy panels */}
       {/* {activeTab === "health" && <NeuralHealth />}

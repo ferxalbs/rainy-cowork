@@ -1,5 +1,5 @@
 use crate::services::atm_client::{ATMClient, CreateAgentParams};
-use tauri::{command, State};
+use tauri::{command, Manager, State};
 
 #[command]
 pub async fn bootstrap_atm(
@@ -239,15 +239,29 @@ pub async fn ensure_atm_credentials_loaded(client: State<'_, ATMClient>) -> Resu
 pub async fn reset_neural_workspace(
     client: State<'_, ATMClient>,
     neural: State<'_, crate::commands::neural::NeuralServiceState>,
+    command_poller: State<'_, std::sync::Arc<crate::services::CommandPoller>>,
+    app_handle: tauri::AppHandle,
     master_key: String,
     user_api_key: String,
 ) -> Result<(), String> {
-    // 1. Delete workspace on server
+    // 1. Stop background services FIRST to prevent re-registration races
+    println!("[reset_neural_workspace] Stopping CommandPoller...");
+    command_poller.stop().await;
+
+    // CloudBridge may not be managed yet (late init in setup), so use try_state
+    if let Some(bridge) = app_handle.try_state::<crate::services::cloud_bridge::CloudBridge>() {
+        println!("[reset_neural_workspace] Stopping CloudBridge...");
+        let b: &crate::services::cloud_bridge::CloudBridge = bridge.inner();
+        b.stop().await;
+    }
+
+    // 2. Delete workspace on server
     client.reset_workspace(master_key, user_api_key).await?;
 
-    // 2. Clear local credentials
+    // 3. Clear local credentials
     neural.0.clear_credentials().await?;
     client.clear_credentials().await?;
 
+    println!("[reset_neural_workspace] Full cleanup complete.");
     Ok(())
 }

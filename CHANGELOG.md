@@ -5,6 +5,49 @@ All notable changes to Rainy Cowork will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.19] - 2026-02-11 - Emergency: Disconnect/Reconnect State Fix
+
+### Fixed - Production-Critical State Management
+
+**Rust Backend (`src-tauri/src/`)**
+
+- `services/atm_client.rs`:
+  - `ATMClientState` now stores `platform_key` for node linkage
+  - `load_credentials_from_keychain` now also loads `neural_platform_key` from Keychain
+  - `create_agent` and `list_agents` now send `x-rainy-platform-key` header
+  - `clear_credentials` now clears `platform_key` (previously leaked stale state)
+
+- `services/cloud_bridge.rs`:
+  - Added `is_stopped` flag and `stop()` method for graceful shutdown
+  - `run_loop` now checks stop flag and exits cleanly
+  - Added `restart()` method (reserved for future reconnect flow)
+
+- `services/command_poller.rs`:
+  - Activated `stop()` method (removed `#[allow(dead_code)]`)
+
+- `commands/atm.rs`:
+  - `reset_neural_workspace` now stops `CommandPoller` and `CloudBridge` **before** clearing credentials
+  - Prevents auto-re-registration race conditions that created ghost nodes
+  - Uses `try_state` for `CloudBridge` (graceful if not yet initialized)
+
+**Frontend (`src/`)**
+
+- `components/neural/NeuralPanel.tsx`:
+  - `handleLogout` now calls `clearNeuralCredentials()` explicitly for defense-in-depth
+
+### Root Cause
+
+Each disconnect/reconnect cycle left orphaned state across 4 subsystems:
+
+- `CommandPoller` never stopped → auto-re-registered ghost nodes
+- `CloudBridge` had no stop mechanism → ran forever with stale credentials
+- `ATMClient.clear_credentials()` didn't clear `platform_key`
+- No coordinated shutdown during logout
+
+### Validation
+
+- `cargo check` — 0 errors, 0 warnings
+
 ## [0.5.18] - 2026-02-11 - Agent Deploy Upsert (No Duplicate Edit Deploys)
 
 ### Fixed - Agent Store Edit/Deploy Duplication

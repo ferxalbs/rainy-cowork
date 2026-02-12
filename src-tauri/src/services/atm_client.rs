@@ -10,6 +10,7 @@ use tokio::sync::Mutex;
 pub struct ATMClientState {
     pub base_url: String,
     pub api_key: Option<String>,
+    pub platform_key: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -340,7 +341,11 @@ impl ATMClient {
     pub fn new(base_url: String, api_key: Option<String>) -> Self {
         Self {
             http: Client::new(),
-            state: Arc::new(Mutex::new(ATMClientState { base_url, api_key })),
+            state: Arc::new(Mutex::new(ATMClientState {
+                base_url,
+                api_key,
+                platform_key: None,
+            })),
         }
     }
 
@@ -362,6 +367,13 @@ impl ATMClient {
         let stored = keychain.get_key(ATM_ADMIN_KEYCHAIN_ID)?;
         if let Some(api_key) = stored {
             self.set_credentials(api_key).await;
+
+            // Also load platform_key from Neural keychain for node linkage
+            if let Ok(Some(pk)) = keychain.get_key("neural_platform_key") {
+                let mut state = self.state.lock().await;
+                state.platform_key = Some(pk);
+            }
+
             Ok(true)
         } else {
             Ok(false)
@@ -371,6 +383,7 @@ impl ATMClient {
     pub async fn clear_credentials(&self) -> Result<(), String> {
         let mut state = self.state.lock().await;
         state.api_key = None;
+        state.platform_key = None;
 
         let keychain = KeychainManager::new();
         let _ = keychain.delete_key(ATM_ADMIN_KEYCHAIN_ID);
@@ -497,14 +510,16 @@ impl ATMClient {
 
         let url = format!("{}/admin/agents", state.base_url);
 
-        let res = self
+        let mut req = self
             .http
             .post(&url)
-            .header("Authorization", format!("Bearer {}", api_key))
-            .json(&params)
-            .send()
-            .await
-            .map_err(|e| e.to_string())?;
+            .header("Authorization", format!("Bearer {}", api_key));
+
+        if let Some(pk) = state.platform_key.as_ref() {
+            req = req.header("x-rainy-platform-key", pk);
+        }
+
+        let res = req.json(&params).send().await.map_err(|e| e.to_string())?;
 
         if !res.status().is_success() {
             let err_text = res.text().await.unwrap_or_default();
@@ -524,13 +539,16 @@ impl ATMClient {
 
         let url = format!("{}/admin/agents", state.base_url);
 
-        let res = self
+        let mut req = self
             .http
             .get(&url)
-            .header("Authorization", format!("Bearer {}", api_key))
-            .send()
-            .await
-            .map_err(|e| e.to_string())?;
+            .header("Authorization", format!("Bearer {}", api_key));
+
+        if let Some(pk) = state.platform_key.as_ref() {
+            req = req.header("x-rainy-platform-key", pk);
+        }
+
+        let res = req.send().await.map_err(|e| e.to_string())?;
 
         if !res.status().is_success() {
             let err_text = res.text().await.unwrap_or_default();

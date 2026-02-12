@@ -236,7 +236,6 @@ impl CommandPoller {
         });
     }
 
-    #[allow(dead_code)]
     pub async fn stop(&self) {
         let mut running = self.is_running.lock().await;
         *running = false;

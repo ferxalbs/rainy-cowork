@@ -11,6 +11,7 @@ pub struct CloudBridge {
     atm_client: Arc<ATMClient>,
     app_handle: AppHandle,
     is_connected: Arc<Mutex<bool>>,
+    is_stopped: Arc<Mutex<bool>>,
 }
 
 #[derive(Serialize, Clone)]
@@ -26,7 +27,22 @@ impl CloudBridge {
             atm_client,
             app_handle,
             is_connected: Arc::new(Mutex::new(false)),
+            is_stopped: Arc::new(Mutex::new(false)),
         }
+    }
+
+    /// Stop the bridge loop. Next iteration will break and emit disconnected status.
+    pub async fn stop(&self) {
+        *self.is_stopped.lock().await = true;
+        *self.is_connected.lock().await = false;
+    }
+
+    /// @RESERVED Restart the bridge loop after a stop (e.g. after new credentials are set).
+    /// Will be used when reconnect flow is implemented.
+    #[allow(dead_code)]
+    pub async fn restart(&self) {
+        *self.is_stopped.lock().await = false;
+        self.start();
     }
 
     pub fn start(&self) {
@@ -38,6 +54,21 @@ impl CloudBridge {
 
     async fn run_loop(&self) {
         loop {
+            // Check stop flag first
+            if *self.is_stopped.lock().await {
+                *self.is_connected.lock().await = false;
+                let _ = self.app_handle.emit(
+                    "cloud:connection-status",
+                    CloudConnectionStatus {
+                        connected: false,
+                        mode: "http_poll".to_string(),
+                        message: "Bridge stopped".to_string(),
+                    },
+                );
+                println!("[CloudBridge] Stopped.");
+                return;
+            }
+
             // Wait for credentials first.
             if !self.atm_client.has_credentials().await {
                 *self.is_connected.lock().await = false;

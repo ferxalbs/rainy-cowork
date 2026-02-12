@@ -165,7 +165,7 @@ function App() {
           {/* Neural Link */}
           {activeSection === "neural-link" && (
             <div className="flex-1 overflow-auto bg-content1/50">
-              <NeuralPanel />
+              <NeuralPanel onNavigate={handleNavigate} />
             </div>
           )}
 
