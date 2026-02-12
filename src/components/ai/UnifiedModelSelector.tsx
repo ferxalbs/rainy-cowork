@@ -92,6 +92,25 @@ export function UnifiedModelSelector({
 
   const filteredModels = useMemo(() => {
     return models.filter((model) => {
+      // Hide OpenAI, Claude, and Astronomer models as requested
+      const normalizedProvider = model.provider.toLowerCase();
+      const normalizedId = model.id.toLowerCase();
+
+      if (
+        normalizedProvider.includes("openai") ||
+        normalizedProvider.includes("anthropic") ||
+        normalizedId.includes("gpt") ||
+        normalizedId.includes("claude") ||
+        normalizedId.includes("astronomer") ||
+        normalizedId.includes("o1-") ||
+        normalizedId.includes("o3") ||
+        normalizedId.includes("o4") ||
+        normalizedId.includes("o5")
+        || normalizedId.includes("gemini-3-pro-image")
+      ) {
+        return false;
+      }
+
       // Search filter
       if (
         searchQuery &&

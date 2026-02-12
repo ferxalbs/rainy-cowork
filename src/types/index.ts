@@ -140,11 +140,19 @@ export const AI_PROVIDERS: AIProvider[] = [
  */
 export const PROVIDER_MODELS: Record<ProviderType, string[]> = {
   rainyapi: [
-    "gpt-4o",
-    "gpt-4o-mini",
-    "gpt-4-turbo",
-    "claude-3.5-sonnet",
-    "claude-3-opus",
+    // OpenAI Models (Hidden)
+    // "gpt-4o",
+    // "gpt-4o-mini",
+    // "gpt-4-turbo",
+    // "o1-preview",
+    // "o1-mini",
+    // "gpt-5",
+    // "gpt-5-pro",
+    // Claude Models (Hidden)
+    // "claude-3.5-sonnet",
+    // "claude-3-opus",
+    // Astronomer Models (Hidden)
+    // "astronomer-alpha",
   ],
   gemini: [
     // Gemini 3 - Latest with thinking levels
