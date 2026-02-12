@@ -193,9 +193,21 @@ export function SettingsPage({
 
   const handleViewKey = async (provider: ProviderType) => {
     const providerId = getProviderId(provider);
+
+    // Toggle visibility: If already visible, hide it
+    if (visibleKeys[providerId]) {
+      setVisibleKeys((prev) => {
+        const next = { ...prev };
+        delete next[providerId];
+        return next;
+      });
+      return;
+    }
+
+    // Otherwise fetch and show
     const key = await getApiKey(providerId);
     if (key) {
-      setVisibleKeys((prev) => ({ ...prev, [getProviderId(provider)]: key }));
+      setVisibleKeys((prev) => ({ ...prev, [providerId]: key }));
     }
   };
 
@@ -383,10 +395,10 @@ export function SettingsPage({
                       </p>
 
                       {showInput ? (
-                        <div className="space-y-2">
-                          <div className="flex gap-2">
+                        <div className="space-y-4 pt-1">
+                          <div className="relative group">
                             <TextField
-                              className="flex-1"
+                              className="w-full"
                               name={`api-key-${provider.id}`}
                               type={showKey ? "text" : "password"}
                               onChange={(value) =>
@@ -394,17 +406,19 @@ export function SettingsPage({
                               }
                             >
                               <Input
+                                className="w-full rounded-xl border border-border/40 bg-muted/30 px-4 py-2.5 text-sm outline-none transition-all placeholder:text-muted-foreground/40 focus:border-primary/50 focus:bg-muted/40 focus:ring-2 focus:ring-primary/10 pr-10"
                                 placeholder={
                                   isReplacing
                                     ? "Enter new API key..."
-                                    : "Enter API key..."
+                                    : "Enter API key to enable..."
                                 }
                                 value={apiKeyInputs[provider.id] || ""}
                               />
                             </TextField>
                             <Button
-                              variant="secondary"
+                              variant="ghost"
                               size="sm"
+                              className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 min-w-0 p-0 text-muted-foreground hover:text-foreground z-10"
                               onPress={() => toggleShowKey(provider.id)}
                             >
                               {showKey ? (
@@ -414,68 +428,77 @@ export function SettingsPage({
                               )}
                             </Button>
                           </div>
-                          <div className="flex gap-2">
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onPress={() => handleValidateKey(provider.id)}
-                              isDisabled={
-                                !apiKeyInputs[provider.id]?.trim() ||
-                                status === "validating"
-                              }
-                            >
-                              {status === "validating"
-                                ? "Validating..."
-                                : "Validate"}
-                            </Button>
-                            <Button
-                              variant="primary"
-                              size="sm"
-                              onPress={async () => {
-                                await handleSaveKey(provider.id);
-                                // If successful (handleSaveKey handles logic), disable replacing mode
-                                setReplacingKeys((prev) => ({
-                                  ...prev,
-                                  [providerId]: false,
-                                }));
-                              }}
-                              isDisabled={
-                                !apiKeyInputs[provider.id]?.trim() || saving
-                              }
-                            >
-                              {saving ? "Saving..." : "Save to Keychain"}
-                            </Button>
-                            {isReplacing && (
+
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2">
+                              {status === "valid" && (
+                                <span className="text-xs text-green-500 font-medium flex items-center gap-1.5 animate-appear">
+                                  <Check className="size-3.5" />
+                                  Key Valid
+                                </span>
+                              )}
+                              {status === "invalid" && (
+                                <span className="text-xs text-red-500 font-medium flex items-center gap-1.5 animate-appear">
+                                  <X className="size-3.5" />
+                                  Invalid Key
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              {isReplacing && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onPress={() =>
+                                    setReplacingKeys((prev) => ({
+                                      ...prev,
+                                      [providerId]: false,
+                                    }))
+                                  }
+                                >
+                                  Cancel
+                                </Button>
+                              )}
                               <Button
-                                variant="tertiary"
+                                variant="secondary"
                                 size="sm"
-                                onPress={() =>
+                                onPress={() => handleValidateKey(provider.id)}
+                                isDisabled={
+                                  !apiKeyInputs[provider.id]?.trim() ||
+                                  status === "validating"
+                                }
+                              >
+                                {status === "validating" ? (
+                                  <Spinner size="sm" color="current" />
+                                ) : (
+                                  "Validate"
+                                )}
+                              </Button>
+                              <Button
+                                variant="primary"
+                                size="sm"
+                                className="font-medium shadow-lg shadow-primary/10"
+                                onPress={async () => {
+                                  await handleSaveKey(provider.id);
                                   setReplacingKeys((prev) => ({
                                     ...prev,
                                     [providerId]: false,
-                                  }))
+                                  }));
+                                }}
+                                isDisabled={
+                                  !apiKeyInputs[provider.id]?.trim() || saving
                                 }
                               >
-                                Cancel
+                                {saving ? "Saving..." : "Save Key"}
                               </Button>
-                            )}
-                          </div>
-                          {status === "valid" && (
-                            <p className="text-xs text-green-600 flex items-center gap-1">
-                              <Check className="size-3" /> API key is valid
-                            </p>
-                          )}
-                          {status === "invalid" && (
-                            <div className="flex flex-col gap-1">
-                              <p className="text-xs text-red-600 flex items-center gap-1">
-                                <X className="size-3" /> Invalid API key
-                              </p>
-                              {validationError[provider.id] && (
-                                <p className="text-xs text-red-500/80 pl-4">
-                                  {validationError[provider.id]}
-                                </p>
-                              )}
                             </div>
+                          </div>
+
+                          {validationError[provider.id] && (
+                            <p className="text-xs text-red-500/80 pl-1">
+                              {validationError[provider.id]}
+                            </p>
                           )}
                         </div>
                       ) : (
@@ -501,10 +524,18 @@ export function SettingsPage({
                               size="sm"
                               className="bg-muted/30 hover:bg-muted/50 text-foreground border border-border/20"
                               onPress={() => handleViewKey(provider.id)}
-                              isDisabled={!!visibleKey}
                             >
-                              <Eye className="size-4 mr-1" />
-                              View
+                              {visibleKey ? (
+                                <>
+                                  <EyeOff className="size-4 mr-1" />
+                                  Hide
+                                </>
+                              ) : (
+                                <>
+                                  <Eye className="size-4 mr-1" />
+                                  View
+                                </>
+                              )}
                             </Button>
                             <Button
                               variant="ghost"
