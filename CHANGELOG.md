@@ -5,6 +5,14 @@ All notable changes to Rainy Cowork will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.20] - 2026-02-12 - Welcome Rainy MaTE
+
+### Changed - Visual Identity & Stability
+
+- **Logo Reform**: Implemented a new "whale" logo design across the application (Sidebar, App Icon).
+- **Design Polish**: Refined the sidebar and layout for a cleaner, "perfect", and more stable aesthetic.
+- **Branding**: Consolidated visual identity under "Rainy MaTE".
+
 ## [0.5.19] - 2026-02-11 - Emergency: Disconnect/Reconnect State Fix
 
 ### Fixed - Production-Critical State Management
