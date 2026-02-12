@@ -191,7 +191,7 @@ function App() {
 
           {/* Settings Section */}
           {isSettingsSection && (
-            <div className="flex-1 overflow-auto">
+            <div className="flex-1 h-full min-h-0 overflow-hidden">
               <SettingsPage
                 initialTab={settingsTab}
                 onBack={() => handleNavigate("agent-chat")}

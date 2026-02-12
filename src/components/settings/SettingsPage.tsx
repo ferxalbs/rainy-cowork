@@ -241,7 +241,7 @@ export function SettingsPage({
   );
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
+    <div className="h-full flex flex-col relative z-20">
       {/* Header */}
       <div className="flex items-center gap-3 p-4 border-b border-border shrink-0">
         {onBack && (
@@ -260,7 +260,7 @@ export function SettingsPage({
             onSelectionChange={(key) => setActiveTab(key as string)}
             className="w-full"
           >
-            <Tabs.List className="mb-4 bg-muted/50 p-1 rounded-xl gap-1 backdrop-blur-xl border border-border/30">
+            <Tabs.List className="mb-4 bg-muted/50 p-1 rounded-xl gap-1 border border-border/30">
               <Tabs.Tab
                 id="models"
                 className="px-3 py-1.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 data-[selected=true]:text-foreground data-[selected=true]:bg-background transition-all focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ring-offset-background"
