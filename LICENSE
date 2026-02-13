@@ -1,7 +1,6 @@
-MIT License
+Rainy MaTE License
 
-Copyright (c) 2026 Rainy Cowork Contributors
-Powered by Enosis Labs AI Infrastructure
+Copyright (c) 2026 Rainy MaTE licensed by Enosis Labs, Inc.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -13,21 +12,26 @@ furnished to do so, subject to the following conditions:
 The above copyright notice and this permission notice shall be included in all
 copies or substantial portions of the Software.
 
-ADDITIONAL TERMS FOR AI SERVICES:
-When using this Software with Enosis Labs AI services (including but not limited 
-to the Rainy API, Astronomer models, or other Enosis Labs AI infrastructure), 
-users must comply with:
+---
 
-1. Enosis Labs Terms of Service: https://enosislabs.vercel.app/terms
-2. Enosis Labs Privacy Policy: https://enosislabs.vercel.app/privacy
-3. Applicable AI usage policies and rate limits
-4. Data sovereignty and responsible AI principles as outlined by Enosis Labs
+### AI Autonomy & Responsibility
 
-DIGITAL SOVEREIGNTY COMMITMENT:
-This Software is built with Enosis Labs' principles of digital sovereignty, 
-ensuring that users maintain control over their data and AI interactions. 
-The Software prioritizes local processing, user privacy, and technological 
-independence as fundamental rights.
+This Software includes authorized agents capable of autonomous file operations, command execution, and internet interaction. By using this Software, you acknowledge that:
+
+1. **You are solely responsible for all actions taken by the AI agents** running on your instance.
+2. The "Airlock" security system is a safety tool, not a guarantee. It is your responsibility to configure permissions (Safe/Sensitive/Dangerous) appropriate for your environment.
+3. The authors and contributors are not liable for any data loss, system modification, or unintended consequences resulting from autonomous agent actions.
+
+### Cloud Services & Rainy ATM
+
+This license covers the **Rainy MaTE** desktop application source code.
+
+Usage of the **Rainy ATM** (Cloud Cortex) or Enosis Labs-hosted infrastructure is subject to separate terms:
+
+- **Enosis Labs Terms of Service**: https://enosislabs.com/terms
+- **Acceptable Use Policy**: You may not use the Cloud Cortex for illegal activities, botnets, or malicious command and control.
+
+---
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -37,8 +41,6 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-DISCLAIMER: This Software integrates with third-party AI services. Users are
-responsible for compliance with all applicable terms of service, privacy
-policies, and usage agreements of integrated AI providers (OpenAI, Google,
-Groq, Cerebras, etc.). The Software maintainers are not responsible for
-third-party service availability, pricing, or policy changes.
+### Third-party services disclaimer
+
+This Software can integrate with third-party AI providers (OpenAI, Anthropic, Google, etc.). Users are responsible for complying with the terms, privacy policies, and usage limits of those providers. Maintainers are not responsible for third-party availability, pricing, or policy changes.
