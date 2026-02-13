@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Tooltip, Button, Separator } from "@heroui/react";
 import {
   FolderOpen,
@@ -14,7 +15,12 @@ import {
   Network,
   Bot,
   Library,
+  RefreshCw,
+  Check,
+  AlertCircle,
 } from "lucide-react";
+import { check } from "@tauri-apps/plugin-updater";
+import { relaunch } from "@tauri-apps/plugin-process";
 import type { Folder } from "../../types";
 
 interface AppSidebarProps {
@@ -36,6 +42,14 @@ const folderIcons: Record<string, any> = {
   Projects: FileCode,
 };
 
+type UpdateStatus =
+  | "idle"
+  | "checking"
+  | "available"
+  | "downloading"
+  | "up-to-date"
+  | "error";
+
 export function AppSidebar({
   folders = [],
   onFolderSelect,
@@ -47,6 +61,42 @@ export function AppSidebar({
   onToggleCollapse,
   onSettingsClick,
 }: AppSidebarProps) {
+  const [updateStatus, setUpdateStatus] = useState<UpdateStatus>("idle");
+  const [updateVersion, setUpdateVersion] = useState<string>("");
+  const [pendingUpdate, setPendingUpdate] = useState<Awaited<
+    ReturnType<typeof check>
+  > | null>(null);
+
+  const handleCheckUpdate = async () => {
+    if (updateStatus === "checking" || updateStatus === "downloading") return;
+    setUpdateStatus("checking");
+    try {
+      const update = await check();
+      if (update) {
+        setUpdateVersion(update.version);
+        setPendingUpdate(update);
+        setUpdateStatus("available");
+      } else {
+        setUpdateStatus("up-to-date");
+        setTimeout(() => setUpdateStatus("idle"), 3000);
+      }
+    } catch {
+      setUpdateStatus("error");
+      setTimeout(() => setUpdateStatus("idle"), 3000);
+    }
+  };
+
+  const handleInstallUpdate = async () => {
+    if (!pendingUpdate) return;
+    setUpdateStatus("downloading");
+    try {
+      await pendingUpdate.downloadAndInstall();
+      await relaunch();
+    } catch {
+      setUpdateStatus("error");
+      setTimeout(() => setUpdateStatus("idle"), 3000);
+    }
+  };
   const NavItem = ({
     id,
     label,
@@ -279,6 +329,82 @@ export function AppSidebar({
           <NavItem id="settings-models" label="AI Provider" icon={Sparkles} />
           <NavItem id="settings-appearance" label="Appearance" icon={Palette} />
         </div>
+
+        <Separator className="bg-border/30" />
+
+        {/* Update Check Button */}
+        {(() => {
+          const isChecking = updateStatus === "checking";
+          const isAvailable = updateStatus === "available";
+          const isDownloading = updateStatus === "downloading";
+          const isUpToDate = updateStatus === "up-to-date";
+          const isError = updateStatus === "error";
+
+          const UpdateIcon = isUpToDate
+            ? Check
+            : isError
+              ? AlertCircle
+              : isAvailable
+                ? Download
+                : RefreshCw;
+
+          const label = isChecking
+            ? "Checking…"
+            : isAvailable
+              ? `Update v${updateVersion}`
+              : isDownloading
+                ? "Installing…"
+                : isUpToDate
+                  ? "Up to date"
+                  : isError
+                    ? "Check failed"
+                    : "Check Updates";
+
+          const handlePress = isAvailable
+            ? handleInstallUpdate
+            : handleCheckUpdate;
+          const isBusy = isChecking || isDownloading;
+
+          const btn = (
+            <Button
+              variant={isAvailable ? "secondary" : "ghost"}
+              isIconOnly={isCollapsed}
+              isDisabled={isBusy}
+              className={`transition-all duration-200 ${
+                isCollapsed
+                  ? "w-10 h-10 justify-center mx-auto rounded-xl"
+                  : "w-full justify-start gap-3 h-10 px-3"
+              } ${
+                isUpToDate
+                  ? "text-green-500"
+                  : isError
+                    ? "text-red-400"
+                    : isAvailable
+                      ? "text-primary bg-primary/10 font-medium"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              }`}
+              onPress={handlePress}
+            >
+              <UpdateIcon
+                className={`size-4 shrink-0 ${isBusy ? "animate-spin" : ""}`}
+              />
+              {!isCollapsed && (
+                <span className="truncate flex-1 text-left text-xs">
+                  {label}
+                </span>
+              )}
+            </Button>
+          );
+
+          return isCollapsed ? (
+            <Tooltip delay={0}>
+              {btn}
+              <Tooltip.Content placement="right">{label}</Tooltip.Content>
+            </Tooltip>
+          ) : (
+            btn
+          );
+        })()}
 
         {/* User / Settings Footer */}
         <div

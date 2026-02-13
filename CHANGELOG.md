@@ -5,6 +5,17 @@ All notable changes to Rainy Cowork will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.21] - 2026-02-13 - Update Check Button
+
+### Added
+
+- **Check for Updates Button**: Added a manual update check button to the AppSidebar footer.
+  - Uses `@tauri-apps/plugin-updater` `check()` API
+  - Full state feedback: idle → checking (spinner) → up-to-date / available / error
+  - When update is available, button becomes "Update vX.X.X" and triggers `downloadAndInstall()` + `relaunch()`
+  - Auto-resets status messages after 3 seconds
+  - Fully responsive: icon-only with tooltip when sidebar is collapsed
+
 ## [0.5.20] - 2026-02-12 - Welcome Rainy MaTE
 
 ### Changed - Visual Identity & Stability
