@@ -22,6 +22,7 @@ import {
 import { check } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import type { Folder } from "../../types";
+import { MandatoryUpdateOverlay } from "../updater/MandatoryUpdateOverlay";
 
 interface AppSidebarProps {
   folders?: Folder[];
@@ -484,269 +485,23 @@ export function AppSidebar({
 
       {/* Mandatory Update Overlay — non-dismissable, blocks the entire app */}
       {showMandatoryOverlay && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 99999,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: "rgba(0, 0, 0, 0.85)",
-            backdropFilter: "blur(12px)",
-            WebkitBackdropFilter: "blur(12px)",
-          }}
-        >
-          <div
-            style={{
-              width: "100%",
-              maxWidth: 420,
-              padding: "2.5rem 2rem",
-              borderRadius: 16,
-              background: "linear-gradient(145deg, #0d1117 0%, #161b22 100%)",
-              border: "1px solid rgba(74, 222, 128, 0.15)",
-              boxShadow:
-                "0 25px 50px -12px rgba(0, 0, 0, 0.6), 0 0 80px rgba(74, 222, 128, 0.05)",
-              textAlign: "center" as const,
-              color: "#e6edf3",
-              fontFamily: "'Inter', -apple-system, sans-serif",
-            }}
-          >
-            {/* Icon */}
-            <div style={{ marginBottom: "1rem" }}>
-              <svg
-                width="48"
-                height="48"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                style={{ color: "#4ade80" }}
-              >
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="7 10 12 15 17 10" />
-                <line x1="12" y1="15" x2="12" y2="3" />
-              </svg>
-            </div>
-
-            <h2
-              style={{
-                fontSize: "1.5rem",
-                fontWeight: 700,
-                margin: "0 0 0.5rem 0",
-                color: "#ffffff",
-              }}
-            >
-              Update Required
-            </h2>
-
-            {/* Available state */}
-            {updateStatus === "available" && (
-              <>
-                <p
-                  style={{
-                    fontSize: "0.9rem",
-                    color: "#8b949e",
-                    margin: "0 0 1.25rem 0",
-                    lineHeight: 1.5,
-                  }}
-                >
-                  A new version of <strong>Rainy MaTE</strong> is available.
-                </p>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    padding: "0.5rem 1rem",
-                    borderRadius: 8,
-                    backgroundColor: "rgba(255,255,255,0.04)",
-                    marginBottom: "0.4rem",
-                  }}
-                >
-                  <span style={{ fontSize: "0.85rem", color: "#8b949e" }}>
-                    Current
-                  </span>
-                  <span
-                    style={{
-                      fontSize: "0.85rem",
-                      fontWeight: 600,
-                      fontFamily: "'SF Mono', 'Fira Code', monospace",
-                      color: "#e6edf3",
-                    }}
-                  >
-                    {currentVersion}
-                  </span>
-                </div>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    padding: "0.5rem 1rem",
-                    borderRadius: 8,
-                    backgroundColor: "rgba(255,255,255,0.04)",
-                    marginBottom: "0.4rem",
-                  }}
-                >
-                  <span style={{ fontSize: "0.85rem", color: "#8b949e" }}>
-                    New
-                  </span>
-                  <span
-                    style={{
-                      fontSize: "0.85rem",
-                      fontWeight: 600,
-                      fontFamily: "'SF Mono', 'Fira Code', monospace",
-                      color: "#4ade80",
-                    }}
-                  >
-                    {updateVersion}
-                  </span>
-                </div>
-                <button
-                  style={{
-                    marginTop: "1.5rem",
-                    width: "100%",
-                    padding: "0.75rem 1.5rem",
-                    border: "none",
-                    borderRadius: 10,
-                    background:
-                      "linear-gradient(135deg, #22c55e 0%, #16a34a 100%)",
-                    color: "#ffffff",
-                    fontSize: "0.95rem",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    boxShadow: "0 4px 14px rgba(34, 197, 94, 0.3)",
-                  }}
-                  onClick={handleInstallUpdate}
-                >
-                  Update Now
-                </button>
-                <p
-                  style={{
-                    marginTop: "0.75rem",
-                    fontSize: "0.7rem",
-                    color: "#6e7681",
-                    fontStyle: "italic",
-                  }}
-                >
-                  This update is required to continue using the app.
-                </p>
-              </>
-            )}
-
-            {/* Downloading state */}
-            {updateStatus === "downloading" && (
-              <>
-                <p
-                  style={{
-                    fontSize: "0.9rem",
-                    color: "#8b949e",
-                    margin: "0 0 1.25rem 0",
-                  }}
-                >
-                  Downloading update...
-                </p>
-                <div
-                  style={{
-                    width: "100%",
-                    height: 6,
-                    borderRadius: 3,
-                    backgroundColor: "rgba(255,255,255,0.08)",
-                    overflow: "hidden",
-                  }}
-                >
-                  <div
-                    style={{
-                      height: "100%",
-                      borderRadius: 3,
-                      background: "linear-gradient(90deg, #22c55e, #4ade80)",
-                      transition: "width 0.3s ease",
-                      width:
-                        progressPercent !== null
-                          ? `${progressPercent}%`
-                          : "60%",
-                      animation:
-                        progressPercent === null
-                          ? "updater-pulse 1.5s ease-in-out infinite"
-                          : "none",
-                    }}
-                  />
-                </div>
-                {progressPercent !== null && (
-                  <p
-                    style={{
-                      marginTop: "0.5rem",
-                      fontSize: "0.85rem",
-                      color: "#8b949e",
-                      fontFamily: "'SF Mono', 'Fira Code', monospace",
-                    }}
-                  >
-                    {progressPercent}%
-                  </p>
-                )}
-              </>
-            )}
-
-            {/* Error state (within mandatory overlay) */}
-            {updateStatus === "error" && (
-              <>
-                <p
-                  style={{
-                    fontSize: "0.9rem",
-                    color: "#f87171",
-                    margin: "0 0 1.25rem 0",
-                  }}
-                >
-                  Update failed
-                </p>
-                {errorMsg && (
-                  <p
-                    style={{
-                      fontSize: "0.8rem",
-                      color: "#f87171",
-                      backgroundColor: "rgba(248, 113, 113, 0.08)",
-                      padding: "0.5rem 0.75rem",
-                      borderRadius: 6,
-                      marginBottom: "0.5rem",
-                      fontFamily: "'SF Mono', 'Fira Code', monospace",
-                      wordBreak: "break-all" as const,
-                    }}
-                  >
-                    {errorMsg}
-                  </p>
-                )}
-                <button
-                  style={{
-                    marginTop: "1rem",
-                    width: "100%",
-                    padding: "0.75rem 1.5rem",
-                    border: "none",
-                    borderRadius: 10,
-                    background:
-                      "linear-gradient(135deg, #22c55e 0%, #16a34a 100%)",
-                    color: "#ffffff",
-                    fontSize: "0.95rem",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    boxShadow: "0 4px 14px rgba(34, 197, 94, 0.3)",
-                  }}
-                  onClick={handleRetryUpdate}
-                >
-                  Retry
-                </button>
-              </>
-            )}
-          </div>
-
-          <style>{`
-            @keyframes updater-pulse {
-              0%, 100% { opacity: 0.6; }
-              50% { opacity: 1; }
-            }
-          `}</style>
-        </div>
+        <MandatoryUpdateOverlay
+          phase={
+            updateStatus === "downloading"
+              ? "downloading"
+              : updateStatus === "error"
+                ? "error"
+                : "available"
+          }
+          currentVersion={currentVersion}
+          newVersion={updateVersion}
+          progressPercent={progressPercent}
+          errorMsg={errorMsg}
+          onInstall={handleInstallUpdate}
+          onRetry={handleRetryUpdate}
+        />
       )}
     </>
   );
 }
+
