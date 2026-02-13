@@ -1,46 +1,100 @@
-Rainy MaTE License
+Rainy MaTE License (RML) v1.0
 
 Copyright (c) 2026 Rainy MaTE licensed by Enosis Labs, Inc.
+All rights reserved.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+1. Definitions
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+"Software" means this repository, including source code, binaries, assets,
+documentation, and related materials distributed by Enosis Labs, Inc. and its
+subsidiaries and maintainers. 
 
----
+"Local User" means a natural person using the Software on personal devices,
+for personal or internal non-commercial purposes, without providing services to
+third parties.
 
-### AI Autonomy & Responsibility
+"Professional or Team Use" means use by a company, startup, agency,
+organization, public sector entity, NGO, research lab with sponsored/commercial
+outcomes, or any group of two or more people collaborating in a structured
+professional context.
 
-This Software includes authorized agents capable of autonomous file operations, command execution, and internet interaction. By using this Software, you acknowledge that:
+"Commercial Use" means any use intended for commercial advantage, monetary
+compensation, paid services, internal business operations, client work,
+revenue-generating activities, or productization.
 
-1. **You are solely responsible for all actions taken by the AI agents** running on your instance.
-2. The "Airlock" security system is a safety tool, not a guarantee. It is your responsibility to configure permissions (Safe/Sensitive/Dangerous) appropriate for your environment.
-3. The authors and contributors are not liable for any data loss, system modification, or unintended consequences resulting from autonomous agent actions.
+2. Free Use Grant (Local and Non-Commercial)
 
-### Cloud Services & Rainy ATM
+Subject to compliance with this License, Enosis Labs grants Local Users a
+limited, non-exclusive, non-transferable, revocable license to install and use
+the Software free of charge for:
 
-This license covers the **Rainy MaTE** desktop application source code.
+a) personal local use, and
+b) individual, non-commercial research or learning activities.
 
-Usage of the **Rainy ATM** (Cloud Cortex) or Enosis Labs-hosted infrastructure is subject to separate terms:
+3. Professional and Enterprise Licensing Requirement
 
-- **Enosis Labs Terms of Service**: https://enosislabs.com/terms
-- **Acceptable Use Policy**: You may not use the Cloud Cortex for illegal activities, botnets, or malicious command and control.
+Professional or Team Use requires a valid Professional or Enterprise license
+from Enosis Labs before installation, deployment, or operation in that context.
 
----
+Any Commercial Use is prohibited under this community license unless separately
+authorized in writing by Enosis Labs.
+
+4. Research and Academic Use
+
+Non-commercial individual research is permitted.
+
+Institutional, sponsored, contract-based, or commercially oriented research
+requires a Professional or Enterprise license unless Enosis Labs provides
+written authorization for an alternative arrangement.
+
+5. Restrictions
+
+Unless expressly authorized in writing by Enosis Labs, you must not:
+
+a) use the Software for Commercial Use;
+b) offer the Software as a hosted service, managed service, or SaaS;
+c) sublicense, resell, lease, or commercially distribute the Software;
+d) replicate, clone, or create a substantially similar competing product based
+   on the Software's protected architecture, workflows, or proprietary design;
+e) remove copyright, trademark, or license notices;
+f) circumvent technical, policy, or access controls.
+
+6. Intellectual Property and Enforcement
+
+The Software and all associated intellectual property rights remain the
+exclusive property of Enosis Labs and its licensors.
+
+Enosis Labs expressly reserves the right to enforce its rights against
+unauthorized use, replication, distribution, or commercial exploitation,
+including through cease-and-desist actions, DMCA takedown notices, platform
+complaints, injunction requests, and claims for damages where applicable.
+
+7. Third-Party Services
+
+The Software may interoperate with third-party AI providers and platforms.
+Users are solely responsible for compliance with applicable third-party terms,
+privacy policies, usage limits, and legal obligations.
+
+8. Termination
+
+This license terminates automatically upon any breach. Upon termination, you
+must cease all use and destroy all copies of the Software in your possession or
+control, except where retention is required by law.
+
+9. Disclaimer of Warranty
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+IMPLIED, INCLUDING BUT NOT LIMITED TO MERCHANTABILITY, FITNESS FOR A PARTICULAR
+PURPOSE, TITLE, AND NON-INFRINGEMENT.
 
-### Third-party services disclaimer
+10. Limitation of Liability
 
-This Software can integrate with third-party AI providers (OpenAI, Anthropic, Google, etc.). Users are responsible for complying with the terms, privacy policies, and usage limits of those providers. Maintainers are not responsible for third-party availability, pricing, or policy changes.
+TO THE MAXIMUM EXTENT PERMITTED BY LAW, ENOSIS LABS AND CONTRIBUTORS SHALL NOT
+BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, EXEMPLARY, OR
+PUNITIVE DAMAGES, OR ANY LOSS OF PROFITS, REVENUE, DATA, GOODWILL, OR BUSINESS
+INTERRUPTION, ARISING OUT OF OR RELATED TO THE SOFTWARE OR THIS LICENSE.
+
+11. Contact
+
+For Professional/Enterprise licensing or legal permissions:
+legal@enosislabs.com
