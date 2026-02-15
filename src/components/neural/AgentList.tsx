@@ -12,7 +12,10 @@ interface Agent {
   name: string;
   type: string;
   status: string;
-  created_at: string;
+  createdAt?: number;
+  updatedAt?: number;
+  logicalSpecId?: string | null;
+  isDuplicateLogicalSpec?: boolean;
   config?: {
     model?: string;
     temperature?: number;
@@ -135,6 +138,14 @@ export function AgentList({ onCreateClick }: AgentListProps) {
                     <span className="text-xs text-muted-foreground uppercase">
                       {agent.type}
                     </span>
+                    <div className="mt-1 text-[10px] font-mono text-muted-foreground/80">
+                      Cloud ID: {agent.id.slice(0, 8)}
+                    </div>
+                    {agent.logicalSpecId ? (
+                      <div className="text-[10px] font-mono text-muted-foreground/80">
+                        Spec ID: {agent.logicalSpecId.slice(0, 8)}
+                      </div>
+                    ) : null}
                     {agent.config?.model && (
                       <div className="flex items-center gap-1 mt-1">
                         <Sparkles className="size-3 text-amber-500" />
@@ -153,6 +164,11 @@ export function AgentList({ onCreateClick }: AgentListProps) {
                   {agent.status}
                 </Chip>
               </div>
+              {agent.isDuplicateLogicalSpec ? (
+                <div className="mt-3 text-[10px] font-semibold uppercase tracking-wide text-warning">
+                  Duplicate logical spec detected
+                </div>
+              ) : null}
             </Card>
           ))}
         </div>

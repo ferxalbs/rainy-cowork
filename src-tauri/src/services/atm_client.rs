@@ -1225,41 +1225,21 @@ impl ATMClient {
         })
     }
 
-    /// Deploys an AgentSpec v2 to the Cloud, signing it first.
+    /// Deploys an AgentSpec to the Cloud.
+    ///
+    /// Cloud ATM applies/rotates its own HMAC signature for stored specs.
+    /// We intentionally strip any local signature payload before upload.
     pub async fn deploy_agent(
         &self,
         mut spec: crate::ai::specs::AgentSpec,
     ) -> Result<serde_json::Value, String> {
-        use crate::ai::features::security_service::SecurityService;
-
         self.verify_authenticated_connection().await?;
 
-        // 1. Sign the agent package
-        let security = SecurityService::new();
+        // Signature shape for local specs differs from cloud HMAC signature.
+        // Clearing it avoids false validation failures on /admin/agents.
+        spec.signature = None;
 
-        // Hash capabilities for integrity
-        let skills_json = serde_json::to_value(&spec.skills).map_err(|e| e.to_string())?;
-        let cap_hash = SecurityService::hash_capabilities(&skills_json);
-
-        // Create content to sign (Soul + Skills Hash + Version)
-        let signable_content = format!("{}:{}:{}", spec.soul.name, cap_hash, spec.version);
-        let signature_str = security
-            .sign_content(&signable_content)
-            .map_err(|e| e.to_string())?;
-        let pub_key = security
-            .get_public_key_string()
-            .map_err(|e| e.to_string())?;
-
-        // Attach signature
-        spec.signature = Some(crate::ai::specs::AgentSignature {
-            signature: signature_str,
-            signer_id: pub_key, // Using public key as ID for now
-            capabilities_hash: cap_hash,
-            origin_device_id: "desktop-local".to_string(), // TODO: Get real device ID
-            signed_at: chrono::Utc::now().timestamp(),
-        });
-
-        // 2. Wrap in CreateAgentParams
+        // Wrap in CreateAgentParams
         let config_json = serde_json::to_value(&spec).map_err(|e| e.to_string())?;
 
         let params = CreateAgentParams {
@@ -1268,7 +1248,7 @@ impl ATMClient {
             config: config_json,
         };
 
-        // 3. Upload
+        // Upload
         self.create_agent(params).await
     }
 }

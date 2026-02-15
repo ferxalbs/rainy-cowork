@@ -1,8 +1,8 @@
 import { AgentSpec } from "../../../types/agent-spec";
 
-export function createDefaultAgentSpec(): AgentSpec {
+export function createDefaultAgentSpec(id: string = crypto.randomUUID()): AgentSpec {
   return {
-    id: crypto.randomUUID(),
+    id,
     version: "2.0.0",
     soul: {
       name: "",
@@ -59,16 +59,21 @@ export function createDefaultAgentSpec(): AgentSpec {
 }
 
 export function normalizeAgentSpec(raw: any): AgentSpec {
-  const defaults = createDefaultAgentSpec();
+  const defaults = createDefaultAgentSpec("");
   const source = raw ?? {};
   const sourceMemory = source.memory_config ?? {};
   const sourceRetrieval = sourceMemory.retrieval ?? {};
   const sourcePersistence = sourceMemory.persistence ?? {};
   const sourceKnowledge = sourceMemory.knowledge ?? {};
+  const sourceId =
+    typeof source.id === "string" && source.id.trim().length > 0
+      ? source.id.trim()
+      : "";
 
   return {
     ...defaults,
     ...source,
+    id: sourceId,
     soul: {
       ...defaults.soul,
       ...(source.soul ?? {}),
