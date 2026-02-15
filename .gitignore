@@ -29,6 +29,7 @@ rainy-sdk
 rainy-api-v2
 rainy-atm
 rainy-docs
+.kilocode/mcp.json
 .agent/rules/cowork-architecture.md
 COWORK_INFO.md
 
