@@ -30,10 +30,10 @@ mod tests {
         // AgentManager::new takes Pool<Sqlite>, not Arc<Pool>
         let agent_manager = Arc::new(AgentManager::new(pool));
 
-        // 2. Create AgentSpec V2
+        // 2. Create AgentSpec V3
         let spec = AgentSpec {
             id: "test-persisted-agent".to_string(),
-            version: "2.0.0".to_string(),
+            version: "3.0.0".to_string(),
             soul: AgentSoul {
                 name: "Test Agent".to_string(),
                 description: "A test agent".to_string(),

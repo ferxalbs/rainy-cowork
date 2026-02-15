@@ -511,7 +511,7 @@ impl CommandPoller {
                             // Fallback / Ephemeral Construction
                             AgentSpec {
                                 id: uuid::Uuid::new_v4().to_string(),
-                                version: "2.0.0".to_string(),
+                                version: "3.0.0".to_string(),
                                 soul: AgentSoul {
                                     name: agent_name.clone(),
                                     description: "Ephemeral agent spawned by Cloud Command"

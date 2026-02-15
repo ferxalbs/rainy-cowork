@@ -1244,7 +1244,7 @@ impl ATMClient {
 
         let params = CreateAgentParams {
             name: spec.soul.name.clone(),
-            type_: "v2_spec".to_string(),
+            type_: "v3_spec".to_string(),
             config: config_json,
         };
 

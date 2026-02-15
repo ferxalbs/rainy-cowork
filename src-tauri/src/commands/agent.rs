@@ -125,7 +125,7 @@ pub async fn run_agent_workflow(
                     use crate::ai::specs::soul::AgentSoul;
                     AgentSpec {
                         id: "default".to_string(),
-                        version: "2.0.0".to_string(),
+                        version: "3.0.0".to_string(),
                         soul: AgentSoul {
                             name: "Rainy Agent".to_string(),
                             description: "Default fallback agent".to_string(),
@@ -147,7 +147,7 @@ pub async fn run_agent_workflow(
         use crate::ai::specs::soul::AgentSoul;
         AgentSpec {
             id: "default".to_string(),
-            version: "2.0.0".to_string(),
+            version: "3.0.0".to_string(),
             soul: AgentSoul {
                 name: "Rainy Agent".to_string(),
                 description: "Default agent".to_string(),

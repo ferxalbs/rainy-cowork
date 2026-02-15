@@ -3,7 +3,7 @@ import { AgentSpec } from "../../../types/agent-spec";
 export function createDefaultAgentSpec(id: string = crypto.randomUUID()): AgentSpec {
   return {
     id,
-    version: "2.0.0",
+    version: "3.0.0",
     soul: {
       name: "",
       description: "",
