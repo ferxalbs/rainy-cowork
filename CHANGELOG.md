@@ -5,6 +5,97 @@ All notable changes to Rainy Cowork will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.22] - 2026-02-15 - Airlock Hardening + Tooling Expansion
+
+### Added - Agent Tools (Desktop Runtime)
+
+**Rust Backend (`src-tauri/src/services/`)**
+
+- `skill_executor.rs`:
+  - Added filesystem utility tools:
+    - `file_exists`
+    - `get_file_info`
+    - `read_file_chunk`
+  - Added browser automation tools:
+    - `extract_links`
+    - `wait_for_selector`
+    - `type_text`
+    - `open_new_tab`
+    - `go_back`
+    - `submit_form`
+  - Added web/API tools:
+    - `http_get_json`
+    - `http_post_json`
+  - Added shell wrappers for developer workflows:
+    - `git_status`
+    - `git_diff`
+  - Hardened command output handling by truncating oversized shell outputs before returning to models.
+
+**Browser Controller (`src-tauri/src/services/browser_controller.rs`)**
+
+- Added stable primitives used by tools:
+  - `wait_for_selector`
+  - `type_text` (with optional clear + input/change event dispatch)
+
+### Changed - Tool Policy + Registration
+
+**Frontend + Runtime Policy Maps**
+
+- `src-tauri/src/services/tool_policy.rs`:
+  - Updated canonical tool risk mapping for all newly added tools.
+- `src/constants/toolPolicy.ts`:
+  - Synced frontend Airlock policy map with backend tool policy.
+- `src/constants/defaultNeuralSkills.ts`:
+  - Registered all new methods so node registration exposes them to Cloud Cortex.
+
+### Changed - Airlock UI Modularization
+
+**Frontend (`src/components/agents/builder/`)**
+
+- `AirlockPanel.tsx` refactored into smaller modules:
+  - `airlock/PolicySection.tsx`
+  - `airlock/ScopesSection.tsx`
+  - `airlock/RateLimitsSection.tsx`
+  - `airlock/constants.ts`
+  - `airlock/utils.ts`
+- Reduced panel complexity and improved render behavior using memoization (`useMemo`, `useCallback`, `React.memo`) while preserving functionality.
+
+### Fixed - Real Airlock Scope Enforcement (Rust)
+
+**Rust Runtime (`src-tauri/src/`)**
+
+- `models/neural.rs`:
+  - Extended `RainyPayload` with scope fields:
+    - `blocked_paths`
+    - `allowed_domains`
+    - `blocked_domains`
+- `ai/agent/workflow.rs`:
+  - Injects Airlock scope data from `AgentSpec` into each queued tool command payload.
+  - Expanded filesystem tool guard list to include recently added filesystem methods.
+- `commands/skills.rs`:
+  - Updated local `execute_skill` pseudo-command payload to include new scope fields.
+- `services/skill_executor.rs`:
+  - Enforces `blocked_paths` in filesystem/shell path resolution.
+  - Enforces `allowed_domains` / `blocked_domains` for browser/web URL-based operations.
+  - Applies domain checks to:
+    - `browse_url` / `open_new_tab`
+    - `read_web_page`
+    - `http_get_json`
+    - `http_post_json`
+- `services/airlock.rs`:
+  - Added effective risk-level resolution that escalates to canonical policy level when a command declares a lower `airlock_level`.
+  - Approval requests now use effective level (prevents downscoping bypass attempts).
+
+### Validation
+
+- `pnpm run build` — passes
+- `cd src-tauri && cargo check -q` — passes
+- `cd src-tauri && cargo test services::tool_policy::tests::maps_core_tools -- --nocapture` — passes
+- `cd src-tauri && cargo test services::skill_executor::tests::shell_allowlist_matches_agents_policy -- --nocapture` — passes
+- `cd src-tauri && cargo test services::skill_executor::tests::domain_scope_enforces_blocked_before_allowed -- --nocapture` — passes
+- `cd src-tauri && cargo test services::airlock::tests::pending_approvals_are_sorted_by_timestamp -- --nocapture` — passes
+- `cd src-tauri && cargo test services::airlock::tests::effective_airlock_level_escalates_when_declared_is_lower_than_policy -- --nocapture` — passes
+
 ## [0.5.21] - 2026-02-13 - Update Check Button
 
 ### Added
