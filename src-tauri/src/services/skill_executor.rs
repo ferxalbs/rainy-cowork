@@ -556,6 +556,9 @@ impl SkillExecutor {
 
         // Get allowed_paths from payload (Cloud sends these from workspace config)
         let allowed_paths = &payload.allowed_paths;
+        let blocked_paths = &payload.blocked_paths;
+        let allowed_domains = &payload.allowed_domains;
+        let blocked_domains = &payload.blocked_domains;
         if let (Some(policy), Some(expected_hash)) = (
             tool_policy,
             payload.tool_access_policy_hash.as_deref(),
@@ -589,18 +592,33 @@ impl SkillExecutor {
 
         match skill {
             "filesystem" => {
-                self.execute_filesystem(workspace_id, method, &payload.params, allowed_paths)
-                    .await
+                self.execute_filesystem(
+                    workspace_id,
+                    method,
+                    &payload.params,
+                    allowed_paths,
+                    blocked_paths,
+                )
+                .await
             }
             "shell" => {
-                self.execute_shell(workspace_id, method, &payload.params, allowed_paths)
-                    .await
+                self.execute_shell(
+                    workspace_id,
+                    method,
+                    &payload.params,
+                    allowed_paths,
+                    blocked_paths,
+                )
+                .await
             }
             "web" => {
-                self.execute_web(workspace_id, method, &payload.params)
+                self.execute_web(method, &payload.params, allowed_domains, blocked_domains)
                     .await
             }
-            "browser" => self.execute_browser(method, &payload.params).await,
+            "browser" => {
+                self.execute_browser(method, &payload.params, allowed_domains, blocked_domains)
+                    .await
+            }
             _ => CommandResult {
                 success: false,
                 output: None,
@@ -616,6 +634,7 @@ impl SkillExecutor {
         method: &str,
         params: &Option<Value>,
         allowed_paths: &[String],
+        blocked_paths: &[String],
     ) -> CommandResult {
         let params = match params {
             Some(p) => p,
@@ -624,47 +643,47 @@ impl SkillExecutor {
 
         match method {
             "read_file" => {
-                self.handle_read_file(workspace_id, params, allowed_paths)
+                self.handle_read_file(workspace_id, params, allowed_paths, blocked_paths)
                     .await
             }
             "list_files" => {
-                self.handle_list_files(workspace_id, params, allowed_paths)
+                self.handle_list_files(workspace_id, params, allowed_paths, blocked_paths)
                     .await
             }
             "file_exists" => {
-                self.handle_file_exists(workspace_id, params, allowed_paths)
+                self.handle_file_exists(workspace_id, params, allowed_paths, blocked_paths)
                     .await
             }
             "get_file_info" => {
-                self.handle_get_file_info(workspace_id, params, allowed_paths)
+                self.handle_get_file_info(workspace_id, params, allowed_paths, blocked_paths)
                     .await
             }
             "search_files" => {
-                self.handle_search_files(workspace_id, params, allowed_paths)
+                self.handle_search_files(workspace_id, params, allowed_paths, blocked_paths)
                     .await
             }
             "read_file_chunk" => {
-                self.handle_read_file_chunk(workspace_id, params, allowed_paths)
+                self.handle_read_file_chunk(workspace_id, params, allowed_paths, blocked_paths)
                     .await
             }
             "write_file" => {
-                self.handle_write_file(workspace_id, params, allowed_paths)
+                self.handle_write_file(workspace_id, params, allowed_paths, blocked_paths)
                     .await
             }
             "append_file" => {
-                self.handle_append_file(workspace_id, params, allowed_paths)
+                self.handle_append_file(workspace_id, params, allowed_paths, blocked_paths)
                     .await
             }
             "mkdir" => {
-                self.handle_make_dir(workspace_id, params, allowed_paths)
+                self.handle_make_dir(workspace_id, params, allowed_paths, blocked_paths)
                     .await
             }
             "delete_file" => {
-                self.handle_delete_file(workspace_id, params, allowed_paths)
+                self.handle_delete_file(workspace_id, params, allowed_paths, blocked_paths)
                     .await
             }
             "move_file" => {
-                self.handle_move_file(workspace_id, params, allowed_paths)
+                self.handle_move_file(workspace_id, params, allowed_paths, blocked_paths)
                     .await
             }
             _ => CommandResult {
@@ -676,7 +695,13 @@ impl SkillExecutor {
         }
     }
 
-    async fn execute_browser(&self, method: &str, params: &Option<Value>) -> CommandResult {
+    async fn execute_browser(
+        &self,
+        method: &str,
+        params: &Option<Value>,
+        allowed_domains: &[String],
+        blocked_domains: &[String],
+    ) -> CommandResult {
         let params = match params {
             Some(p) => p,
             None => return self.error("Missing parameters"),
@@ -688,6 +713,11 @@ impl SkillExecutor {
                     Ok(a) => a,
                     Err(e) => return self.error(&format!("Invalid parameters: {}", e)),
                 };
+                if let Err(e) =
+                    Self::enforce_domain_scope(&args.url, allowed_domains, blocked_domains)
+                {
+                    return self.error(&e);
+                }
                 match self.browser.navigate(&args.url).await {
                     Ok(result) => {
                         // Return rich navigation result with title and content preview
@@ -908,6 +938,7 @@ impl SkillExecutor {
         method: &str,
         params: &Option<Value>,
         allowed_paths: &[String],
+        blocked_paths: &[String],
     ) -> CommandResult {
         let params = match params {
             Some(p) => p,
@@ -925,7 +956,10 @@ impl SkillExecutor {
 
                 // We need a CWD. Default to workspace root.
                 // We reuse resolve_path to get the root.
-                let root_path = match self.resolve_path(workspace_id, ".", allowed_paths).await {
+                let root_path = match self
+                    .resolve_path(workspace_id, ".", allowed_paths, blocked_paths)
+                    .await
+                {
                     Ok(p) => p,
                     Err(e) => return self.error(&e),
                 };
@@ -938,14 +972,16 @@ impl SkillExecutor {
                     Ok(a) => a,
                     Err(e) => return self.error(&format!("Invalid parameters: {}", e)),
                 };
-                self.handle_git_status(workspace_id, args, allowed_paths).await
+                self.handle_git_status(workspace_id, args, allowed_paths, blocked_paths)
+                    .await
             }
             "git_diff" => {
                 let args: GitDiffArgs = match serde_json::from_value(params.clone()) {
                     Ok(a) => a,
                     Err(e) => return self.error(&format!("Invalid parameters: {}", e)),
                 };
-                self.handle_git_diff(workspace_id, args, allowed_paths).await
+                self.handle_git_diff(workspace_id, args, allowed_paths, blocked_paths)
+                    .await
             }
             _ => CommandResult {
                 success: false,
@@ -958,9 +994,10 @@ impl SkillExecutor {
 
     async fn execute_web(
         &self,
-        _workspace_id: String,
         method: &str,
         params: &Option<Value>,
+        allowed_domains: &[String],
+        blocked_domains: &[String],
     ) -> CommandResult {
         let params = match params {
             Some(p) => p,
@@ -980,21 +1017,24 @@ impl SkillExecutor {
                     Ok(a) => a,
                     Err(e) => return self.error(&format!("Invalid parameters: {}", e)),
                 };
-                self.handle_read_web_page(&args.url).await
+                self.handle_read_web_page(&args.url, allowed_domains, blocked_domains)
+                    .await
             }
             "http_get_json" => {
                 let args: HttpGetJsonArgs = match serde_json::from_value(params.clone()) {
                     Ok(a) => a,
                     Err(e) => return self.error(&format!("Invalid parameters: {}", e)),
                 };
-                self.handle_http_get_json(args).await
+                self.handle_http_get_json(args, allowed_domains, blocked_domains)
+                    .await
             }
             "http_post_json" => {
                 let args: HttpPostJsonArgs = match serde_json::from_value(params.clone()) {
                     Ok(a) => a,
                     Err(e) => return self.error(&format!("Invalid parameters: {}", e)),
                 };
-                self.handle_http_post_json(args).await
+                self.handle_http_post_json(args, allowed_domains, blocked_domains)
+                    .await
             }
             _ => CommandResult {
                 success: false,
@@ -1026,7 +1066,15 @@ impl SkillExecutor {
         }
     }
 
-    async fn handle_read_web_page(&self, url: &str) -> CommandResult {
+    async fn handle_read_web_page(
+        &self,
+        url: &str,
+        allowed_domains: &[String],
+        blocked_domains: &[String],
+    ) -> CommandResult {
+        if let Err(e) = Self::enforce_domain_scope(url, allowed_domains, blocked_domains) {
+            return self.error(&e);
+        }
         // Use native BrowserController instead of legacy WebResearchService
         match self.browser.navigate(url).await {
             Ok(nav_result) => {
@@ -1050,24 +1098,38 @@ impl SkillExecutor {
         }
     }
 
-    async fn handle_http_get_json(&self, args: HttpGetJsonArgs) -> CommandResult {
+    async fn handle_http_get_json(
+        &self,
+        args: HttpGetJsonArgs,
+        allowed_domains: &[String],
+        blocked_domains: &[String],
+    ) -> CommandResult {
         self.handle_http_json_request(
             "GET",
             args.url,
             None,
             args.timeout_ms,
             args.max_bytes,
+            allowed_domains,
+            blocked_domains,
         )
         .await
     }
 
-    async fn handle_http_post_json(&self, args: HttpPostJsonArgs) -> CommandResult {
+    async fn handle_http_post_json(
+        &self,
+        args: HttpPostJsonArgs,
+        allowed_domains: &[String],
+        blocked_domains: &[String],
+    ) -> CommandResult {
         self.handle_http_json_request(
             "POST",
             args.url,
             Some(args.body),
             args.timeout_ms,
             args.max_bytes,
+            allowed_domains,
+            blocked_domains,
         )
         .await
     }
@@ -1079,7 +1141,12 @@ impl SkillExecutor {
         body: Option<Value>,
         timeout_ms_opt: Option<u64>,
         max_bytes_opt: Option<usize>,
+        allowed_domains: &[String],
+        blocked_domains: &[String],
     ) -> CommandResult {
+        if let Err(e) = Self::enforce_domain_scope(&url, allowed_domains, blocked_domains) {
+            return self.error(&e);
+        }
         let parsed_url = match Self::validate_http_url(&url) {
             Ok(u) => u,
             Err(e) => return self.error(&e),
@@ -1234,14 +1301,65 @@ impl SkillExecutor {
         Ok(parsed)
     }
 
+    fn domain_rule_matches(host: &str, rule: &str) -> bool {
+        let normalized_host = host.trim().trim_end_matches('.').to_ascii_lowercase();
+        let normalized_rule = rule.trim().trim_end_matches('.').to_ascii_lowercase();
+        if normalized_rule.is_empty() {
+            return false;
+        }
+        if normalized_rule == "*" {
+            return true;
+        }
+        if let Some(root) = normalized_rule.strip_prefix("*.") {
+            return normalized_host == root || normalized_host.ends_with(&format!(".{}", root));
+        }
+        normalized_host == normalized_rule
+            || normalized_host.ends_with(&format!(".{}", normalized_rule))
+    }
+
+    fn enforce_domain_scope(
+        url: &str,
+        allowed_domains: &[String],
+        blocked_domains: &[String],
+    ) -> Result<(), String> {
+        let parsed = reqwest::Url::parse(url).map_err(|e| format!("Invalid URL: {}", e))?;
+        let host = parsed
+            .host_str()
+            .ok_or_else(|| "URL must include a valid host".to_string())?
+            .to_ascii_lowercase();
+
+        if blocked_domains
+            .iter()
+            .any(|rule| Self::domain_rule_matches(&host, rule))
+        {
+            return Err(format!("Domain '{}' is blocked by Airlock scopes", host));
+        }
+
+        if !allowed_domains.is_empty()
+            && !allowed_domains
+                .iter()
+                .any(|rule| Self::domain_rule_matches(&host, rule))
+        {
+            return Err(format!(
+                "Domain '{}' is not in Airlock allowed_domains",
+                host
+            ));
+        }
+
+        Ok(())
+    }
+
     async fn resolve_git_working_dir(
         &self,
         workspace_id: String,
         path: Option<String>,
         allowed_paths: &[String],
+        blocked_paths: &[String],
     ) -> Result<PathBuf, String> {
         let target = path.unwrap_or_else(|| ".".to_string());
-        let resolved = self.resolve_path(workspace_id, &target, allowed_paths).await?;
+        let resolved = self
+            .resolve_path(workspace_id, &target, allowed_paths, blocked_paths)
+            .await?;
         if resolved.is_dir() {
             Ok(resolved)
         } else {
@@ -1257,9 +1375,10 @@ impl SkillExecutor {
         workspace_id: String,
         args: GitStatusArgs,
         allowed_paths: &[String],
+        blocked_paths: &[String],
     ) -> CommandResult {
         let cwd = match self
-            .resolve_git_working_dir(workspace_id, args.path, allowed_paths)
+            .resolve_git_working_dir(workspace_id, args.path, allowed_paths, blocked_paths)
             .await
         {
             Ok(path) => path,
@@ -1278,9 +1397,10 @@ impl SkillExecutor {
         workspace_id: String,
         args: GitDiffArgs,
         allowed_paths: &[String],
+        blocked_paths: &[String],
     ) -> CommandResult {
         let cwd = match self
-            .resolve_git_working_dir(workspace_id, args.path, allowed_paths)
+            .resolve_git_working_dir(workspace_id, args.path, allowed_paths, blocked_paths)
             .await
         {
             Ok(path) => path,
@@ -1361,6 +1481,36 @@ impl SkillExecutor {
         Ok(normalized)
     }
 
+    fn is_path_blocked(
+        normalized_target: &Path,
+        blocked_paths: &[String],
+        allowed_roots: &[String],
+    ) -> bool {
+        for blocked in blocked_paths {
+            let blocked_path = Path::new(blocked);
+            if blocked_path.is_absolute() {
+                if let Ok(normalized_blocked) = Self::normalize_absolute_path(blocked_path) {
+                    if normalized_target.starts_with(&normalized_blocked) {
+                        return true;
+                    }
+                }
+                continue;
+            }
+
+            for root in allowed_roots {
+                if let Ok(normalized_root) = Self::normalize_absolute_path(Path::new(root)) {
+                    let candidate = normalized_root.join(blocked_path);
+                    if let Ok(normalized_candidate) = Self::normalize_absolute_path(&candidate) {
+                        if normalized_target.starts_with(&normalized_candidate) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        false
+    }
+
     /// Resolve a path within the workspace. First tries to load local workspace,
     /// falls back to using allowed_paths from the command payload (Cloud-provided).
     async fn resolve_path(
@@ -1368,6 +1518,7 @@ impl SkillExecutor {
         workspace_id: String,
         path_str: &str,
         allowed_paths: &[String],
+        blocked_paths: &[String],
     ) -> Result<PathBuf, String> {
         let path_buf = PathBuf::from(path_str);
 
@@ -1406,6 +1557,10 @@ Configure allowed paths before filesystem operations."
                         path_str
                     ));
                 }
+            }
+
+            if Self::is_path_blocked(&normalized_target, blocked_paths, &workspace_allowed) {
+                return Err(format!("Path '{}' is blocked by Airlock scopes", path_str));
             }
 
             return Ok(normalized_target);
@@ -1451,6 +1606,10 @@ Configure allowed paths before filesystem operations."
             ));
         }
 
+        if Self::is_path_blocked(&normalized_target, blocked_paths, &workspace_allowed_paths) {
+            return Err(format!("Path '{}' is blocked by Airlock scopes", path_str));
+        }
+
         Ok(normalized_target)
     }
 
@@ -1459,6 +1618,7 @@ Configure allowed paths before filesystem operations."
         workspace_id: String,
         params: &Value,
         allowed_paths: &[String],
+        blocked_paths: &[String],
     ) -> CommandResult {
         let args: ReadFileArgs = match serde_json::from_value(params.clone()) {
             Ok(a) => a,
@@ -1466,7 +1626,7 @@ Configure allowed paths before filesystem operations."
         };
 
         let path = match self
-            .resolve_path(workspace_id, &args.path, allowed_paths)
+            .resolve_path(workspace_id, &args.path, allowed_paths, blocked_paths)
             .await
         {
             Ok(p) => p,
@@ -1522,6 +1682,7 @@ Configure allowed paths before filesystem operations."
         workspace_id: String,
         params: &Value,
         allowed_paths: &[String],
+        blocked_paths: &[String],
     ) -> CommandResult {
         // Handle optional path manually or via struct default?
         // Let's rely on struct default if possible, or manual parse
@@ -1529,7 +1690,7 @@ Configure allowed paths before filesystem operations."
         let path_str = params.get("path").and_then(|v| v.as_str()).unwrap_or(".");
 
         let path = match self
-            .resolve_path(workspace_id, path_str, allowed_paths)
+            .resolve_path(workspace_id, path_str, allowed_paths, blocked_paths)
             .await
         {
             Ok(p) => p,
@@ -1565,6 +1726,7 @@ Configure allowed paths before filesystem operations."
         workspace_id: String,
         params: &Value,
         allowed_paths: &[String],
+        blocked_paths: &[String],
     ) -> CommandResult {
         let args: SearchFilesArgs = match serde_json::from_value(params.clone()) {
             Ok(a) => a,
@@ -1575,7 +1737,7 @@ Configure allowed paths before filesystem operations."
         let search_content = args.search_content.unwrap_or(false);
 
         let root_path = match self
-            .resolve_path(workspace_id, path_str, allowed_paths)
+            .resolve_path(workspace_id, path_str, allowed_paths, blocked_paths)
             .await
         {
             Ok(p) => p,
@@ -1680,6 +1842,7 @@ Configure allowed paths before filesystem operations."
         workspace_id: String,
         params: &Value,
         allowed_paths: &[String],
+        blocked_paths: &[String],
     ) -> CommandResult {
         let args: FileExistsArgs = match serde_json::from_value(params.clone()) {
             Ok(a) => a,
@@ -1687,7 +1850,7 @@ Configure allowed paths before filesystem operations."
         };
 
         let path = match self
-            .resolve_path(workspace_id, &args.path, allowed_paths)
+            .resolve_path(workspace_id, &args.path, allowed_paths, blocked_paths)
             .await
         {
             Ok(p) => p,
@@ -1732,6 +1895,7 @@ Configure allowed paths before filesystem operations."
         workspace_id: String,
         params: &Value,
         allowed_paths: &[String],
+        blocked_paths: &[String],
     ) -> CommandResult {
         let args: FileInfoArgs = match serde_json::from_value(params.clone()) {
             Ok(a) => a,
@@ -1739,7 +1903,7 @@ Configure allowed paths before filesystem operations."
         };
 
         let path = match self
-            .resolve_path(workspace_id, &args.path, allowed_paths)
+            .resolve_path(workspace_id, &args.path, allowed_paths, blocked_paths)
             .await
         {
             Ok(p) => p,
@@ -1786,6 +1950,7 @@ Configure allowed paths before filesystem operations."
         workspace_id: String,
         params: &Value,
         allowed_paths: &[String],
+        blocked_paths: &[String],
     ) -> CommandResult {
         let args: ReadFileChunkArgs = match serde_json::from_value(params.clone()) {
             Ok(a) => a,
@@ -1793,7 +1958,7 @@ Configure allowed paths before filesystem operations."
         };
 
         let path = match self
-            .resolve_path(workspace_id, &args.path, allowed_paths)
+            .resolve_path(workspace_id, &args.path, allowed_paths, blocked_paths)
             .await
         {
             Ok(p) => p,
@@ -1860,6 +2025,7 @@ Configure allowed paths before filesystem operations."
         workspace_id: String,
         params: &Value,
         allowed_paths: &[String],
+        blocked_paths: &[String],
     ) -> CommandResult {
         let args: WriteFileArgs = match serde_json::from_value(params.clone()) {
             Ok(a) => a,
@@ -1867,7 +2033,7 @@ Configure allowed paths before filesystem operations."
         };
 
         let path = match self
-            .resolve_path(workspace_id, &args.path, allowed_paths)
+            .resolve_path(workspace_id, &args.path, allowed_paths, blocked_paths)
             .await
         {
             Ok(p) => p,
@@ -1897,6 +2063,7 @@ Configure allowed paths before filesystem operations."
         workspace_id: String,
         params: &Value,
         allowed_paths: &[String],
+        blocked_paths: &[String],
     ) -> CommandResult {
         // Re-use WriteFileArgs since it has path + content
         let args: WriteFileArgs = match serde_json::from_value(params.clone()) {
@@ -1905,7 +2072,7 @@ Configure allowed paths before filesystem operations."
         };
 
         let path = match self
-            .resolve_path(workspace_id, &args.path, allowed_paths)
+            .resolve_path(workspace_id, &args.path, allowed_paths, blocked_paths)
             .await
         {
             Ok(p) => p,
@@ -1938,6 +2105,7 @@ Configure allowed paths before filesystem operations."
         workspace_id: String,
         params: &Value,
         allowed_paths: &[String],
+        blocked_paths: &[String],
     ) -> CommandResult {
         let args: MakeDirArgs = match serde_json::from_value(params.clone()) {
             Ok(a) => a,
@@ -1945,7 +2113,7 @@ Configure allowed paths before filesystem operations."
         };
 
         let path = match self
-            .resolve_path(workspace_id, &args.path, allowed_paths)
+            .resolve_path(workspace_id, &args.path, allowed_paths, blocked_paths)
             .await
         {
             Ok(p) => p,
@@ -1968,6 +2136,7 @@ Configure allowed paths before filesystem operations."
         workspace_id: String,
         params: &Value,
         allowed_paths: &[String],
+        blocked_paths: &[String],
     ) -> CommandResult {
         let args: DeleteFileArgs = match serde_json::from_value(params.clone()) {
             Ok(a) => a,
@@ -1975,7 +2144,7 @@ Configure allowed paths before filesystem operations."
         };
 
         let path = match self
-            .resolve_path(workspace_id, &args.path, allowed_paths)
+            .resolve_path(workspace_id, &args.path, allowed_paths, blocked_paths)
             .await
         {
             Ok(p) => p,
@@ -2010,6 +2179,7 @@ Configure allowed paths before filesystem operations."
         workspace_id: String,
         params: &Value,
         allowed_paths: &[String],
+        blocked_paths: &[String],
     ) -> CommandResult {
         let args: MoveFileArgs = match serde_json::from_value(params.clone()) {
             Ok(a) => a,
@@ -2017,7 +2187,12 @@ Configure allowed paths before filesystem operations."
         };
 
         let source = match self
-            .resolve_path(workspace_id.clone(), &args.source, allowed_paths)
+            .resolve_path(
+                workspace_id.clone(),
+                &args.source,
+                allowed_paths,
+                blocked_paths,
+            )
             .await
         {
             Ok(p) => p,
@@ -2025,7 +2200,7 @@ Configure allowed paths before filesystem operations."
         };
 
         let destination = match self
-            .resolve_path(workspace_id, &args.destination, allowed_paths)
+            .resolve_path(workspace_id, &args.destination, allowed_paths, blocked_paths)
             .await
         {
             Ok(p) => p,
@@ -2122,6 +2297,7 @@ mod policy_tests {
 #[cfg(test)]
 mod tests {
     use super::SkillExecutor;
+    use std::path::PathBuf;
     use std::path::Path;
 
     #[test]
@@ -2156,5 +2332,53 @@ mod tests {
         let err =
             SkillExecutor::normalize_absolute_path(Path::new("relative/path/to/file")).unwrap_err();
         assert!(err.contains("must be absolute"));
+    }
+
+    #[test]
+    fn domain_scope_matches_exact_and_wildcard_rules() {
+        assert!(SkillExecutor::domain_rule_matches(
+            "api.example.com",
+            "example.com"
+        ));
+        assert!(SkillExecutor::domain_rule_matches(
+            "api.example.com",
+            "*.example.com"
+        ));
+        assert!(!SkillExecutor::domain_rule_matches(
+            "evil.com",
+            "example.com"
+        ));
+    }
+
+    #[test]
+    fn domain_scope_enforces_blocked_before_allowed() {
+        let err = SkillExecutor::enforce_domain_scope(
+            "https://api.example.com/v1",
+            &["example.com".to_string()],
+            &["api.example.com".to_string()],
+        )
+        .unwrap_err();
+
+        assert!(err.contains("blocked"));
+    }
+
+    #[test]
+    fn blocked_paths_reject_relative_and_absolute_matches() {
+        let target =
+            PathBuf::from("/Users/fer/Projects/rainy-cowork/src-tauri/src/services/skill_executor.rs");
+        let allowed = vec!["/Users/fer/Projects/rainy-cowork".to_string()];
+        let blocked_relative = vec!["src-tauri/src/services".to_string()];
+        let blocked_absolute = vec!["/Users/fer/Projects/rainy-cowork/src-tauri".to_string()];
+
+        assert!(SkillExecutor::is_path_blocked(
+            &target,
+            &blocked_relative,
+            &allowed
+        ));
+        assert!(SkillExecutor::is_path_blocked(
+            &target,
+            &blocked_absolute,
+            &allowed
+        ));
     }
 }

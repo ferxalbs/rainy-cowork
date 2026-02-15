@@ -137,6 +137,15 @@ pub struct RainyPayload {
     /// Allowed paths for this command (from workspace config)
     #[serde(default)]
     pub allowed_paths: Vec<String>,
+    /// Blocked paths for this command (from agent Airlock scopes)
+    #[serde(default)]
+    pub blocked_paths: Vec<String>,
+    /// Allowlist of domains for web/browser operations (empty = no allowlist)
+    #[serde(default)]
+    pub allowed_domains: Vec<String>,
+    /// Denylist of domains for web/browser operations
+    #[serde(default)]
+    pub blocked_domains: Vec<String>,
     /// Optional workspace tool access policy (deny-first) pushed by Cloud.
     #[serde(default)]
     pub tool_access_policy: Option<ToolAccessPolicy>,

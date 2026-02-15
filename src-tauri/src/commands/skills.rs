@@ -43,6 +43,9 @@ pub async fn execute_skill(
             params: Some(params),
             content: None,
             allowed_paths, // Pass the workspace path for local path resolution
+            blocked_paths: vec![],
+            allowed_domains: vec![],
+            blocked_domains: vec![],
             tool_access_policy: None,
             tool_access_policy_version: None,
             tool_access_policy_hash: None,

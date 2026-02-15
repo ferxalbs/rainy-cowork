@@ -10,6 +10,7 @@
 //! - **Level 2 (Dangerous)**: Execution operations - requires explicit approval
 
 use crate::models::neural::{AirlockLevel, QueuedCommand};
+use crate::services::tool_policy::get_tool_policy;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -50,6 +51,31 @@ pub struct AirlockService {
 }
 
 impl AirlockService {
+    fn infer_tool_name(command: &QueuedCommand) -> Option<String> {
+        if let Some(method) = command.payload.method.as_ref() {
+            return Some(method.clone());
+        }
+        command
+            .intent
+            .rsplit('.')
+            .next()
+            .map(|s| s.to_string())
+            .filter(|s| !s.is_empty())
+    }
+
+    fn effective_airlock_level(command: &QueuedCommand) -> AirlockLevel {
+        let declared = command.airlock_level;
+        let policy_level = Self::infer_tool_name(command)
+            .map(|tool| get_tool_policy(&tool).airlock_level)
+            .unwrap_or(AirlockLevel::Sensitive);
+
+        if policy_level > declared {
+            policy_level
+        } else {
+            declared
+        }
+    }
+
     fn insert_pending_approval(
         pending: &mut HashMap<String, PendingApproval>,
         request: ApprovalRequest,
@@ -94,7 +120,17 @@ impl AirlockService {
 
     // Called during command execution flow
     pub async fn check_permission(&self, command: &QueuedCommand) -> Result<bool, String> {
-        match command.airlock_level {
+        let effective_level = Self::effective_airlock_level(command);
+        if effective_level != command.airlock_level {
+            tracing::warn!(
+                "Airlock: Escalating command {} level from {:?} to {:?} based on tool policy",
+                command.id,
+                command.airlock_level,
+                effective_level
+            );
+        }
+
+        match effective_level {
             AirlockLevel::Safe => {
                 // Level 0: Auto-approve read-only operations
                 tracing::debug!("Airlock: Auto-approved SAFE command {}", command.id);
@@ -113,7 +149,7 @@ impl AirlockService {
                         "Airlock: SENSITIVE command {} requires notification",
                         command.id
                     );
-                    self.request_approval(command, false).await
+                    self.request_approval(command, effective_level, false).await
                 }
             }
             AirlockLevel::Dangerous => {
@@ -130,7 +166,7 @@ impl AirlockService {
                     "Airlock: DANGEROUS command {} requires explicit approval",
                     command.id
                 );
-                self.request_approval(command, false).await
+                self.request_approval(command, effective_level, false).await
             }
         }
     }
@@ -139,13 +175,14 @@ impl AirlockService {
     async fn request_approval(
         &self,
         command: &QueuedCommand,
+        effective_level: AirlockLevel,
         allow_on_timeout: bool,
     ) -> Result<bool, String> {
         let request = ApprovalRequest {
             command_id: command.id.clone(),
             intent: command.intent.clone(),
             payload_summary: serde_json::to_string(&command.payload).unwrap_or_default(),
-            airlock_level: command.airlock_level,
+            airlock_level: effective_level,
             timestamp: chrono::Utc::now().timestamp_millis(),
         };
 
@@ -163,7 +200,7 @@ impl AirlockService {
             .map_err(|e| format!("Failed to emit approval event: {}", e))?;
 
         // Wait for response with timeout (30 seconds for dangerous, 10 for sensitive)
-        let timeout_secs = if command.airlock_level == AirlockLevel::Dangerous {
+        let timeout_secs = if effective_level == AirlockLevel::Dangerous {
             30
         } else {
             10
@@ -247,6 +284,9 @@ impl AirlockService {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::neural::{
+        CommandPriority, CommandStatus, QueuedCommand, RainyPayload, ToolAccessPolicy,
+    };
 
     fn make_request(command_id: &str, timestamp: i64) -> ApprovalRequest {
         ApprovalRequest {
@@ -289,5 +329,44 @@ mod tests {
             .expect("responder send should succeed");
         let result = rx.await.expect("receiver should get approval result");
         assert!(matches!(result, ApprovalResult::Approved));
+    }
+
+    #[test]
+    fn effective_airlock_level_escalates_when_declared_is_lower_than_policy() {
+        let command = QueuedCommand {
+            id: "cmd-1".to_string(),
+            workspace_id: Some("ws-1".to_string()),
+            desktop_node_id: Some("node-1".to_string()),
+            intent: "shell.execute_command".to_string(),
+            payload: RainyPayload {
+                skill: Some("shell".to_string()),
+                method: Some("execute_command".to_string()),
+                params: None,
+                content: None,
+                allowed_paths: vec![],
+                blocked_paths: vec![],
+                allowed_domains: vec![],
+                blocked_domains: vec![],
+                tool_access_policy: Some(ToolAccessPolicy {
+                    enabled: true,
+                    mode: "all".to_string(),
+                    allow: vec![],
+                    deny: vec![],
+                }),
+                tool_access_policy_version: None,
+                tool_access_policy_hash: None,
+            },
+            priority: CommandPriority::Normal,
+            status: CommandStatus::Pending,
+            airlock_level: AirlockLevel::Safe,
+            approved_by: None,
+            result: None,
+            created_at: None,
+            started_at: None,
+            completed_at: None,
+        };
+
+        let level = AirlockService::effective_airlock_level(&command);
+        assert_eq!(level, AirlockLevel::Dangerous);
     }
 }
