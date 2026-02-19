@@ -89,8 +89,8 @@ impl AgentManager {
             .await?;
 
         // Also clear semantic memories and entities (scoped by workspace_id, which corresponds to chat_id)
-        // This supports "Full Context Reset" requested by user
-        sqlx::query("DELETE FROM memory_entries WHERE workspace_id = ?")
+        // This supports "Full Context Reset" requested by user.
+        sqlx::query("DELETE FROM memory_vault_entries WHERE workspace_id = ?")
             .bind(chat_id)
             .execute(&*self.db)
             .await?;

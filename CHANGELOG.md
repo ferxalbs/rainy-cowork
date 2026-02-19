@@ -5,6 +5,58 @@ All notable changes to Rainy Cowork will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.91] - 2026-02-19 - DARK ARCHIVE (Encrypted Memory Vault)
+
+### Added - Encrypted Memory Vault (AES-256-GCM)
+
+**Rust Backend (`src-tauri/src/services/`)**
+
+- Added new modular memory vault service:
+  - `src-tauri/src/services/memory_vault/mod.rs`
+  - `src-tauri/src/services/memory_vault/types.rs`
+  - `src-tauri/src/services/memory_vault/key_provider.rs`
+  - `src-tauri/src/services/memory_vault/crypto.rs`
+  - `src-tauri/src/services/memory_vault/repository.rs`
+  - `src-tauri/src/services/memory_vault/service.rs`
+- Vault uses AES-256-GCM envelope encryption at entry level with per-entry nonce.
+- Added key-provider abstraction (`VaultKeyProvider`) and initial macOS keychain backend.
+- Added DB migration:
+  - `src-tauri/migrations/20260219090000_add_memory_vault_entries.sql`
+
+### Changed - Memory Runtime + Command Surface (API-compatible)
+
+**Agent Runtime (`src-tauri/src/ai/agent/`)**
+
+- `memory.rs` now persists/retrieves memory via `MemoryVaultService` (encrypted at rest).
+- Legacy `short_term.json` migration path now imports into vault and renames legacy file to `.migrated`.
+
+**Memory Manager (`src-tauri/src/services/memory/`)**
+
+- Reworked `MemoryManager` internals to route long-term storage and retrieval through encrypted vault while keeping existing command-facing methods.
+- Preserved existing Tauri command signatures for memory APIs.
+
+**Commands (`src-tauri/src/commands/memory.rs`)**
+
+- Kept external API signatures stable.
+- Replaced plaintext knowledge-store JSON dependency for query/index runtime path with vault-backed retrieval/tag resolution.
+
+### Changed - Context Reset Semantics
+
+**Agent Manager (`src-tauri/src/ai/agent/manager.rs`)**
+
+- `clear_chat_history` now clears workspace memory from `memory_vault_entries` (instead of plaintext `memory_entries`).
+
+### Changed - Versioning
+
+- `package.json` -> `0.5.91`
+- `src-tauri/Cargo.toml` -> `0.5.91`
+- `src-tauri/tauri.conf.json` -> `0.5.91`
+
+### Validation
+
+- `cd src-tauri && cargo check -q` — passes
+- `pnpm exec tsc --noEmit` — passes
+
 ## [0.5.90] - 2026-02-18 - IRON FLOOR (Foundation Hardening)
 
 ### Changed - Dynamic Tool Manifest Source of Truth

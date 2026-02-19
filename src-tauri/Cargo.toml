@@ -1,6 +1,6 @@
 [package]
 name = "rainy-cowork"
-version = "0.5.90"
+version = "0.5.91"
 description = "A Tauri App"
 authors = ["you"]
 edition = "2021"
@@ -54,6 +54,7 @@ handlebars = "6"
 image = "0.25"
 kamadak-exif = "0.5"
 base64 = "0.22"
+aes-gcm = "0.10"
 # File Operations (AI Agent)
 tempfile = "3.16"
 rayon = "1.10"

@@ -7,7 +7,7 @@ use crate::services::memory::MemoryEntry;
 use crate::services::memory::MemoryManager;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
-use tauri::{AppHandle, Manager, State};
+use tauri::State;
 
 /// State wrapper for MemoryManager
 ///
@@ -47,57 +47,6 @@ pub enum MemoryStrategy {
     Vector,
     SimpleBuffer,
     Hybrid,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-struct AgentKnowledgeStore {
-    files: Vec<KnowledgeFile>,
-    chunks: Vec<KnowledgeChunk>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct KnowledgeChunk {
-    id: String,
-    file_id: String,
-    content: String,
-    indexed_at: i64,
-}
-
-fn knowledge_base_dir(app_handle: &AppHandle) -> Result<PathBuf, String> {
-    let app_dir = app_handle
-        .path()
-        .app_data_dir()
-        .map_err(|e| format!("Failed to resolve app data dir: {}", e))?;
-    Ok(app_dir.join("agent_knowledge"))
-}
-
-fn knowledge_store_path(app_handle: &AppHandle, agent_id: &str) -> Result<PathBuf, String> {
-    let base = knowledge_base_dir(app_handle)?;
-    Ok(base.join(format!("{}.json", agent_id)))
-}
-
-fn load_knowledge_store(app_handle: &AppHandle, agent_id: &str) -> Result<AgentKnowledgeStore, String> {
-    let path = knowledge_store_path(app_handle, agent_id)?;
-    if !path.exists() {
-        return Ok(AgentKnowledgeStore::default());
-    }
-    let body = std::fs::read_to_string(&path)
-        .map_err(|e| format!("Failed to read knowledge store {}: {}", path.to_string_lossy(), e))?;
-    serde_json::from_str(&body).map_err(|e| format!("Invalid knowledge store json: {}", e))
-}
-
-fn save_knowledge_store(
-    app_handle: &AppHandle,
-    agent_id: &str,
-    store: &AgentKnowledgeStore,
-) -> Result<(), String> {
-    let dir = knowledge_base_dir(app_handle)?;
-    std::fs::create_dir_all(&dir).map_err(|e| format!("Failed to create knowledge dir: {}", e))?;
-    let path = knowledge_store_path(app_handle, agent_id)?;
-    let json = serde_json::to_string_pretty(store)
-        .map_err(|e| format!("Failed to serialize knowledge store: {}", e))?;
-    std::fs::write(&path, json)
-        .map_err(|e| format!("Failed to write knowledge store {}: {}", path.to_string_lossy(), e))
 }
 
 fn split_text_into_chunks(content: &str, chunk_size: usize, overlap: usize) -> Vec<String> {
@@ -339,7 +288,7 @@ pub async fn clear_short_term_memory(manager: State<'_, MemoryManagerState>) -> 
 #[tauri::command]
 pub async fn get_memory_stats(
     manager: State<'_, MemoryManagerState>,
-) -> Result<crate::services::memory::long_term::MemoryStats, String> {
+) -> Result<crate::services::memory::MemoryStats, String> {
     manager.0.get_stats().await.map_err(|e| e.to_string())
 }
 
@@ -457,7 +406,7 @@ pub async fn is_short_term_memory_empty(
 
 #[tauri::command]
 pub async fn index_knowledge_file(
-    app_handle: AppHandle,
+    _app_handle: tauri::AppHandle,
     manager: State<'_, MemoryManagerState>,
     agent_id: String,
     file_path: String,
@@ -479,20 +428,6 @@ pub async fn index_knowledge_file(
     }
 
     let indexed_at = chrono::Utc::now().timestamp();
-    let mut store = load_knowledge_store(&app_handle, &agent_id)?;
-
-    let previous_file_ids: std::collections::HashSet<String> = store
-        .files
-        .iter()
-        .filter(|file| file.path == file_path)
-        .map(|file| file.id.clone())
-        .collect();
-    if !previous_file_ids.is_empty() {
-        store
-            .chunks
-            .retain(|chunk| !previous_file_ids.contains(&chunk.file_id));
-    }
-    store.files.retain(|file| file.path != file_path);
 
     let file = KnowledgeFile {
         id: uuid::Uuid::new_v4().to_string(),
@@ -513,21 +448,14 @@ pub async fn index_knowledge_file(
                 format!("agent:{}", agent_id),
                 "knowledge".to_string(),
                 format!("knowledge_file:{}", file.id),
+                format!("knowledge_file_name:{}", file.name),
+                format!("knowledge_file_path:{}", file.path),
+                format!("workspace:{}", agent_id),
                 format!("chunk:{}", idx),
             ],
         };
         manager.0.store(entry).await.map_err(|e| e.to_string())?;
-
-        store.chunks.push(KnowledgeChunk {
-            id: uuid::Uuid::new_v4().to_string(),
-            file_id: file.id.clone(),
-            content: chunk.clone(),
-            indexed_at,
-        });
     }
-
-    store.files.push(file.clone());
-    save_knowledge_store(&app_handle, &agent_id, &store)?;
 
     Ok(KnowledgeIndexResult {
         file: file.clone(),
@@ -537,7 +465,8 @@ pub async fn index_knowledge_file(
 
 #[tauri::command]
 pub async fn query_agent_memory(
-    app_handle: AppHandle,
+    _app_handle: tauri::AppHandle,
+    manager: State<'_, MemoryManagerState>,
     agent_id: String,
     query: String,
     strategy: Option<MemoryStrategy>,
@@ -550,67 +479,53 @@ pub async fn query_agent_memory(
         return Ok(Vec::new());
     }
 
-    let store = load_knowledge_store(&app_handle, &agent_id)?;
-    if store.chunks.is_empty() {
-        return Ok(Vec::new());
-    }
-
     let max_results = limit.unwrap_or(8).max(1).min(50);
     let selected_strategy = strategy.unwrap_or(MemoryStrategy::Hybrid);
+    let entries = manager
+        .0
+        .query_workspace_memory(&agent_id, &query, max_results * 5)
+        .await
+        .map_err(|e| e.to_string())?;
 
-    let mut scored: Vec<(KnowledgeChunk, f32)> = match selected_strategy {
-        MemoryStrategy::SimpleBuffer => {
-            let mut ordered = store.chunks.clone();
-            ordered.sort_by(|a, b| b.indexed_at.cmp(&a.indexed_at));
-            ordered
-                .into_iter()
-                .map(|chunk| {
-                    let score = compute_text_score(&query, &chunk.content) * 0.7 + 0.3;
-                    (chunk, score)
-                })
-                .collect()
-        }
-        MemoryStrategy::Vector | MemoryStrategy::Hybrid => store
-            .chunks
-            .clone()
-            .into_iter()
-            .map(|chunk| {
-                let score = compute_text_score(&query, &chunk.content);
-                (chunk, score)
-            })
-            .collect(),
-    };
+    let mut results: Vec<MemoryResult> = entries
+        .into_iter()
+        .filter(|entry| {
+            entry.tags.iter().any(|tag| tag == "knowledge")
+                && entry
+                    .tags
+                    .iter()
+                    .any(|tag| tag == &format!("agent:{}", agent_id))
+        })
+        .map(|entry| {
+            let score = match selected_strategy {
+                MemoryStrategy::SimpleBuffer => compute_text_score(&query, &entry.content) * 0.7 + 0.3,
+                MemoryStrategy::Vector | MemoryStrategy::Hybrid => compute_text_score(&query, &entry.content),
+            };
 
-    scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-    scored.truncate(max_results);
+            let file_id = extract_tag_value(&entry.tags, "knowledge_file");
+            let file_name = extract_tag_value(&entry.tags, "knowledge_file_name");
+            let file_path = extract_tag_value(&entry.tags, "knowledge_file_path");
 
-    let mut results = Vec::with_capacity(scored.len());
-    for (chunk, score) in scored {
-        let file = store
-            .files
-            .iter()
-            .find(|file| file.id == chunk.file_id)
-            .cloned()
-            .unwrap_or(KnowledgeFile {
-                id: chunk.file_id.clone(),
-                name: "Unknown".to_string(),
-                path: "".to_string(),
-                size_bytes: 0,
-                indexed_at: chunk.indexed_at,
-                chunk_count: 0,
-            });
+            MemoryResult {
+                id: entry.id,
+                file_id: file_id.unwrap_or_else(|| "unknown".to_string()),
+                file_name: file_name.unwrap_or_else(|| "Unknown".to_string()),
+                file_path: file_path.unwrap_or_default(),
+                content: entry.content,
+                score,
+            }
+        })
+        .collect();
 
-        results.push(MemoryResult {
-            id: chunk.id,
-            file_id: file.id,
-            file_name: file.name,
-            file_path: file.path,
-            content: chunk.content,
-            score,
-        });
-    }
-
+    results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    results.truncate(max_results);
     Ok(results)
+}
+
+fn extract_tag_value(tags: &[String], key: &str) -> Option<String> {
+    let prefix = format!("{}:", key);
+    tags.iter()
+        .find_map(|tag| tag.strip_prefix(&prefix).map(|value| value.to_string()))
 }
 
 #[cfg(test)]

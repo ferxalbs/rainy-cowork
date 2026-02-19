@@ -1,3 +1,6 @@
+use crate::services::memory_vault::{
+    MemorySensitivity, MemoryVaultService, StoreMemoryInput,
+};
 use chrono::{TimeZone, Utc};
 use reqwest::Client;
 use scraper::{Html, Selector};
@@ -8,23 +11,21 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::fs;
 
-/// Represents a unit of information in the agent's memory
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemoryEntry {
     pub id: String,
     pub content: String,
-    pub source: String, // e.g., "user", "web:https://google.com", "file:/path/to/file"
+    pub source: String,
     pub timestamp: i64,
     pub metadata: HashMap<String, String>,
-    pub importance: f32, // 0.0 to 1.0
+    pub importance: f32,
 }
 
-/// Managing agent context and knowledge
 #[derive(Debug, Clone)]
 pub struct AgentMemory {
     workspace_id: String,
     db: Arc<sqlx::SqlitePool>,
-    /// Web client for fetching external info
+    vault: Arc<MemoryVaultService>,
     #[allow(dead_code)]
     http_client: Client,
 }
@@ -44,21 +45,6 @@ impl AgentMemory {
             .await
             .expect("failed to connect to sqlite db for agent memory");
 
-        // Safety net in case migration has not run yet in early startup race conditions.
-        let _ = sqlx::query(
-            "CREATE TABLE IF NOT EXISTS memory_entries (
-                id TEXT PRIMARY KEY,
-                workspace_id TEXT NOT NULL,
-                content TEXT NOT NULL,
-                source TEXT NOT NULL,
-                timestamp INTEGER NOT NULL,
-                metadata_json TEXT NOT NULL DEFAULT '{}',
-                importance REAL NOT NULL DEFAULT 0.5
-            )",
-        )
-        .execute(&pool)
-        .await;
-
         let _ = sqlx::query(
             "CREATE TABLE IF NOT EXISTS agent_entities (
                 id TEXT PRIMARY KEY,
@@ -72,9 +58,16 @@ impl AgentMemory {
         .execute(&pool)
         .await;
 
+        let vault = Arc::new(
+            MemoryVaultService::new(app_data_dir.clone())
+                .await
+                .expect("failed to initialize memory vault"),
+        );
+
         let memory = Self {
             workspace_id: workspace_id.to_string(),
             db: Arc::new(pool),
+            vault,
             http_client: Client::builder()
                 .user_agent("Rainy-MaTE-Agent/1.0")
                 .build()
@@ -82,7 +75,6 @@ impl AgentMemory {
         };
 
         memory.migrate_legacy_json_if_present(app_data_dir).await;
-
         memory
     }
 
@@ -92,36 +84,39 @@ impl AgentMemory {
         source: String,
         metadata: Option<HashMap<String, String>>,
     ) {
-        let entry = MemoryEntry {
-            id: uuid::Uuid::new_v4().to_string(),
-            content,
-            source,
-            timestamp: Utc::now().timestamp(),
-            metadata: metadata.unwrap_or_default(),
-            importance: 0.5, // Default importance
-        };
+        let entry_id = uuid::Uuid::new_v4().to_string();
+        let timestamp = Utc::now().timestamp();
+        let metadata = metadata.unwrap_or_default();
 
-        if let Ok(metadata_json) = serde_json::to_string(&entry.metadata) {
-            let _ = sqlx::query(
-                "INSERT INTO memory_entries (id, workspace_id, content, source, timestamp, metadata_json, importance)
-                 VALUES (?, ?, ?, ?, ?, ?, ?)",
-            )
-            .bind(&entry.id)
-            .bind(&self.workspace_id)
-            .bind(&entry.content)
-            .bind(&entry.source)
-            .bind(entry.timestamp)
-            .bind(metadata_json)
-            .bind(entry.importance)
-            .execute(&*self.db)
-            .await;
+        let mut tags = vec![
+            format!("workspace:{}", self.workspace_id),
+            format!("source:{}", source),
+            "agent_memory".to_string(),
+        ];
+        if let Some(role) = metadata.get("role") {
+            tags.push(format!("role:{}", role));
+        }
+        if let Some(tool) = metadata.get("tool") {
+            tags.push(format!("tool:{}", tool));
         }
 
-        // Optional entity persistence if the caller provides a structured hint.
-        if let (Some(entity_key), Some(entity_value)) = (
-            entry.metadata.get("entity_key"),
-            entry.metadata.get("entity_value"),
-        ) {
+        let _ = self
+            .vault
+            .put(StoreMemoryInput {
+                id: entry_id,
+                workspace_id: self.workspace_id.clone(),
+                content,
+                tags,
+                source: source.clone(),
+                sensitivity: MemorySensitivity::Internal,
+                metadata: metadata.clone(),
+                created_at: timestamp,
+            })
+            .await;
+
+        if let (Some(entity_key), Some(entity_value)) =
+            (metadata.get("entity_key"), metadata.get("entity_value"))
+        {
             let _ = sqlx::query(
                 "INSERT INTO agent_entities (id, workspace_id, entity_key, entity_value, confidence)
                  VALUES (?, ?, ?, ?, ?)",
@@ -130,42 +125,39 @@ impl AgentMemory {
             .bind(&self.workspace_id)
             .bind(entity_key)
             .bind(entity_value)
-            .bind(entry.importance)
+            .bind(0.5_f32)
             .execute(&*self.db)
             .await;
         }
     }
 
     pub async fn retrieve(&self, query: &str) -> Vec<MemoryEntry> {
-        let like_query = format!("%{}%", query.to_lowercase());
-        let rows = sqlx::query_as::<_, (String, String, String, i64, String, f64)>(
-            "SELECT id, content, source, timestamp, metadata_json, importance
-             FROM memory_entries
-             WHERE workspace_id = ? AND LOWER(content) LIKE ?
-             ORDER BY importance DESC, timestamp DESC
-             LIMIT 20",
-        )
-        .bind(&self.workspace_id)
-        .bind(&like_query)
-        .fetch_all(&*self.db)
-        .await
-        .unwrap_or_default();
+        let rows = self
+            .vault
+            .search_workspace(&self.workspace_id, query, 20)
+            .await
+            .unwrap_or_default();
 
         rows.into_iter()
-            .map(
-                |(id, content, source, timestamp, metadata_json, importance)| MemoryEntry {
-                    id,
-                    content,
-                    source,
-                    timestamp,
-                    metadata: serde_json::from_str(&metadata_json).unwrap_or_default(),
-                    importance: importance as f32,
-                },
-            )
+            .map(|row| {
+                let importance = row
+                    .metadata
+                    .get("importance")
+                    .and_then(|v| v.parse::<f32>().ok())
+                    .unwrap_or(0.5);
+                MemoryEntry {
+                    id: row.id,
+                    content: row.content,
+                    source: row.source,
+                    timestamp: row.created_at,
+                    metadata: row.metadata,
+                    importance,
+                }
+            })
             .collect()
     }
 
-    #[allow(dead_code)] // @RESERVED — will be wired to a Tauri command for web page ingestion
+    #[allow(dead_code)]
     pub async fn ingest_web_page(&self, url: &str) -> Result<String, String> {
         let res = self
             .http_client
@@ -184,7 +176,6 @@ impl AgentMemory {
             .map_err(|e| format!("Failed to read text: {}", e))?;
 
         let document = Html::parse_document(&html_content);
-
         let selector = Selector::parse("body").unwrap();
         let body = document.select(&selector).next();
 
@@ -218,27 +209,23 @@ impl AgentMemory {
         ))
     }
 
-    #[allow(dead_code)] // @RESERVED — will be wired to a Tauri command for memory debugging
+    #[allow(dead_code)]
     pub async fn dump_context(&self) -> String {
-        let rows = sqlx::query_as::<_, (String, i64, String)>(
-            "SELECT source, timestamp, content
-             FROM memory_entries
-             WHERE workspace_id = ?
-             ORDER BY timestamp DESC
-             LIMIT 100",
-        )
-        .bind(&self.workspace_id)
-        .fetch_all(&*self.db)
-        .await
-        .unwrap_or_default();
+        let rows = self
+            .vault
+            .recent_workspace(&self.workspace_id, 100)
+            .await
+            .unwrap_or_default();
 
         rows.iter()
-            .map(|(source, timestamp, content)| {
+            .map(|entry| {
                 format!(
                     "[{}] {}: {}",
-                    source,
-                    Utc.timestamp_opt(*timestamp, 0).unwrap().format("%H:%M:%S"),
-                    content
+                    entry.source,
+                    Utc.timestamp_opt(entry.created_at, 0)
+                        .unwrap()
+                        .format("%H:%M:%S"),
+                    entry.content
                 )
             })
             .collect::<Vec<_>>()
@@ -266,25 +253,30 @@ impl AgentMemory {
         };
 
         for entry in legacy_entries {
-            if let Ok(metadata_json) = serde_json::to_string(&entry.metadata) {
-                let _ = sqlx::query(
-                    "INSERT OR IGNORE INTO memory_entries
-                     (id, workspace_id, content, source, timestamp, metadata_json, importance)
-                     VALUES (?, ?, ?, ?, ?, ?, ?)",
-                )
-                .bind(entry.id)
-                .bind(&self.workspace_id)
-                .bind(entry.content)
-                .bind(entry.source)
-                .bind(entry.timestamp)
-                .bind(metadata_json)
-                .bind(entry.importance)
-                .execute(&*self.db)
-                .await;
+            let mut tags = vec![
+                format!("workspace:{}", self.workspace_id),
+                "legacy".to_string(),
+                "agent_memory".to_string(),
+            ];
+            if !entry.source.trim().is_empty() {
+                tags.push(format!("source:{}", entry.source));
             }
+
+            let _ = self
+                .vault
+                .put(StoreMemoryInput {
+                    id: entry.id,
+                    workspace_id: self.workspace_id.clone(),
+                    content: entry.content,
+                    tags,
+                    source: "legacy".to_string(),
+                    sensitivity: MemorySensitivity::Internal,
+                    metadata: entry.metadata,
+                    created_at: entry.timestamp,
+                })
+                .await;
         }
 
-        // Keep a backup, but remove legacy active file to avoid dual-write confusion.
         let backup_path = legacy_path.with_extension("json.migrated");
         let _ = fs::rename(&legacy_path, backup_path).await;
     }
