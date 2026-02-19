@@ -20,6 +20,9 @@ const MAX_PROGRESS_PREVIEW_CHARS: usize = 300;
 const AGENT_PROGRESS_CHANNEL_CAPACITY: usize = 128;
 const AGENT_PROGRESS_MIN_INTERVAL: Duration = Duration::from_millis(250);
 const AGENT_PROGRESS_MAX_SUPPRESSED: u32 = 12;
+const DEFAULT_REMOTE_AGENT_MAX_STEPS: usize = 80;
+const MIN_REMOTE_AGENT_MAX_STEPS: usize = 4;
+const MAX_REMOTE_AGENT_MAX_STEPS: usize = 200;
 
 fn with_jitter(duration: Duration) -> Duration {
     let base_ms = duration.as_millis() as u64;
@@ -430,12 +433,25 @@ impl CommandPoller {
                             settings.get_selected_model().to_string()
                         });
 
+                    let max_steps = command
+                        .payload
+                        .params
+                        .as_ref()
+                        .and_then(|p| p.get("maxSteps").or_else(|| p.get("max_steps")))
+                        .and_then(|v| v.as_u64())
+                        .map(|n| n as usize)
+                        .unwrap_or(DEFAULT_REMOTE_AGENT_MAX_STEPS)
+                        .clamp(MIN_REMOTE_AGENT_MAX_STEPS, MAX_REMOTE_AGENT_MAX_STEPS);
+
                     // Optional agent ID to load persisted spec
                     let agent_id = command
                         .payload
                         .params
                         .as_ref()
-                        .and_then(|p| p.get("agentId"))
+                        .and_then(|p| {
+                            p.get("agentId")
+                                .or_else(|| p.get("agentSpecId"))
+                        })
                         .and_then(|v| v.as_str())
                         .map(|s| s.to_string());
 
@@ -472,6 +488,7 @@ impl CommandPoller {
                             &format!("Initializing agent runtime for '{}'", agent_name),
                             Some(serde_json::json!({
                                 "model": model.clone(),
+                                "maxSteps": max_steps,
                                 "workspaceId": workspace_id.clone(),
                                 "agentId": agent_id.clone(),
                             })),
@@ -512,7 +529,7 @@ impl CommandPoller {
                             workspace_id: workspace_id.clone(),
                             // Cloud commands often require several think/act cycles.
                             // Keep a bounded ceiling but avoid premature termination.
-                            max_steps: Some(30),
+                            max_steps: Some(max_steps),
                             // Resolve allowed_paths: payload > spec airlock > None
                             allowed_paths: if !command.payload.allowed_paths.is_empty() {
                                 Some(command.payload.allowed_paths.clone())
