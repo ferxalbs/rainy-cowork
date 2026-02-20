@@ -30,6 +30,8 @@ pub struct UserSettings {
     pub profile: UserProfile,
     pub auto_reconnect_cloud: bool,
     pub tool_policy_version_floor: HashMap<String, u64>,
+    pub embedder_provider: String,
+    pub embedder_model: String,
 }
 
 /// User profile metadata for desktop personalization and cloud identity sync
@@ -52,6 +54,8 @@ impl Default for UserSettings {
             profile: UserProfile::default(),
             auto_reconnect_cloud: true,
             tool_policy_version_floor: HashMap::new(),
+            embedder_provider: "gemini".to_string(),
+            embedder_model: "gemini-embedding-001".to_string(),
         }
     }
 }
@@ -152,6 +156,28 @@ impl SettingsManager {
         self.save_to_disk()
     }
 
+    /// Get embedder provider
+    pub fn get_embedder_provider(&self) -> &str {
+        &self.settings.embedder_provider
+    }
+
+    /// Set embedder provider and persist
+    pub fn set_embedder_provider(&mut self, provider: String) -> Result<(), String> {
+        self.settings.embedder_provider = provider;
+        self.save_to_disk()
+    }
+
+    /// Get embedder model
+    pub fn get_embedder_model(&self) -> &str {
+        &self.settings.embedder_model
+    }
+
+    /// Set embedder model and persist
+    pub fn set_embedder_model(&mut self, model: String) -> Result<(), String> {
+        self.settings.embedder_model = model;
+        self.save_to_disk()
+    }
+
     /// Get the persisted minimum accepted tool policy version for a workspace.
     pub fn get_tool_policy_floor(&self, workspace_id: &str) -> u64 {
         self.settings
@@ -162,7 +188,11 @@ impl SettingsManager {
     }
 
     /// Persist the minimum accepted tool policy version for a workspace.
-    pub fn set_tool_policy_floor(&mut self, workspace_id: &str, version: u64) -> Result<(), String> {
+    pub fn set_tool_policy_floor(
+        &mut self,
+        workspace_id: &str,
+        version: u64,
+    ) -> Result<(), String> {
         self.settings
             .tool_policy_version_floor
             .insert(workspace_id.to_string(), version);

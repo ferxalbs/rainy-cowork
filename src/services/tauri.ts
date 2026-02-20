@@ -439,6 +439,8 @@ export interface UserSettings {
   notificationsEnabled: boolean;
   autoReconnectCloud: boolean;
   profile: UserProfile;
+  embedderProvider: string;
+  embedderModel: string;
 }
 
 export interface UserProfile {
@@ -480,6 +482,22 @@ export async function getUserProfile(): Promise<UserProfile> {
 
 export async function setUserProfile(profile: UserProfile): Promise<void> {
   return invoke<void>("set_user_profile", { profile });
+}
+
+export async function getEmbedderProvider(): Promise<string> {
+  return invoke<string>("get_embedder_provider");
+}
+
+export async function setEmbedderProvider(provider: string): Promise<void> {
+  return invoke<void>("set_embedder_provider", { provider });
+}
+
+export async function getEmbedderModel(): Promise<string> {
+  return invoke<string>("get_embedder_model");
+}
+
+export async function setEmbedderModel(model: string): Promise<void> {
+  return invoke<void>("set_embedder_model", { model });
 }
 
 // ============ Workspace Types ============

@@ -37,8 +37,12 @@ impl KeychainManager {
                 Ok(Some(key))
             }
             Err(e) => {
+                let err_str = e.to_string();
                 // ItemNotFound is not an error - just means no key stored
-                if e.to_string().contains("ItemNotFound") || e.to_string().contains("not found") {
+                if err_str.contains("ItemNotFound")
+                    || err_str.contains("not found")
+                    || err_str.contains("could not be found")
+                {
                     Ok(None)
                 } else {
                     Err(format!("Failed to retrieve API key: {}", e))
@@ -54,8 +58,12 @@ impl KeychainManager {
         match delete_generic_password(SERVICE_NAME, &account) {
             Ok(_) => Ok(()),
             Err(e) => {
+                let err_str = e.to_string();
                 // Ignore "not found" errors
-                if e.to_string().contains("ItemNotFound") || e.to_string().contains("not found") {
+                if err_str.contains("ItemNotFound")
+                    || err_str.contains("not found")
+                    || err_str.contains("could not be found")
+                {
                     Ok(())
                 } else {
                     Err(format!("Failed to delete API key: {}", e))

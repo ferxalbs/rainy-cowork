@@ -74,6 +74,44 @@ pub async fn set_user_profile(
     settings.set_profile(profile)
 }
 
+/// Get embedder provider
+#[tauri::command]
+pub async fn get_embedder_provider(
+    settings: State<'_, Arc<Mutex<SettingsManager>>>,
+) -> Result<String, String> {
+    let settings = settings.lock().await;
+    Ok(settings.get_embedder_provider().to_string())
+}
+
+/// Set embedder provider
+#[tauri::command]
+pub async fn set_embedder_provider(
+    provider: String,
+    settings: State<'_, Arc<Mutex<SettingsManager>>>,
+) -> Result<(), String> {
+    let mut settings = settings.lock().await;
+    settings.set_embedder_provider(provider)
+}
+
+/// Get embedder model
+#[tauri::command]
+pub async fn get_embedder_model(
+    settings: State<'_, Arc<Mutex<SettingsManager>>>,
+) -> Result<String, String> {
+    let settings = settings.lock().await;
+    Ok(settings.get_embedder_model().to_string())
+}
+
+/// Set embedder model
+#[tauri::command]
+pub async fn set_embedder_model(
+    model: String,
+    settings: State<'_, Arc<Mutex<SettingsManager>>>,
+) -> Result<(), String> {
+    let mut settings = settings.lock().await;
+    settings.set_embedder_model(model)
+}
+
 /// Get available models based on user's plan
 #[tauri::command]
 pub async fn get_available_models(

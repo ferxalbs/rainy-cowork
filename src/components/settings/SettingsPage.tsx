@@ -11,6 +11,8 @@ import {
   TextField,
   Input,
   Spinner,
+  Select,
+  ListBox,
 } from "@heroui/react";
 import {
   Bot,
@@ -86,17 +88,28 @@ export function SettingsPage({
   const [rainyApiModels, setRainyApiModels] = useState<string[]>([]);
   const [geminiModels, setGeminiModels] = useState<string[]>([]);
 
+  // Embedder preferences
+  const [embedderProvider, setEmbedderProvider] = useState<string>("gemini");
+  const [embedderModel, setEmbedderModel] = useState<string>(
+    "gemini-embedding-001",
+  );
+
   // Load available models
   useEffect(() => {
     async function loadData() {
       try {
-        const [rainyModels, geminiModelsList] = await Promise.all([
-          tauri.getProviderModels("rainy_api").catch(() => []),
-          tauri.getProviderModels("gemini").catch(() => []),
-        ]);
+        const [rainyModels, geminiModelsList, eProvider, eModel] =
+          await Promise.all([
+            tauri.getProviderModels("rainy_api").catch(() => []),
+            tauri.getProviderModels("gemini").catch(() => []),
+            tauri.getEmbedderProvider().catch(() => "gemini"),
+            tauri.getEmbedderModel().catch(() => "gemini-embedding-001"),
+          ]);
 
         setRainyApiModels(rainyModels || []);
         setGeminiModels(geminiModelsList || []);
+        setEmbedderProvider(eProvider);
+        setEmbedderModel(eModel);
       } catch (error) {
         console.error("Failed to load settings:", error);
       } finally {
@@ -105,6 +118,24 @@ export function SettingsPage({
     }
     loadData();
   }, []);
+
+  const handleEmbedderProviderChange = async (provider: string) => {
+    setEmbedderProvider(provider);
+    try {
+      await tauri.setEmbedderProvider(provider);
+    } catch (error) {
+      console.error("Failed to save embedder provider:", error);
+    }
+  };
+
+  const handleEmbedderModelChange = async (model: string) => {
+    setEmbedderModel(model);
+    try {
+      await tauri.setEmbedderModel(model);
+    } catch (error) {
+      console.error("Failed to save embedder model:", error);
+    }
+  };
 
   useEffect(() => {
     setProfileForm(profile);
@@ -324,6 +355,111 @@ export function SettingsPage({
                 </div>
               ) : (
                 <>
+                  <div className="space-y-6">
+                    {/* Embedder Provider Selection */}
+                    <div>
+                      <h3 className="text-sm font-medium text-foreground mb-3">
+                        Embedder Provider
+                      </h3>
+                      <Select
+                        className="w-full max-w-sm bg-background/30"
+                        // @ts-expect-error HeroUI beta incorrect typing for selectedKeys
+                        selectedKeys={new Set([embedderProvider])}
+                        onSelectionChange={(keys: any) => {
+                          const val = Array.from(keys)[0] as string;
+                          if (val) handleEmbedderProviderChange(val);
+                        }}
+                      >
+                        <Select.Trigger>
+                          <Select.Value />
+                          <Select.Indicator />
+                        </Select.Trigger>
+                        <Select.Popover>
+                          <ListBox>
+                            <ListBox.Item id="gemini" textValue="Gemini">
+                              Gemini
+                              <ListBox.ItemIndicator />
+                            </ListBox.Item>
+                            <ListBox.Item
+                              id="openai"
+                              textValue="OpenAI (Coming Soon)"
+                            >
+                              OpenAI (Coming Soon)
+                              <ListBox.ItemIndicator />
+                            </ListBox.Item>
+                          </ListBox>
+                        </Select.Popover>
+                      </Select>
+
+                      {embedderProvider === "gemini" && (
+                        <Select
+                          className="w-full max-w-sm mt-3"
+                          // @ts-expect-error HeroUI beta incorrect typing for selectedKeys
+                          selectedKeys={new Set([embedderModel])}
+                          onSelectionChange={(keys: any) => {
+                            const val = Array.from(keys)[0] as string;
+                            if (val) handleEmbedderModelChange(val);
+                          }}
+                          placeholder="Select a model"
+                        >
+                          <Select.Trigger>
+                            <Select.Value />
+                            <Select.Indicator />
+                          </Select.Trigger>
+                          <Select.Popover>
+                            <ListBox>
+                              <ListBox.Item
+                                id="text-embedding-004"
+                                textValue="text-embedding-004 (768 dimensions)"
+                              >
+                                text-embedding-004 (768 dimensions)
+                                <ListBox.ItemIndicator />
+                              </ListBox.Item>
+                              <ListBox.Item
+                                id="gemini-embedding-001"
+                                textValue="gemini-embedding-001 (3072 dimensions)"
+                              >
+                                gemini-embedding-001 (3072 dimensions)
+                                <ListBox.ItemIndicator />
+                              </ListBox.Item>
+                            </ListBox>
+                          </Select.Popover>
+                        </Select>
+                      )}
+                    </div>
+
+                    {/* Vector Store Provider */}
+                    <div className="pt-2">
+                      <h3 className="text-sm font-medium text-foreground mb-3">
+                        Vector Store Provider
+                      </h3>
+                      <Select
+                        className="w-full max-w-sm"
+                        // @ts-expect-error HeroUI beta incorrect typing for selectedKeys
+                        selectedKeys={new Set(["turso"])}
+                        isDisabled
+                      >
+                        <Select.Trigger>
+                          <Select.Value />
+                          <Select.Indicator />
+                        </Select.Trigger>
+                        <Select.Popover>
+                          <ListBox>
+                            <ListBox.Item id="turso" textValue="Turso (libSQL)">
+                              Turso (libSQL)
+                              <ListBox.ItemIndicator />
+                            </ListBox.Item>
+                          </ListBox>
+                        </Select.Popover>
+                      </Select>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Currently locked to Turso for encrypted memory vault.
+                      </p>
+                    </div>
+                  </div>
+
+                  <Separator className="my-6" />
+
                   {/* 2. Rainy API (PAYG) */}
                   {hasApiKey("rainy_api") && (
                     <div>
