@@ -1,4 +1,4 @@
-use sqlx::{sqlite::SqlitePoolOptions, Row, SqlitePool};
+use libsql::{params, Builder, Connection};
 use std::path::PathBuf;
 
 #[derive(Debug, Clone)]
@@ -16,11 +16,12 @@ pub struct VaultRow {
     pub tags_nonce: Vec<u8>,
     pub metadata_ciphertext: Option<Vec<u8>>,
     pub metadata_nonce: Option<Vec<u8>>,
+    pub embedding: Option<Vec<u8>>,
 }
 
 #[derive(Debug, Clone)]
 pub struct MemoryVaultRepository {
-    pool: SqlitePool,
+    conn: Connection,
 }
 
 impl MemoryVaultRepository {
@@ -28,17 +29,21 @@ impl MemoryVaultRepository {
         let _ = std::fs::create_dir_all(&app_data_dir);
         let db_path = app_data_dir.join("rainy_cowork_v2.db");
         if !db_path.exists() {
-            std::fs::File::create(&db_path).map_err(|e| format!("Failed to create db file: {}", e))?;
+            std::fs::File::create(&db_path)
+                .map_err(|e| format!("Failed to create db file: {}", e))?;
         }
-        let db_url = format!("sqlite://{}", db_path.to_string_lossy());
 
-        let pool = SqlitePoolOptions::new()
-            .max_connections(5)
-            .connect(&db_url)
+        let db_url = db_path.to_string_lossy().to_string();
+        let db = Builder::new_local(db_url)
+            .build()
             .await
-            .map_err(|e| format!("Failed to open sqlite for vault: {}", e))?;
+            .map_err(|e| format!("Failed to open libsql builder: {}", e))?;
 
-        sqlx::query(
+        let conn = db
+            .connect()
+            .map_err(|e| format!("Failed to connect to libsql: {}", e))?;
+
+        conn.execute(
             "CREATE TABLE IF NOT EXISTS memory_vault_entries (
                 id TEXT PRIMARY KEY,
                 workspace_id TEXT NOT NULL,
@@ -53,48 +58,45 @@ impl MemoryVaultRepository {
                 tags_nonce BLOB NOT NULL,
                 metadata_ciphertext BLOB,
                 metadata_nonce BLOB,
+                embedding F32_BLOB(1536),
                 key_version INTEGER NOT NULL DEFAULT 1
             )",
+            (),
         )
-        .execute(&pool)
         .await
         .map_err(|e| format!("Failed to create vault table: {}", e))?;
 
-        sqlx::query(
+        conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_memory_vault_workspace_time
              ON memory_vault_entries(workspace_id, created_at DESC)",
+            (),
         )
-        .execute(&pool)
         .await
         .map_err(|e| format!("Failed to create vault index: {}", e))?;
 
-        sqlx::query(
+        conn.execute(
             "CREATE TABLE IF NOT EXISTS memory_vault_migrations (
                 id TEXT PRIMARY KEY,
                 completed_at INTEGER NOT NULL
             )",
+            (),
         )
-        .execute(&pool)
         .await
         .map_err(|e| format!("Failed to create vault migration table: {}", e))?;
 
-        Ok(Self { pool })
+        Ok(Self { conn })
     }
 
-    pub fn pool(&self) -> &SqlitePool {
-        &self.pool
+    pub fn conn(&self) -> &Connection {
+        &self.conn
     }
 
-    pub async fn upsert_encrypted(
-        &self,
-        row: &VaultRow,
-        key_version: i64,
-    ) -> Result<(), String> {
-        sqlx::query(
+    pub async fn upsert_encrypted(&self, row: &VaultRow, key_version: i64) -> Result<(), String> {
+        self.conn.execute(
             "INSERT INTO memory_vault_entries
              (id, workspace_id, source, sensitivity, created_at, last_accessed, access_count,
-              content_ciphertext, content_nonce, tags_ciphertext, tags_nonce, metadata_ciphertext, metadata_nonce, key_version)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              content_ciphertext, content_nonce, tags_ciphertext, tags_nonce, metadata_ciphertext, metadata_nonce, embedding, key_version)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
              ON CONFLICT(id) DO UPDATE SET
                workspace_id = excluded.workspace_id,
                source = excluded.source,
@@ -108,97 +110,162 @@ impl MemoryVaultRepository {
                tags_nonce = excluded.tags_nonce,
                metadata_ciphertext = excluded.metadata_ciphertext,
                metadata_nonce = excluded.metadata_nonce,
+               embedding = excluded.embedding,
                key_version = excluded.key_version",
+            params![
+                row.id.clone(),
+                row.workspace_id.clone(),
+                row.source.clone(),
+                row.sensitivity.clone(),
+                row.created_at,
+                row.last_accessed,
+                row.access_count,
+                row.content_ciphertext.clone(),
+                row.content_nonce.clone(),
+                row.tags_ciphertext.clone(),
+                row.tags_nonce.clone(),
+                row.metadata_ciphertext.clone(),
+                row.metadata_nonce.clone(),
+                row.embedding.clone(),
+                key_version
+            ]
         )
-        .bind(&row.id)
-        .bind(&row.workspace_id)
-        .bind(&row.source)
-        .bind(&row.sensitivity)
-        .bind(row.created_at)
-        .bind(row.last_accessed)
-        .bind(row.access_count)
-        .bind(&row.content_ciphertext)
-        .bind(&row.content_nonce)
-        .bind(&row.tags_ciphertext)
-        .bind(&row.tags_nonce)
-        .bind(&row.metadata_ciphertext)
-        .bind(&row.metadata_nonce)
-        .bind(key_version)
-        .execute(&self.pool)
         .await
         .map_err(|e| format!("Failed to upsert vault entry: {}", e))?;
 
         Ok(())
     }
 
-    pub async fn list_workspace_rows(&self, workspace_id: &str, limit: usize) -> Result<Vec<VaultRow>, String> {
-        let rows = sqlx::query(
+    pub async fn list_workspace_rows(
+        &self,
+        workspace_id: &str,
+        limit: usize,
+    ) -> Result<Vec<VaultRow>, String> {
+        let mut rows = self.conn.query(
             "SELECT id, workspace_id, source, sensitivity, created_at, last_accessed, access_count,
-                    content_ciphertext, content_nonce, tags_ciphertext, tags_nonce, metadata_ciphertext, metadata_nonce
+                    content_ciphertext, content_nonce, tags_ciphertext, tags_nonce, metadata_ciphertext, metadata_nonce, embedding
              FROM memory_vault_entries
-             WHERE workspace_id = ?
+             WHERE workspace_id = ?1
              ORDER BY created_at DESC
-             LIMIT ?",
+             LIMIT ?2",
+            params![workspace_id.to_string(), limit as i64]
         )
-        .bind(workspace_id)
-        .bind(limit as i64)
-        .fetch_all(&self.pool)
         .await
-        .map_err(|e| format!("Failed to list vault entries: {}", e))?;
+        .map_err(|e| format!("Failed to query list_workspace_rows: {}", e))?;
 
-        Ok(rows.into_iter().map(row_to_vault).collect())
+        let mut results = Vec::new();
+        while let Some(row) = rows.next().await.map_err(|e| e.to_string())? {
+            results.push(row_to_vault(&row)?);
+        }
+
+        Ok(results)
+    }
+
+    pub async fn search_workspace_vector(
+        &self,
+        workspace_id: &str,
+        query_embedding: &[f32],
+        limit: usize,
+    ) -> Result<Vec<(VaultRow, f32)>, String> {
+        let mut bytes = Vec::with_capacity(query_embedding.len() * 4);
+        for f in query_embedding {
+            bytes.extend_from_slice(&f.to_le_bytes());
+        }
+
+        let mut rows = self.conn.query(
+            "SELECT id, workspace_id, source, sensitivity, created_at, last_accessed, access_count,
+                    content_ciphertext, content_nonce, tags_ciphertext, tags_nonce, metadata_ciphertext, metadata_nonce, embedding,
+                    vector_distance_cos(embedding, ?1) as distance
+             FROM memory_vault_entries
+             WHERE workspace_id = ?2 AND embedding IS NOT NULL
+             ORDER BY distance ASC
+             LIMIT ?3",
+            params![bytes, workspace_id.to_string(), limit as i64]
+        )
+        .await
+        .map_err(|e| format!("Failed to search vector vault entries: {}", e))?;
+
+        let mut results = Vec::new();
+        while let Some(row) = rows.next().await.map_err(|e| e.to_string())? {
+            let distance: f64 = row.get(14).unwrap_or(0.0);
+            results.push((row_to_vault(&row)?, distance as f32));
+        }
+
+        Ok(results)
     }
 
     pub async fn get_by_id(&self, id: &str) -> Result<Option<VaultRow>, String> {
-        let row = sqlx::query(
+        let mut rows = self.conn.query(
             "SELECT id, workspace_id, source, sensitivity, created_at, last_accessed, access_count,
-                    content_ciphertext, content_nonce, tags_ciphertext, tags_nonce, metadata_ciphertext, metadata_nonce
-             FROM memory_vault_entries WHERE id = ?",
+                    content_ciphertext, content_nonce, tags_ciphertext, tags_nonce, metadata_ciphertext, metadata_nonce, embedding
+             FROM memory_vault_entries WHERE id = ?1",
+            params![id.to_string()]
         )
-        .bind(id)
-        .fetch_optional(&self.pool)
         .await
         .map_err(|e| format!("Failed to get vault entry: {}", e))?;
 
-        Ok(row.map(row_to_vault))
+        if let Some(row) = rows.next().await.map_err(|e| e.to_string())? {
+            Ok(Some(row_to_vault(&row)?))
+        } else {
+            Ok(None)
+        }
     }
 
     pub async fn delete_by_id(&self, id: &str) -> Result<(), String> {
-        sqlx::query("DELETE FROM memory_vault_entries WHERE id = ?")
-            .bind(id)
-            .execute(&self.pool)
+        self.conn
+            .execute(
+                "DELETE FROM memory_vault_entries WHERE id = ?1",
+                params![id.to_string()],
+            )
             .await
             .map_err(|e| format!("Failed to delete vault entry: {}", e))?;
         Ok(())
     }
 
-    pub async fn touch_access(&self, id: &str, last_accessed: i64, access_count: i64) -> Result<(), String> {
-        sqlx::query(
-            "UPDATE memory_vault_entries
-             SET last_accessed = ?, access_count = ?
-             WHERE id = ?",
-        )
-        .bind(last_accessed)
-        .bind(access_count)
-        .bind(id)
-        .execute(&self.pool)
-        .await
-        .map_err(|e| format!("Failed to update vault access counters: {}", e))?;
+    pub async fn touch_access(
+        &self,
+        id: &str,
+        last_accessed: i64,
+        access_count: i64,
+    ) -> Result<(), String> {
+        self.conn
+            .execute(
+                "UPDATE memory_vault_entries
+             SET last_accessed = ?1, access_count = ?2
+             WHERE id = ?3",
+                params![last_accessed, access_count, id.to_string()],
+            )
+            .await
+            .map_err(|e| format!("Failed to update vault access counters: {}", e))?;
         Ok(())
     }
 
     pub async fn counts(&self, workspace_id: Option<&str>) -> Result<(usize, usize), String> {
-        let total: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM memory_vault_entries")
-            .fetch_one(&self.pool)
+        let mut total_rows = self
+            .conn
+            .query("SELECT COUNT(*) FROM memory_vault_entries", ())
             .await
-            .map_err(|e| format!("Failed to count vault entries: {}", e))?;
+            .map_err(|e| e.to_string())?;
+        let total: i64 = if let Some(r) = total_rows.next().await.map_err(|e| e.to_string())? {
+            r.get::<i64>(0).unwrap_or(0)
+        } else {
+            0
+        };
 
         let workspace: i64 = if let Some(ws) = workspace_id {
-            sqlx::query_scalar("SELECT COUNT(*) FROM memory_vault_entries WHERE workspace_id = ?")
-                .bind(ws)
-                .fetch_one(&self.pool)
+            let mut ws_rows = self
+                .conn
+                .query(
+                    "SELECT COUNT(*) FROM memory_vault_entries WHERE workspace_id = ?1",
+                    params![ws.to_string()],
+                )
                 .await
-                .map_err(|e| format!("Failed to count workspace vault entries: {}", e))?
+                .map_err(|e| e.to_string())?;
+            if let Some(r) = ws_rows.next().await.map_err(|e| e.to_string())? {
+                r.get::<i64>(0).unwrap_or(0)
+            } else {
+                0
+            }
         } else {
             total
         };
@@ -207,40 +274,142 @@ impl MemoryVaultRepository {
     }
 
     pub async fn migration_completed(&self, id: &str) -> Result<bool, String> {
-        let exists: Option<String> =
-            sqlx::query_scalar("SELECT id FROM memory_vault_migrations WHERE id = ?")
-                .bind(id)
-                .fetch_optional(&self.pool)
-                .await
-                .map_err(|e| format!("Failed to check vault migration marker: {}", e))?;
-        Ok(exists.is_some())
+        let mut rows = self
+            .conn
+            .query(
+                "SELECT id FROM memory_vault_migrations WHERE id = ?1",
+                params![id.to_string()],
+            )
+            .await
+            .map_err(|e| format!("Failed to check vault migration marker: {}", e))?;
+
+        Ok(rows.next().await.map_err(|e| e.to_string())?.is_some())
     }
 
     pub async fn mark_migration_completed(&self, id: &str) -> Result<(), String> {
-        sqlx::query("INSERT OR REPLACE INTO memory_vault_migrations (id, completed_at) VALUES (?, ?)")
-            .bind(id)
-            .bind(chrono::Utc::now().timestamp())
-            .execute(&self.pool)
+        self.conn
+            .execute(
+                "INSERT OR REPLACE INTO memory_vault_migrations (id, completed_at) VALUES (?1, ?2)",
+                params![id.to_string(), chrono::Utc::now().timestamp()],
+            )
             .await
             .map_err(|e| format!("Failed to mark vault migration: {}", e))?;
         Ok(())
     }
 }
 
-fn row_to_vault(row: sqlx::sqlite::SqliteRow) -> VaultRow {
-    VaultRow {
-        id: row.get("id"),
-        workspace_id: row.get("workspace_id"),
-        source: row.get("source"),
-        sensitivity: row.get("sensitivity"),
-        created_at: row.get("created_at"),
-        last_accessed: row.get("last_accessed"),
-        access_count: row.get("access_count"),
-        content_ciphertext: row.get("content_ciphertext"),
-        content_nonce: row.get("content_nonce"),
-        tags_ciphertext: row.get("tags_ciphertext"),
-        tags_nonce: row.get("tags_nonce"),
-        metadata_ciphertext: row.get("metadata_ciphertext"),
-        metadata_nonce: row.get("metadata_nonce"),
+fn row_to_vault(row: &libsql::Row) -> Result<VaultRow, String> {
+    Ok(VaultRow {
+        id: row.get::<String>(0).map_err(|e| e.to_string())?,
+        workspace_id: row.get::<String>(1).map_err(|e| e.to_string())?,
+        source: row.get::<String>(2).map_err(|e| e.to_string())?,
+        sensitivity: row.get::<String>(3).map_err(|e| e.to_string())?,
+        created_at: row.get::<i64>(4).map_err(|e| e.to_string())?,
+        last_accessed: row.get::<i64>(5).map_err(|e| e.to_string())?,
+        access_count: row.get::<i64>(6).map_err(|e| e.to_string())?,
+        content_ciphertext: row.get::<Vec<u8>>(7).map_err(|e| e.to_string())?,
+        content_nonce: row.get::<Vec<u8>>(8).map_err(|e| e.to_string())?,
+        tags_ciphertext: row.get::<Vec<u8>>(9).map_err(|e| e.to_string())?,
+        tags_nonce: row.get::<Vec<u8>>(10).map_err(|e| e.to_string())?,
+        metadata_ciphertext: row.get::<Option<Vec<u8>>>(11).unwrap_or(None),
+        metadata_nonce: row.get::<Option<Vec<u8>>>(12).unwrap_or(None),
+        embedding: row.get::<Option<Vec<u8>>>(13).unwrap_or(None),
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    #[tokio::test]
+    async fn test_create_and_query_vault_schema() {
+        let temp_dir = std::env::temp_dir().join(uuid::Uuid::new_v4().to_string());
+
+        // Initialize the DB
+        let repo = MemoryVaultRepository::new(temp_dir.clone())
+            .await
+            .expect("Failed to initialize vault repository");
+
+        // Create a dummy row
+        let row = VaultRow {
+            id: "test-id".to_string(),
+            workspace_id: "test-ws".to_string(),
+            source: "test".to_string(),
+            sensitivity: "Safe".to_string(),
+            created_at: chrono::Utc::now().timestamp(),
+            last_accessed: chrono::Utc::now().timestamp(),
+            access_count: 0,
+            content_ciphertext: vec![1, 2, 3],
+            content_nonce: vec![4, 5, 6],
+            tags_ciphertext: vec![7, 8],
+            tags_nonce: vec![9, 10],
+            metadata_ciphertext: None,
+            metadata_nonce: None,
+            embedding: None, // Test with no embedding first
+        };
+
+        // Test insertion
+        repo.upsert_encrypted(&row, 1)
+            .await
+            .expect("Failed to upsert row");
+
+        // Verify retrieval
+        let retrieved = repo
+            .get_by_id("test-id")
+            .await
+            .expect("Failed to get row")
+            .expect("Row not found");
+
+        assert_eq!(retrieved.workspace_id, "test-ws");
+
+        // Clean up
+        let _ = fs::remove_dir_all(temp_dir);
+    }
+
+    #[tokio::test]
+    async fn test_libsql_direct_vector_api() {
+        let temp_dir = std::env::temp_dir().join(uuid::Uuid::new_v4().to_string());
+
+        let db = libsql::Builder::new_local(temp_dir.clone())
+            .build()
+            .await
+            .unwrap();
+        let conn = db.connect().unwrap();
+
+        conn.execute("CREATE TABLE test_vec (id TEXT, embedding F32_BLOB(3))", ())
+            .await
+            .unwrap();
+
+        let embedding = vec![1.0f32, 2.0f32, 3.0f32];
+        let mut embedding_bytes = Vec::new();
+        for f in &embedding {
+            embedding_bytes.extend_from_slice(&f.to_le_bytes());
+        }
+
+        conn.execute(
+            "INSERT INTO test_vec VALUES (?1, ?2)",
+            libsql::params!["test-id", embedding_bytes.clone()],
+        )
+        .await
+        .unwrap();
+
+        let mut rows = conn
+            .query(
+                "SELECT id, vector_distance_cos(embedding, ?1) as dist FROM test_vec",
+                libsql::params![embedding_bytes],
+            )
+            .await
+            .unwrap();
+
+        let row = rows.next().await.unwrap().unwrap();
+        let id: String = row.get(0).unwrap();
+        // Option 1: f64 or f32? libsql often returns f64 for REAL. We'll read it as f64.
+        let dist: f64 = row.get(1).unwrap();
+
+        assert_eq!(id, "test-id");
+        println!("Distance: {}", dist);
+
+        let _ = fs::remove_dir_all(temp_dir);
     }
 }

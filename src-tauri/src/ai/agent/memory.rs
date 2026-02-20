@@ -1,6 +1,4 @@
-use crate::services::memory_vault::{
-    MemorySensitivity, MemoryVaultService, StoreMemoryInput,
-};
+use crate::services::memory_vault::{MemorySensitivity, MemoryVaultService, StoreMemoryInput};
 use chrono::{TimeZone, Utc};
 use reqwest::Client;
 use scraper::{Html, Selector};
@@ -19,6 +17,7 @@ pub struct MemoryEntry {
     pub timestamp: i64,
     pub metadata: HashMap<String, String>,
     pub importance: f32,
+    pub sensitivity: crate::services::memory_vault::MemorySensitivity,
 }
 
 #[derive(Debug, Clone)]
@@ -26,6 +25,7 @@ pub struct AgentMemory {
     workspace_id: String,
     db: Arc<sqlx::SqlitePool>,
     vault: Arc<MemoryVaultService>,
+    embedder: Arc<crate::services::embedder::EmbedderService>,
     #[allow(dead_code)]
     http_client: Client,
 }
@@ -68,6 +68,12 @@ impl AgentMemory {
             workspace_id: workspace_id.to_string(),
             db: Arc::new(pool),
             vault,
+            embedder: Arc::new(crate::services::embedder::EmbedderService::new(
+                std::env::var("OPENAI_API_KEY")
+                    .or_else(|_| std::env::var("OPENAI_KEY"))
+                    .unwrap_or_default(),
+                None,
+            )),
             http_client: Client::builder()
                 .user_agent("Rainy-MaTE-Agent/1.0")
                 .build()
@@ -100,6 +106,15 @@ impl AgentMemory {
             tags.push(format!("tool:{}", tool));
         }
 
+        let embed_res = self.embedder.embed_text(&content).await;
+        let embedding = match embed_res {
+            Ok(vec) => Some(vec),
+            Err(e) => {
+                println!("Failed to embed memory: {}", e);
+                None
+            }
+        };
+
         let _ = self
             .vault
             .put(StoreMemoryInput {
@@ -111,6 +126,7 @@ impl AgentMemory {
                 sensitivity: MemorySensitivity::Internal,
                 metadata: metadata.clone(),
                 created_at: timestamp,
+                embedding,
             })
             .await;
 
@@ -132,11 +148,24 @@ impl AgentMemory {
     }
 
     pub async fn retrieve(&self, query: &str) -> Vec<MemoryEntry> {
-        let rows = self
-            .vault
-            .search_workspace(&self.workspace_id, query, 20)
-            .await
-            .unwrap_or_default();
+        let embed_res = self.embedder.embed_text(query).await;
+
+        let rows = if let Ok(query_embedding) = embed_res {
+            let limit = 20;
+            self.vault
+                .search_workspace_vector(&self.workspace_id, &query_embedding, limit)
+                .await
+                .unwrap_or_default()
+                .into_iter()
+                .map(|(entry, _dist)| entry)
+                .collect()
+        } else {
+            // Fallback to basic keyword search if embedding fails
+            self.vault
+                .search_workspace(&self.workspace_id, query, 20)
+                .await
+                .unwrap_or_default()
+        };
 
         rows.into_iter()
             .map(|row| {
@@ -152,6 +181,7 @@ impl AgentMemory {
                     timestamp: row.created_at,
                     metadata: row.metadata,
                     importance,
+                    sensitivity: row.sensitivity,
                 }
             })
             .collect()
@@ -273,6 +303,7 @@ impl AgentMemory {
                     sensitivity: MemorySensitivity::Internal,
                     metadata: entry.metadata,
                     created_at: entry.timestamp,
+                    embedding: None,
                 })
                 .await;
         }

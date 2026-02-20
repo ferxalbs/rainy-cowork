@@ -114,6 +114,7 @@ pub struct AgentState {
     pub memory: Arc<AgentMemory>,
     #[allow(dead_code)] // Used by steps
     pub spec: Arc<AgentSpec>,
+    pub airlock_service: Arc<Option<crate::services::airlock::AirlockService>>,
 }
 
 impl AgentState {
@@ -122,6 +123,7 @@ impl AgentState {
         allowed_paths: Vec<String>,
         memory: Arc<AgentMemory>,
         spec: Arc<AgentSpec>,
+        airlock_service: Arc<Option<crate::services::airlock::AirlockService>>,
     ) -> Self {
         Self {
             messages: Vec::new(),
@@ -130,6 +132,7 @@ impl AgentState {
             allowed_paths,
             memory,
             spec,
+            airlock_service,
         }
     }
 }
@@ -318,10 +321,75 @@ impl WorkflowStep for ThinkStep {
         // 1.5. Inject Memory Context (RAG)
         if let Some(last_user_msg) = state.messages.iter().rfind(|m| m.role == "user") {
             // Use as_text() to extract text for vector search
-            let hits = state
+            let mut hits = state
                 .memory
                 .retrieve(&last_user_msg.content.as_text())
                 .await;
+
+            // Airlock Gatekeeping: Filter out Confidential memories if Dangerous permission is denied
+            let has_confidential = hits.iter().any(|hit| {
+                matches!(
+                    hit.sensitivity,
+                    crate::services::memory_vault::MemorySensitivity::Confidential
+                )
+            });
+
+            if has_confidential {
+                let allowed = if let Some(airlock) = state.airlock_service.as_ref() {
+                    let cmd = crate::models::neural::QueuedCommand {
+                        id: uuid::Uuid::new_v4().to_string(),
+                        intent: "memory_vault.read_confidential".to_string(),
+                        payload: crate::models::neural::RainyPayload {
+                            skill: Some("memory_vault".to_string()),
+                            method: Some("read_confidential".to_string()),
+                            params: None,
+                            content: None,
+                            allowed_paths: state.allowed_paths.clone(),
+                            blocked_paths: state.spec.airlock.scopes.blocked_paths.clone(),
+                            allowed_domains: state.spec.airlock.scopes.allowed_domains.clone(),
+                            blocked_domains: state.spec.airlock.scopes.blocked_domains.clone(),
+                            tool_access_policy: None,
+                            tool_access_policy_version: None,
+                            tool_access_policy_hash: None,
+                        },
+                        status: crate::models::neural::CommandStatus::Pending,
+                        priority: crate::models::neural::CommandPriority::Normal,
+                        airlock_level: crate::models::neural::AirlockLevel::Dangerous,
+                        created_at: Some(chrono::Utc::now().timestamp()),
+                        started_at: None,
+                        completed_at: None,
+                        result: None,
+                        workspace_id: Some(state.workspace_id.clone()),
+                        desktop_node_id: None,
+                        approved_by: None,
+                    };
+
+                    match airlock.check_permission(&cmd).await {
+                        Ok(true) => true,
+                        Ok(false) => {
+                            on_event(AgentEvent::Error(
+                                "Reading confidential memory was blocked by Airlock".to_string(),
+                            ));
+                            false
+                        }
+                        Err(e) => {
+                            on_event(AgentEvent::Error(format!("Airlock check failed: {}", e)));
+                            false
+                        }
+                    }
+                } else {
+                    true // local bypass wrapper
+                };
+
+                if !allowed {
+                    hits.retain(|hit| {
+                        !matches!(
+                            hit.sensitivity,
+                            crate::services::memory_vault::MemorySensitivity::Confidential
+                        )
+                    });
+                }
+            }
             if !hits.is_empty() {
                 let ctx = hits
                     .iter()
@@ -433,10 +501,7 @@ impl WorkflowStep for ThinkStep {
 
             let mut stream_request = request.clone();
             stream_request.stream = true;
-            if let Err(e) = router_guard
-                .complete_stream(stream_request, callback)
-                .await
-            {
+            if let Err(e) = router_guard.complete_stream(stream_request, callback).await {
                 event_fn(AgentEvent::Status(format!(
                     "Streaming fallback engaged: {}",
                     e
@@ -566,10 +631,8 @@ impl WorkflowStep for ActStep {
                 .map_err(|e| format!("Failed to parse args: {}", e))?;
 
             if !is_tool_allowed_by_spec(state.spec.as_ref(), &function_name) {
-                let blocked_msg = format!(
-                    "Tool '{}' blocked by agent Airlock policy",
-                    function_name
-                );
+                let blocked_msg =
+                    format!("Tool '{}' blocked by agent Airlock policy", function_name);
                 on_event(AgentEvent::ToolResult {
                     id: call.id.clone(),
                     result: blocked_msg.clone(),
@@ -688,19 +751,66 @@ impl WorkflowStep for ActStep {
 
             // Persist web research results to long-term memory
             if matches!(function_name.as_str(), "web_search" | "read_web_page") {
-                let mut metadata = std::collections::HashMap::new();
-                metadata.insert("tool".to_string(), function_name.clone());
-                metadata.insert("role".to_string(), "tool_result".to_string());
-                let content_preview: String = final_output.chars().take(2000).collect();
-                if !content_preview.is_empty() {
-                    state
-                        .memory
-                        .store(
-                            content_preview,
-                            format!("tool:{}", function_name),
-                            Some(metadata),
-                        )
-                        .await;
+                let allowed = if let Some(airlock) = state.airlock_service.as_ref() {
+                    let cmd = crate::models::neural::QueuedCommand {
+                        id: uuid::Uuid::new_v4().to_string(),
+                        intent: "memory_vault.write".to_string(),
+                        payload: crate::models::neural::RainyPayload {
+                            skill: Some("memory_vault".to_string()),
+                            method: Some("write".to_string()),
+                            params: None,
+                            content: None,
+                            allowed_paths: state.allowed_paths.clone(),
+                            blocked_paths: state.spec.airlock.scopes.blocked_paths.clone(),
+                            allowed_domains: state.spec.airlock.scopes.allowed_domains.clone(),
+                            blocked_domains: state.spec.airlock.scopes.blocked_domains.clone(),
+                            tool_access_policy: None,
+                            tool_access_policy_version: None,
+                            tool_access_policy_hash: None,
+                        },
+                        status: crate::models::neural::CommandStatus::Pending,
+                        priority: crate::models::neural::CommandPriority::Normal,
+                        airlock_level: crate::models::neural::AirlockLevel::Sensitive, // Required for memory writes
+                        created_at: Some(chrono::Utc::now().timestamp()),
+                        started_at: None,
+                        completed_at: None,
+                        result: None,
+                        workspace_id: Some(state.workspace_id.clone()),
+                        desktop_node_id: None,
+                        approved_by: None,
+                    };
+                    match airlock.check_permission(&cmd).await {
+                        Ok(true) => true,
+                        Ok(false) => {
+                            on_event(AgentEvent::Error(
+                                "Memory write (Web Research) blocked by Airlock".to_string(),
+                            ));
+                            false
+                        }
+                        Err(e) => {
+                            on_event(AgentEvent::Error(format!("Airlock error: {}", e)));
+                            false
+                        }
+                    }
+                } else {
+                    true
+                };
+
+                if allowed {
+                    let mut metadata = std::collections::HashMap::new();
+                    metadata.insert("tool".to_string(), function_name.clone());
+                    metadata.insert("role".to_string(), "tool_result".to_string());
+                    let content_preview: String = final_output.chars().take(2000).collect();
+                    if !content_preview.is_empty() {
+                        state
+                            .memory
+                            .store(
+                                content_preview,
+                                format!("tool:{}", function_name),
+                                Some(metadata),
+                            )
+                            .await;
+                    }
                 }
             }
         }
@@ -807,6 +917,7 @@ mod tests {
             Vec::new(),
             memory,
             Arc::new(spec.clone()),
+            Arc::new(None),
         );
 
         match WorkspaceManager::new() {

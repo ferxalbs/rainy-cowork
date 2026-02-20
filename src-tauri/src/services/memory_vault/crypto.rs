@@ -62,3 +62,87 @@ pub fn decrypt_bytes(
         .decrypt(nonce_ga, ciphertext)
         .map_err(|e| format!("Vault decryption failed: {}", e))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_encryption_decryption_roundtrip() {
+        let master_key = b"0123456789abcdef0123456789abcdef"; // 32 bytes
+        let workspace_id = "ws-testing";
+        let entry_id = "entry-123";
+        let plaintext = b"Hello, encrypted vault!";
+
+        // Encrypt
+        let encrypted = encrypt_bytes(master_key, workspace_id, entry_id, plaintext).unwrap();
+        assert_ne!(encrypted.ciphertext, plaintext);
+        assert_eq!(encrypted.nonce.len(), 12);
+
+        // Decrypt
+        let decrypted = decrypt_bytes(
+            master_key,
+            workspace_id,
+            entry_id,
+            &encrypted.ciphertext,
+            &encrypted.nonce,
+        )
+        .unwrap();
+
+        assert_eq!(decrypted, plaintext);
+    }
+
+    #[test]
+    fn test_encryption_different_entries_different_ciphertexts() {
+        let master_key = b"0123456789abcdef0123456789abcdef";
+        let workspace_id = "ws-testing";
+        let plaintext = b"Hello, encrypted vault!";
+
+        let enc1 = encrypt_bytes(master_key, workspace_id, "entry-1", plaintext).unwrap();
+        let enc2 = encrypt_bytes(master_key, workspace_id, "entry-2", plaintext).unwrap();
+
+        assert_ne!(enc1.ciphertext, enc2.ciphertext);
+        assert_ne!(enc1.nonce, enc2.nonce);
+    }
+
+    #[test]
+    fn test_decryption_fails_with_wrong_key_or_workspace() {
+        let master_key = b"0123456789abcdef0123456789abcdef";
+        let wrong_key = b"abcdef0123456789abcdef0123456789";
+        let workspace_id = "ws-testing";
+        let entry_id = "entry-123";
+        let plaintext = b"Hello, encrypted vault!";
+
+        let encrypted = encrypt_bytes(master_key, workspace_id, entry_id, plaintext).unwrap();
+
+        // 1. Wrong master key
+        let res1 = decrypt_bytes(
+            wrong_key,
+            workspace_id,
+            entry_id,
+            &encrypted.ciphertext,
+            &encrypted.nonce,
+        );
+        assert!(res1.is_err());
+
+        // 2. Wrong workspace id
+        let res2 = decrypt_bytes(
+            master_key,
+            "ws-wrong",
+            entry_id,
+            &encrypted.ciphertext,
+            &encrypted.nonce,
+        );
+        assert!(res2.is_err());
+
+        // 3. Wrong entry id
+        let res3 = decrypt_bytes(
+            master_key,
+            workspace_id,
+            "entry-wrong",
+            &encrypted.ciphertext,
+            &encrypted.nonce,
+        );
+        assert!(res3.is_err());
+    }
+}

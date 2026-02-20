@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS memory_vault_entries (
     tags_nonce BLOB NOT NULL,
     metadata_ciphertext BLOB,
     metadata_nonce BLOB,
+    embedding F32_BLOB(1536),
     key_version INTEGER NOT NULL DEFAULT 1
 );
 

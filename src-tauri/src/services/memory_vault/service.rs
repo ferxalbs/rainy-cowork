@@ -2,7 +2,6 @@ use super::crypto::{decrypt_bytes, encrypt_bytes};
 use super::key_provider::{MacOSKeychainVaultKeyProvider, VaultKeyProvider};
 use super::repository::{MemoryVaultRepository, VaultRow};
 use super::types::{DecryptedMemoryEntry, MemorySensitivity, MemoryVaultStats, StoreMemoryInput};
-use sqlx::Row;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -39,8 +38,8 @@ impl MemoryVaultService {
     }
 
     pub async fn put(&self, input: StoreMemoryInput) -> Result<(), String> {
-        let tags_json =
-            serde_json::to_vec(&input.tags).map_err(|e| format!("Failed to serialize tags: {}", e))?;
+        let tags_json = serde_json::to_vec(&input.tags)
+            .map_err(|e| format!("Failed to serialize tags: {}", e))?;
         let metadata_json = serde_json::to_vec(&input.metadata)
             .map_err(|e| format!("Failed to serialize metadata: {}", e))?;
 
@@ -63,6 +62,14 @@ impl MemoryVaultService {
             &metadata_json,
         )?;
 
+        let embedding_bytes = input.embedding.as_ref().map(|v| {
+            let mut bytes = Vec::with_capacity(v.len() * 4);
+            for f in v {
+                bytes.extend_from_slice(&f.to_le_bytes());
+            }
+            bytes
+        });
+
         let row = VaultRow {
             id: input.id,
             workspace_id: input.workspace_id,
@@ -77,6 +84,7 @@ impl MemoryVaultService {
             tags_nonce: tags.nonce,
             metadata_ciphertext: Some(metadata.ciphertext),
             metadata_nonce: Some(metadata.nonce),
+            embedding: embedding_bytes,
         };
 
         self.repository.upsert_encrypted(&row, 1).await
@@ -116,12 +124,46 @@ impl MemoryVaultService {
         Ok(results)
     }
 
+    pub async fn search_workspace_vector(
+        &self,
+        workspace_id: &str,
+        query_embedding: &[f32],
+        limit: usize,
+    ) -> Result<Vec<(DecryptedMemoryEntry, f32)>, String> {
+        let rows = self
+            .repository
+            .search_workspace_vector(workspace_id, query_embedding, limit)
+            .await?;
+        let mut results = Vec::new();
+
+        for (row, distance) in rows {
+            let entry = self.decrypt_row(&row)?;
+            let touched = entry.access_count + 1;
+            let now = chrono::Utc::now().timestamp();
+            let _ = self.repository.touch_access(&entry.id, now, touched).await;
+
+            results.push((
+                DecryptedMemoryEntry {
+                    access_count: touched,
+                    last_accessed: now,
+                    ..entry
+                },
+                distance,
+            ));
+        }
+
+        Ok(results)
+    }
+
     pub async fn recent_workspace(
         &self,
         workspace_id: &str,
         limit: usize,
     ) -> Result<Vec<DecryptedMemoryEntry>, String> {
-        let rows = self.repository.list_workspace_rows(workspace_id, limit).await?;
+        let rows = self
+            .repository
+            .list_workspace_rows(workspace_id, limit)
+            .await?;
         let mut out = Vec::with_capacity(rows.len());
         for row in rows {
             out.push(self.decrypt_row(&row)?);
@@ -180,6 +222,15 @@ impl MemoryVaultService {
         let metadata: HashMap<String, String> = serde_json::from_slice(&metadata_bytes)
             .map_err(|e| format!("Invalid decrypted metadata json: {}", e))?;
 
+        let embedding = row.embedding.as_ref().map(|bytes| {
+            let mut floats = Vec::with_capacity(bytes.len() / 4);
+            for chunk in bytes.chunks_exact(4) {
+                let f = f32::from_le_bytes(chunk.try_into().unwrap());
+                floats.push(f);
+            }
+            floats
+        });
+
         Ok(DecryptedMemoryEntry {
             id: row.id.clone(),
             workspace_id: row.workspace_id.clone(),
@@ -191,32 +242,43 @@ impl MemoryVaultService {
             last_accessed: row.last_accessed,
             access_count: row.access_count,
             metadata,
+            embedding,
         })
     }
 
     async fn run_plaintext_migration(&self) -> Result<(), String> {
-        if self.repository.migration_completed(MIGRATION_PLAINTEXT_DB).await? {
+        if self
+            .repository
+            .migration_completed(MIGRATION_PLAINTEXT_DB)
+            .await?
+        {
             return Ok(());
         }
 
-        let rows = sqlx::query(
-            "SELECT id, workspace_id, content, source, timestamp, metadata_json
+        let mut rows = match self
+            .repository
+            .conn()
+            .query(
+                "SELECT id, workspace_id, content, source, timestamp, metadata_json
              FROM memory_entries",
-        )
-        .fetch_all(self.repository.pool())
-        .await
-        .unwrap_or_default();
+                (),
+            )
+            .await
+        {
+            Ok(r) => r,
+            Err(_) => return Ok(()), // Table doesn't exist, ignore
+        };
 
-        for row in rows {
-            let id: String = row.get("id");
+        while let Ok(Some(row)) = rows.next().await {
+            let id: String = row.get(0).unwrap_or_default();
             if self.repository.get_by_id(&id).await?.is_some() {
                 continue;
             }
-            let workspace_id: String = row.get("workspace_id");
-            let content: String = row.get("content");
-            let source: String = row.get("source");
-            let timestamp: i64 = row.get("timestamp");
-            let metadata_json: String = row.get("metadata_json");
+            let workspace_id: String = row.get(1).unwrap_or_default();
+            let content: String = row.get(2).unwrap_or_default();
+            let source: String = row.get(3).unwrap_or_default();
+            let timestamp: i64 = row.get(4).unwrap_or(0);
+            let metadata_json: String = row.get(5).unwrap_or_default();
             let metadata: HashMap<String, String> =
                 serde_json::from_str(&metadata_json).unwrap_or_default();
 
@@ -233,12 +295,15 @@ impl MemoryVaultService {
                 sensitivity: MemorySensitivity::Internal,
                 metadata,
                 created_at: timestamp,
+                embedding: None,
             })
             .await?;
         }
 
-        let _ = sqlx::query("DELETE FROM memory_entries")
-            .execute(self.repository.pool())
+        let _ = self
+            .repository
+            .conn()
+            .execute("DELETE FROM memory_entries", ())
             .await;
 
         self.repository

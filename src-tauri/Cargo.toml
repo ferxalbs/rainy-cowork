@@ -1,6 +1,6 @@
 [package]
 name = "rainy-cowork"
-version = "0.5.91"
+version = "0.5.92"
 description = "A Tauri App"
 authors = ["you"]
 edition = "2021"
@@ -70,3 +70,4 @@ futures-util = "0.3"
 sqlx = { version = "0.8.6", features = ["sqlite", "runtime-tokio", "tls-native-tls", "chrono"] }
 notify = "8.2.0"
 walkdir = "2.5.0"
+libsql = "0.9.29"

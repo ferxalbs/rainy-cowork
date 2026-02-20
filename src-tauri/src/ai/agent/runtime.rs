@@ -26,6 +26,7 @@ pub struct AgentRuntime {
     router: Arc<tokio::sync::RwLock<IntelligentRouter>>,
     skills: Arc<SkillExecutor>,
     memory: Arc<AgentMemory>,
+    airlock_service: Arc<Option<crate::services::airlock::AirlockService>>,
     history: Arc<Mutex<Vec<AgentMessage>>>,
 }
 
@@ -159,6 +160,7 @@ impl AgentRuntime {
         router: Arc<tokio::sync::RwLock<IntelligentRouter>>,
         skills: Arc<SkillExecutor>,
         memory: Arc<AgentMemory>,
+        airlock_service: Arc<Option<crate::services::airlock::AirlockService>>,
     ) -> Self {
         Self {
             spec,
@@ -166,6 +168,7 @@ impl AgentRuntime {
             router,
             skills,
             memory,
+            airlock_service,
             history: Arc::new(Mutex::new(Vec::new())),
         }
     }
@@ -267,6 +270,7 @@ Rules:
             self.options.allowed_paths.clone().unwrap_or_default(),
             self.memory.clone(),
             Arc::new(self.spec.clone()),
+            self.airlock_service.clone(),
         );
 
         // Add System Message to State
@@ -346,22 +350,73 @@ Rules:
         if last_message.role == "assistant" {
             let response_text = last_message.content.as_text();
             if !response_text.is_empty() && response_text.len() > 20 {
-                let mut metadata = std::collections::HashMap::new();
-                metadata.insert(
-                    "source_input".to_string(),
-                    input.chars().take(200).collect::<String>(),
-                );
-                metadata.insert("role".to_string(), "assistant".to_string());
-                self.memory
-                    .store(
-                        response_text.chars().take(2000).collect::<String>(),
-                        "agent_conversation".to_string(),
-                        Some(metadata),
-                    )
-                    .await;
-                on_event(AgentEvent::MemoryStored(
-                    "Response persisted to memory".to_string(),
-                ));
+                // Airlock Gatekeeping: Check if Agent has permission to write memory.
+                // We construct a synthetic command representing a memory write.
+                let save_command = crate::models::neural::QueuedCommand {
+                    id: uuid::Uuid::new_v4().to_string(),
+                    intent: "memory_vault.write".to_string(),
+                    payload: crate::models::neural::RainyPayload {
+                        skill: Some("memory_vault".to_string()),
+                        method: Some("write".to_string()),
+                        params: None,
+                        content: None,
+                        allowed_paths: self.options.allowed_paths.clone().unwrap_or_default(),
+                        blocked_paths: self.spec.airlock.scopes.blocked_paths.clone(),
+                        allowed_domains: self.spec.airlock.scopes.allowed_domains.clone(),
+                        blocked_domains: self.spec.airlock.scopes.blocked_domains.clone(),
+                        tool_access_policy: None,
+                        tool_access_policy_version: None,
+                        tool_access_policy_hash: None,
+                    },
+                    status: crate::models::neural::CommandStatus::Pending,
+                    priority: crate::models::neural::CommandPriority::Normal,
+                    airlock_level: crate::models::neural::AirlockLevel::Sensitive, // Required for memory writes
+                    created_at: Some(chrono::Utc::now().timestamp()),
+                    started_at: None,
+                    completed_at: None,
+                    result: None,
+                    workspace_id: Some(self.options.workspace_id.clone()),
+                    desktop_node_id: None,
+                    approved_by: None,
+                };
+
+                let allowed = if let Some(airlock) = self.airlock_service.as_ref() {
+                    match airlock.check_permission(&save_command).await {
+                        Ok(true) => true,
+                        Ok(false) => {
+                            on_event(AgentEvent::Error(
+                                "Memory write blocked by Airlock".to_string(),
+                            ));
+                            false
+                        }
+                        Err(e) => {
+                            on_event(AgentEvent::Error(format!("Airlock error: {}", e)));
+                            false
+                        }
+                    }
+                } else {
+                    // Failsafe open if no airlock connected, preserving legacy behavior config
+                    true
+                };
+
+                if allowed {
+                    let mut metadata = std::collections::HashMap::new();
+                    metadata.insert(
+                        "source_input".to_string(),
+                        input.chars().take(200).collect::<String>(),
+                    );
+                    metadata.insert("role".to_string(), "assistant".to_string());
+                    self.memory
+                        .store(
+                            response_text.chars().take(2000).collect::<String>(),
+                            "agent_conversation".to_string(),
+                            Some(metadata),
+                        )
+                        .await;
+                    on_event(AgentEvent::MemoryStored(
+                        "Response persisted to memory".to_string(),
+                    ));
+                }
             }
             Ok(last_message.content.as_text())
         } else {

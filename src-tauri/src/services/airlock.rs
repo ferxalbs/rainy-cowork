@@ -50,6 +50,14 @@ pub struct AirlockService {
     headless_mode: Arc<AtomicBool>,
 }
 
+impl std::fmt::Debug for AirlockService {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AirlockService")
+            .field("headless_mode", &self.headless_mode)
+            .finish()
+    }
+}
+
 impl AirlockService {
     fn is_agent_run_bootstrap(command: &QueuedCommand) -> bool {
         if command.intent == "agent.run" {
@@ -114,8 +122,10 @@ impl AirlockService {
     }
 
     fn list_pending_approvals(pending: &HashMap<String, PendingApproval>) -> Vec<ApprovalRequest> {
-        let mut approvals: Vec<ApprovalRequest> =
-            pending.values().map(|entry| entry.request.clone()).collect();
+        let mut approvals: Vec<ApprovalRequest> = pending
+            .values()
+            .map(|entry| entry.request.clone())
+            .collect();
         approvals.sort_by_key(|request| request.timestamp);
         approvals
     }
@@ -535,6 +545,9 @@ mod tests {
         command.payload.skill = Some("agent".to_string());
         command.payload.method = Some("run".to_string());
         assert!(AirlockService::is_agent_run_bootstrap(&command));
-        assert_eq!(AirlockService::effective_airlock_level(&command), AirlockLevel::Safe);
+        assert_eq!(
+            AirlockService::effective_airlock_level(&command),
+            AirlockLevel::Safe
+        );
     }
 }

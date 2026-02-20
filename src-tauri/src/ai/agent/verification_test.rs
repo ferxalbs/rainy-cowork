@@ -96,6 +96,7 @@ mod tests {
             Arc::new(SkillExecutor::mock()), // Assuming we add a mock/new_empty to SkillExecutor?
             // If not, we can just stop here as the goal was Persistence -> Spec Loading.
             memory,
+            Arc::new(None),
         );
 
         assert_eq!(runtime.spec.soul.name, "Test Agent");

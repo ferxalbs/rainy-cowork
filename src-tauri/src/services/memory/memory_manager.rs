@@ -1,7 +1,5 @@
 use crate::services::memory::{MemoryEntry, MemoryError, MemoryStats};
-use crate::services::memory_vault::{
-    MemorySensitivity, MemoryVaultService, StoreMemoryInput,
-};
+use crate::services::memory_vault::{MemorySensitivity, MemoryVaultService, StoreMemoryInput};
 use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -80,6 +78,7 @@ impl MemoryManager {
                 sensitivity: MemorySensitivity::Internal,
                 metadata,
                 created_at: now,
+                embedding: None,
             })
             .await
             .map_err(MemoryError::Other)?;
@@ -87,11 +86,7 @@ impl MemoryManager {
         Ok(())
     }
 
-    pub async fn search(
-        &self,
-        query: &str,
-        limit: usize,
-    ) -> Result<Vec<MemoryEntry>, MemoryError> {
+    pub async fn search(&self, query: &str, limit: usize) -> Result<Vec<MemoryEntry>, MemoryError> {
         let workspace_id = derive_workspace_id_from_query(query);
         let vault = self.ensure_vault().await?;
         let results = vault
@@ -129,10 +124,7 @@ impl MemoryManager {
 
     pub async fn get_stats(&self) -> Result<MemoryStats, MemoryError> {
         let vault = self.ensure_vault().await?;
-        let stats = vault
-            .stats(None)
-            .await
-            .map_err(MemoryError::Other)?;
+        let stats = vault.stats(None).await.map_err(MemoryError::Other)?;
 
         Ok(MemoryStats {
             total_entries: stats.total_entries,
@@ -140,15 +132,9 @@ impl MemoryManager {
         })
     }
 
-    pub async fn get_by_id(
-        &self,
-        id: &str,
-    ) -> Result<Option<MemoryEntry>, MemoryError> {
+    pub async fn get_by_id(&self, id: &str) -> Result<Option<MemoryEntry>, MemoryError> {
         let vault = self.ensure_vault().await?;
-        let maybe = vault
-            .get_by_id(id)
-            .await
-            .map_err(MemoryError::Other)?;
+        let maybe = vault.get_by_id(id).await.map_err(MemoryError::Other)?;
 
         Ok(maybe.map(|entry| MemoryEntry {
             id: entry.id,
@@ -162,10 +148,7 @@ impl MemoryManager {
 
     pub async fn delete(&self, id: &str) -> Result<(), MemoryError> {
         let vault = self.ensure_vault().await?;
-        vault
-            .delete_by_id(id)
-            .await
-            .map_err(MemoryError::Other)
+        vault.delete_by_id(id).await.map_err(MemoryError::Other)
     }
 
     pub async fn short_term_size(&self) -> usize {

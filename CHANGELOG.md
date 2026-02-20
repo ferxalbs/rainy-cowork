@@ -5,6 +5,20 @@ All notable changes to Rainy Cowork will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.92] - 2026-02-19 - DARK ARCHIVE (Polish & Hardening)
+
+### Added - Native Vector Similarity SQL via libSQL
+
+- `services/memory_vault/repository.rs` completely migrated from standard `sqlx` to native `libsql` connections to unblock and support `vector_distance_cos` SQLite queries.
+- Introduced unit testing for DB vector similarity execution over `F32_BLOB(1536)` types locally.
+
+### Changed - Airlock Security Validations
+
+- **AgentState** natively initializes and propagates `Arc<Option<AirlockService>>`.
+- Enforced `Sensitive` (Level 1) gate restrictions before persisting/writing Memory Vault entries in `ActStep`.
+- Enforced `Dangerous` (Level 2) gate restrictions before resolving `Confidential` Memories in `ThinkStep`.
+- Migrated `run_plaintext_migration` schema iterators to execute purely over `libsql::Row` cursors.
+
 ## [0.5.91] - 2026-02-19 - DARK ARCHIVE (Encrypted Memory Vault)
 
 ### Added - Encrypted Memory Vault (AES-256-GCM)

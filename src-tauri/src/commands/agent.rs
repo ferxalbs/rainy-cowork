@@ -191,6 +191,7 @@ pub async fn run_agent_workflow(
         router.0.clone(),
         skills.inner().clone(),
         memory,
+        Arc::new(None),
     );
 
     // Load persisted conversation history into runtime so local Native Runtime

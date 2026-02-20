@@ -37,6 +37,7 @@ pub struct StoreMemoryInput {
     pub sensitivity: MemorySensitivity,
     pub metadata: HashMap<String, String>,
     pub created_at: i64,
+    pub embedding: Option<Vec<f32>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -51,6 +52,7 @@ pub struct DecryptedMemoryEntry {
     pub last_accessed: i64,
     pub access_count: i64,
     pub metadata: HashMap<String, String>,
+    pub embedding: Option<Vec<f32>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

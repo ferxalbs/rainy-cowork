@@ -448,10 +448,7 @@ impl CommandPoller {
                         .payload
                         .params
                         .as_ref()
-                        .and_then(|p| {
-                            p.get("agentId")
-                                .or_else(|| p.get("agentSpecId"))
-                        })
+                        .and_then(|p| p.get("agentId").or_else(|| p.get("agentSpecId")))
                         .and_then(|v| v.as_str())
                         .map(|s| s.to_string());
 
@@ -611,12 +608,14 @@ GUIDELINES:
                             options
                         };
 
+                        let airlock = self.airlock_service.read().await.clone();
                         let runtime = AgentRuntime::new(
                             spec,
                             final_options,
                             ctx.router.clone(),
                             self.skill_executor.clone(),
                             memory,
+                            Arc::new(airlock),
                         );
 
                         // Run the agent with bounded event streaming to avoid ATM overload under heavy loops.
