@@ -16,28 +16,112 @@ struct OpenAIEmbeddingResponse {
 struct OpenAIEmbeddingData {
     embedding: Vec<f32>,
 }
+#[derive(Debug, Serialize)]
+struct GeminiEmbeddingRequest {
+    model: String,
+    content: GeminiContent,
+}
+
+#[derive(Debug, Serialize)]
+struct GeminiContent {
+    parts: Vec<GeminiPart>,
+}
+
+#[derive(Debug, Serialize)]
+struct GeminiPart {
+    text: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct GeminiEmbeddingResponse {
+    embedding: GeminiEmbeddingData,
+}
+
+#[derive(Debug, Deserialize)]
+struct GeminiEmbeddingData {
+    values: Vec<f32>,
+}
 
 #[derive(Debug)]
 pub struct EmbedderService {
     client: Client,
+    provider: String,
     api_key: String,
     model: String,
 }
 
 impl EmbedderService {
-    pub fn new(api_key: String, model: Option<String>) -> Self {
+    pub fn new(provider: String, api_key: String, model: Option<String>) -> Self {
+        let default_model = if provider.to_lowercase() == "gemini" {
+            "text-embedding-004".to_string()
+        } else {
+            "text-embedding-3-small".to_string()
+        };
+
         Self {
             client: Client::new(),
+            provider,
             api_key,
-            model: model.unwrap_or_else(|| "text-embedding-3-small".to_string()),
+            model: model.unwrap_or(default_model),
         }
     }
 
     pub async fn embed_text(&self, text: &str) -> Result<Vec<f32>, String> {
         if self.api_key.is_empty() {
-            return Err("Missing embedding API key".to_string());
+            return Err(format!(
+                "Missing embedding API key for provider: {}",
+                self.provider
+            ));
         }
 
+        if self.provider.to_lowercase() == "gemini" {
+            self.embed_gemini(text).await
+        } else {
+            self.embed_openai(text).await
+        }
+    }
+
+    async fn embed_gemini(&self, text: &str) -> Result<Vec<f32>, String> {
+        let req_body = GeminiEmbeddingRequest {
+            model: format!("models/{}", self.model),
+            content: GeminiContent {
+                parts: vec![GeminiPart {
+                    text: text.to_string(),
+                }],
+            },
+        };
+
+        let url = format!(
+            "https://generativelanguage.googleapis.com/v1beta/models/{}:embedContent?key={}",
+            self.model, self.api_key
+        );
+
+        let res = self
+            .client
+            .post(&url)
+            .json(&req_body)
+            .send()
+            .await
+            .map_err(|e| format!("Gemini embedding request failed: {}", e))?;
+
+        if !res.status().is_success() {
+            let status = res.status();
+            let text_err = res.text().await.unwrap_or_default();
+            return Err(format!(
+                "Gemini embedding API error: {} - {}",
+                status, text_err
+            ));
+        }
+
+        let parsed: GeminiEmbeddingResponse = res
+            .json()
+            .await
+            .map_err(|e| format!("Parsing Gemini embedding response failed: {}", e))?;
+
+        Ok(parsed.embedding.values)
+    }
+
+    async fn embed_openai(&self, text: &str) -> Result<Vec<f32>, String> {
         let req_body = OpenAIEmbeddingRequest {
             input: text.to_string(),
             model: self.model.clone(),
@@ -45,7 +129,7 @@ impl EmbedderService {
 
         let res = self
             .client
-            .post("https://api.openai.com/v1/embeddings") // Or OpenRouter equivalent if supported
+            .post("https://api.openai.com/v1/embeddings")
             .bearer_auth(&self.api_key)
             .json(&req_body)
             .send()

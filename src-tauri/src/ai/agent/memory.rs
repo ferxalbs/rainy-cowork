@@ -64,15 +64,24 @@ impl AgentMemory {
                 .expect("failed to initialize memory vault"),
         );
 
+        let settings = crate::services::settings::SettingsManager::new();
+        let provider = settings.get_embedder_provider().to_string();
+        let model = settings.get_embedder_model().to_string();
+
+        let keychain = crate::ai::keychain::KeychainManager::new();
+        let api_key = keychain
+            .get_key(&provider)
+            .unwrap_or_default()
+            .unwrap_or_default();
+
         let memory = Self {
             workspace_id: workspace_id.to_string(),
             db: Arc::new(pool),
             vault,
             embedder: Arc::new(crate::services::embedder::EmbedderService::new(
-                std::env::var("OPENAI_API_KEY")
-                    .or_else(|_| std::env::var("OPENAI_KEY"))
-                    .unwrap_or_default(),
-                None,
+                provider,
+                api_key,
+                Some(model),
             )),
             http_client: Client::builder()
                 .user_agent("Rainy-MaTE-Agent/1.0")
