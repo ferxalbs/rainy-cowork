@@ -5,6 +5,21 @@ All notable changes to Rainy Cowork will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.91] - 2026-02-20 - DARK ARCHIVE (Memory V3) PT. 3
+
+### Added - Gemini 3072-Dimension Vector Support
+
+**Rust Backend (`src-tauri/src/services/`)**
+
+- Added strict native `F32_BLOB(3072)` bounds to `memory_vault_entries_v3` inside `memory_vault/repository.rs`.
+- Implemented global dimensionality runtime safety checks inside `MemoryVaultService::put`.
+- Created an automatic background `run_reembed_backfill` process running at startup in `memory_vault/service.rs` to flawlessly re-embed legacy missing-dimension memory contents without downtime.
+- Persisted vector provider origin contexts by saving `embedding_model`, `embedding_provider`, and `embedding_dim` locally during creation.
+
+**Frontend (`src/components/settings/`)**
+
+- Removed runtime embedding drop-down mutation toggles in `ModelsTab.tsx`, enforcing `gemini-embedding-001` to safely prevent 1536 parameter dimension-mismatch DB crashes natively.
+
 ## [0.5.91] - 2026-02-20 - DARK ARCHIVE (Polish & Hardening) PT. 2
 
 ### Added - Native Vector Similarity SQL via libSQL
