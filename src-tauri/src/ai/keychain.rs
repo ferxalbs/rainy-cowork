@@ -6,6 +6,7 @@ use security_framework::passwords::{
     delete_generic_password, get_generic_password, set_generic_password,
 };
 
+#[cfg(target_os = "macos")]
 const SERVICE_NAME: &str = "com.enosislabs.rainycowork";
 
 /// Manager for secure API key storage via macOS Keychain

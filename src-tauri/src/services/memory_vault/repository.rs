@@ -1,3 +1,4 @@
+#[cfg(feature = "vector-db")]
 use libsql::{params, Builder, Connection};
 use std::path::PathBuf;
 
@@ -22,11 +23,17 @@ pub struct VaultRow {
     pub embedding_dim: Option<usize>,
 }
 
+#[cfg(feature = "vector-db")]
 #[derive(Debug, Clone)]
 pub struct MemoryVaultRepository {
     conn: Connection,
 }
 
+#[cfg(not(feature = "vector-db"))]
+#[derive(Debug, Clone)]
+pub struct MemoryVaultRepository;
+
+#[cfg(feature = "vector-db")]
 impl MemoryVaultRepository {
     pub async fn new(app_data_dir: PathBuf) -> Result<Self, String> {
         let _ = std::fs::create_dir_all(&app_data_dir);
@@ -310,6 +317,66 @@ impl MemoryVaultRepository {
     }
 }
 
+// Stub implementation for when vector-db feature is disabled
+#[cfg(not(feature = "vector-db"))]
+impl MemoryVaultRepository {
+    pub async fn new(_app_data_dir: PathBuf) -> Result<Self, String> {
+        // Return a dummy instance
+        Ok(Self)
+    }
+
+    pub async fn upsert_encrypted(&self, _row: &VaultRow, _key_version: i64) -> Result<(), String> {
+        Ok(())
+    }
+
+    pub async fn list_workspace_rows(
+        &self,
+        _workspace_id: &str,
+        _limit: usize,
+    ) -> Result<Vec<VaultRow>, String> {
+        Ok(Vec::new())
+    }
+
+    pub async fn search_workspace_vector(
+        &self,
+        _workspace_id: &str,
+        _query_embedding: &[f32],
+        _limit: usize,
+    ) -> Result<Vec<(VaultRow, f32)>, String> {
+        Ok(Vec::new())
+    }
+
+    pub async fn get_by_id(&self, _id: &str) -> Result<Option<VaultRow>, String> {
+        Ok(None)
+    }
+
+    pub async fn delete_by_id(&self, _id: &str) -> Result<(), String> {
+        Ok(())
+    }
+
+    pub async fn touch_access(
+        &self,
+        _id: &str,
+        _last_accessed: i64,
+        _access_count: i64,
+    ) -> Result<(), String> {
+        Ok(())
+    }
+
+    pub async fn counts(&self, _workspace_id: Option<&str>) -> Result<(usize, usize), String> {
+        Ok((0, 0))
+    }
+
+    pub async fn migration_completed(&self, _id: &str) -> Result<bool, String> {
+        Ok(true)
+    }
+
+    pub async fn mark_migration_completed(&self, _id: &str) -> Result<(), String> {
+        Ok(())
+    }
+}
+
+#[cfg(feature = "vector-db")]
 fn row_to_vault(row: &libsql::Row) -> Result<VaultRow, String> {
     Ok(VaultRow {
         id: row.get::<String>(0).map_err(|e| e.to_string())?,
@@ -342,6 +409,7 @@ mod tests {
 
     #[tokio::test]
     #[ignore] // FIXME: Libsql threading conflict in tests
+    #[cfg(feature = "vector-db")]
     async fn test_create_and_query_vault_schema() {
         let temp_dir = std::env::temp_dir().join(uuid::Uuid::new_v4().to_string());
 
@@ -391,6 +459,7 @@ mod tests {
 
     #[tokio::test]
     #[ignore] // FIXME: Libsql threading conflict in tests
+    #[cfg(feature = "vector-db")]
     async fn test_libsql_direct_vector_api() {
         let temp_dir = std::env::temp_dir().join(uuid::Uuid::new_v4().to_string());
 
