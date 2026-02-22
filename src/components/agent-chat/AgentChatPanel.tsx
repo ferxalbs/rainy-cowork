@@ -85,7 +85,6 @@ export function AgentChatPanel({
     messages,
     isPlanning,
     isExecuting,
-    currentPlan,
     executePlan,
     executeToolCalls,
     runNativeAgent,
@@ -310,17 +309,22 @@ export function AgentChatPanel({
             </div>
           ) : (
             <div className="space-y-8">
-              {messages.map((message) => (
-                <MessageBubble
-                  key={message.id}
-                  message={message}
-                  currentPlan={currentPlan}
-                  isExecuting={isExecuting}
-                  onExecute={executePlan}
-                  onExecuteToolCalls={executeToolCalls}
-                  workspaceId={workspacePath}
-                />
-              ))}
+              {messages.map((message) => {
+                const shouldPassIsExecuting =
+                  (message.toolCalls && !message.isExecuted) || !!message.plan;
+                return (
+                  <MessageBubble
+                    key={message.id}
+                    message={message}
+                    isExecuting={
+                      shouldPassIsExecuting ? isExecuting : undefined
+                    }
+                    onExecute={executePlan}
+                    onExecuteToolCalls={executeToolCalls}
+                    workspaceId={workspacePath}
+                  />
+                );
+              })}
               <div ref={messagesEndRef} />
             </div>
           )}
