@@ -68,11 +68,12 @@ impl AgentMemory {
         let settings = crate::services::settings::SettingsManager::new();
         let provider_raw = settings.get_embedder_provider().to_string();
         let provider = match provider_raw.trim().to_lowercase().as_str() {
-            "g" | "google" | "gemini" => "gemini".to_string(),
-            "oai" | "openai" => "openai".to_string(),
-            other => other.to_string(),
+            "g" | "google" | "gemini" => {
+                crate::services::memory_vault::EMBEDDING_PROVIDER.to_string()
+            }
+            _ => crate::services::memory_vault::EMBEDDING_PROVIDER.to_string(),
         };
-        let model = settings.get_embedder_model().to_string();
+        let model = crate::services::memory_vault::EMBEDDING_MODEL.to_string();
 
         let keychain = crate::ai::keychain::KeychainManager::new();
         let api_key = keychain

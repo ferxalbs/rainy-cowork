@@ -15,3 +15,26 @@ pub struct MemoryEntry {
     /// Tags for categorization and retrieval
     pub tags: Vec<String>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SemanticRetrievalMode {
+    Ann,
+    Exact,
+    LexicalFallback,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SemanticSearchResult {
+    pub entries: Vec<MemoryEntry>,
+    pub mode: SemanticRetrievalMode,
+    pub reason: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IngestionResult {
+    pub chunks_ingested: usize,
+    pub chunks_embedded: usize,
+    pub embedding_mode: String,
+    pub warnings: Vec<String>,
+}

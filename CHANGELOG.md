@@ -20,6 +20,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Registered `ingest_document` in `registry.rs` and the frontend so agents can ingest user-provided documents directly into the workspace knowledge graph.
 
+### Changed - STEP 3 Production Hardening (Gemini-Only 3072d)
+
+**Rust Backend (`src-tauri/src/`)**
+
+- Enforced Gemini-only embedding normalization for memory and agent memory embedding paths (`gemini-embedding-001`, `3072` dimensions) to prevent provider drift and dimension mismatches in STEP 3 semantic retrieval.
+- Added structured semantic retrieval/injection metadata in `MemoryManager` (ANN vs exact vs lexical fallback) and bounded semantic memory prompt injection using the `ContextWindow` budget.
+- Added libSQL ANN retrieval path (`vector_top_k`) in `memory_vault/repository.rs` with safe exact-search fallback (`vector_distance_cos`) if the vector index path is unavailable.
+- Added a best-effort libSQL vector index creation path plus migration file `src-tauri/migrations/20260222090000_memory_vault_vector_ann_index.sql`.
+- Hardened `ingest_document` with file-size checks and richer ingestion status reporting (chunks ingested/embedded + warnings).
+
+### Validation
+
+- `cd src-tauri && cargo check` — passes
+- `cd src-tauri && cargo test context_window --lib` — passes (3/3)
+- `cd src-tauri && cargo test memory_vault::repository::tests::test_libsql_direct_vector_api --lib` — passes (1/1)
+- `pnpm exec tsc --noEmit` — passes
+- `cd src-tauri && cargo test` — compiles and starts test run, but did not complete during this validation window (no failure captured)
+
 ## [0.5.91] - 2026-02-20 - DARK ARCHIVE (Memory V3) PT. 3
 
 ### Added - Gemini 3072-Dimension Vector Support

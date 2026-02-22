@@ -7,7 +7,9 @@ pub mod memory_manager;
 pub mod types;
 
 pub use memory_manager::MemoryManager;
-pub use types::MemoryEntry;
+pub use types::{
+    IngestionResult, MemoryEntry, SemanticRetrievalMode, SemanticSearchResult,
+};
 
 #[derive(Debug, thiserror::Error)]
 pub enum MemoryError {

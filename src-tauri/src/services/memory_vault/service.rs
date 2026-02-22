@@ -8,6 +8,12 @@ use std::sync::Arc;
 
 const MIGRATION_PLAINTEXT_DB: &str = "migrate_plaintext_memory_entries_v1";
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VectorSearchMode {
+    Ann,
+    Exact,
+}
+
 #[derive(Debug, Clone)]
 pub struct MemoryVaultService {
     repository: Arc<MemoryVaultRepository>,
@@ -150,10 +156,31 @@ impl MemoryVaultService {
         query_embedding: &[f32],
         limit: usize,
     ) -> Result<Vec<(DecryptedMemoryEntry, f32)>, String> {
-        let rows = self
-            .repository
-            .search_workspace_vector(workspace_id, query_embedding, limit)
+        let (rows, _mode) = self
+            .search_workspace_vector_with_mode(workspace_id, query_embedding, limit)
             .await?;
+        Ok(rows)
+    }
+
+    pub async fn search_workspace_vector_with_mode(
+        &self,
+        workspace_id: &str,
+        query_embedding: &[f32],
+        limit: usize,
+    ) -> Result<(Vec<(DecryptedMemoryEntry, f32)>, VectorSearchMode), String> {
+        let (rows, mode) = match self
+            .repository
+            .search_workspace_vector_ann(workspace_id, query_embedding, limit)
+            .await
+        {
+            Ok(rows) => (rows, VectorSearchMode::Ann),
+            Err(_) => (
+                self.repository
+                    .search_workspace_vector_exact(workspace_id, query_embedding, limit)
+                    .await?,
+                VectorSearchMode::Exact,
+            ),
+        };
         let mut results = Vec::new();
 
         for (row, distance) in rows {
@@ -172,7 +199,7 @@ impl MemoryVaultService {
             ));
         }
 
-        Ok(results)
+        Ok((results, mode))
     }
 
     pub async fn recent_workspace(
@@ -379,11 +406,16 @@ impl MemoryVaultService {
         let settings = crate::services::settings::SettingsManager::new();
         let provider_raw = settings.get_embedder_provider().to_string();
         let provider = match provider_raw.trim().to_lowercase().as_str() {
-            "g" | "google" | "gemini" => "gemini".to_string(),
-            "oai" | "openai" => "openai".to_string(),
-            other => other.to_string(),
+            "g" | "google" | "gemini" => super::types::EMBEDDING_PROVIDER.to_string(),
+            _ => {
+                println!(
+                    "Memory vault backfill forcing Gemini embedding provider; configured '{}' is unsupported for Step 3",
+                    provider_raw
+                );
+                super::types::EMBEDDING_PROVIDER.to_string()
+            }
         };
-        let model = settings.get_embedder_model().to_string();
+        let model = super::types::EMBEDDING_MODEL.to_string();
 
         let keychain = crate::ai::keychain::KeychainManager::new();
         let api_key = keychain
@@ -395,7 +427,7 @@ impl MemoryVaultService {
         let embedder = crate::services::embedder::EmbedderService::new(
             provider,
             api_key.clone(),
-            Some(model.clone()),
+            Some(model),
         );
 
         if api_key.is_empty() {

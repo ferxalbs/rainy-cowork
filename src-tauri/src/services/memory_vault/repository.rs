@@ -1,6 +1,8 @@
 use libsql::{params, Builder, Connection};
 use std::path::PathBuf;
 
+const MEMORY_VAULT_VECTOR_INDEX: &str = "idx_memory_vault_embedding_gemini_3072";
+
 #[derive(Debug, Clone)]
 pub struct VaultRow {
     pub id: String,
@@ -79,6 +81,18 @@ impl MemoryVaultRepository {
         )
         .await
         .map_err(|e| format!("Failed to create vault index: {}", e))?;
+
+        // Best-effort ANN vector index. Older libsql builds may not support this yet.
+        // We keep exact vector search as a fallback path.
+        let _ = conn
+            .execute(
+                &format!(
+                    "CREATE INDEX IF NOT EXISTS {} ON memory_vault_entries(libsql_vector_idx(embedding))",
+                    MEMORY_VAULT_VECTOR_INDEX
+                ),
+                (),
+            )
+            .await;
 
         conn.execute(
             "CREATE TABLE IF NOT EXISTS memory_vault_migrations (
@@ -173,7 +187,48 @@ impl MemoryVaultRepository {
         Ok(results)
     }
 
-    pub async fn search_workspace_vector(
+    pub async fn search_workspace_vector_ann(
+        &self,
+        workspace_id: &str,
+        query_embedding: &[f32],
+        limit: usize,
+    ) -> Result<Vec<(VaultRow, f32)>, String> {
+        let mut bytes = Vec::with_capacity(query_embedding.len() * 4);
+        for f in query_embedding {
+            bytes.extend_from_slice(&f.to_le_bytes());
+        }
+
+        let mut rows = self
+            .conn
+            .query(
+                &format!(
+                    "SELECT m.id, m.workspace_id, m.source, m.sensitivity, m.created_at, m.last_accessed, m.access_count,
+                            m.content_ciphertext, m.content_nonce, m.tags_ciphertext, m.tags_nonce, m.metadata_ciphertext, m.metadata_nonce, m.embedding, m.embedding_model, m.embedding_provider, m.embedding_dim,
+                            vector_distance_cos(m.embedding, ?1) as distance
+                     FROM vector_top_k('{}', ?1, ?3) nn
+                     JOIN memory_vault_entries m ON m.rowid = nn.id
+                     WHERE m.workspace_id = ?2
+                       AND m.embedding IS NOT NULL
+                       AND m.embedding_dim = 3072
+                       AND m.embedding_model = 'gemini-embedding-001'
+                     ORDER BY distance ASC",
+                    MEMORY_VAULT_VECTOR_INDEX
+                ),
+                params![bytes, workspace_id.to_string(), limit as i64],
+            )
+            .await
+            .map_err(|e| format!("Failed to search ANN vector vault entries: {}", e))?;
+
+        let mut results = Vec::new();
+        while let Some(row) = rows.next().await.map_err(|e| e.to_string())? {
+            let distance: f64 = row.get(17).unwrap_or(0.0);
+            results.push((row_to_vault(&row)?, distance as f32));
+        }
+
+        Ok(results)
+    }
+
+    pub async fn search_workspace_vector_exact(
         &self,
         workspace_id: &str,
         query_embedding: &[f32],
@@ -195,7 +250,7 @@ impl MemoryVaultRepository {
             params![bytes, workspace_id.to_string(), limit as i64]
         )
         .await
-        .map_err(|e| format!("Failed to search vector vault entries: {}", e))?;
+        .map_err(|e| format!("Failed to search exact vector vault entries: {}", e))?;
 
         let mut results = Vec::new();
         while let Some(row) = rows.next().await.map_err(|e| e.to_string())? {

@@ -9,6 +9,7 @@ const CHARS_PER_TOKEN: usize = 4;
 
 /// Default maximum context window in tokens if not configured via spec.
 const DEFAULT_MAX_TOKENS: usize = 120_000;
+const SEMANTIC_CONTEXT_BUDGET_DIVISOR: usize = 5; // 20%
 
 /// Manages the agent's context window to keep history within token limits.
 pub struct ContextWindow {
@@ -42,6 +43,24 @@ impl ContextWindow {
     /// Estimate the total token count for a message list.
     pub fn estimate_total_tokens(messages: &[AgentMessage]) -> usize {
         messages.iter().map(Self::estimate_tokens).sum()
+    }
+
+    pub fn semantic_context_budget_tokens(&self) -> usize {
+        (self.max_tokens / SEMANTIC_CONTEXT_BUDGET_DIVISOR).clamp(256, 8_000)
+    }
+
+    pub fn truncate_text_for_tokens(&self, text: &str, token_budget: usize) -> String {
+        if token_budget == 0 {
+            return String::new();
+        }
+
+        let max_chars = token_budget.saturating_mul(CHARS_PER_TOKEN);
+        if text.chars().count() <= max_chars {
+            return text.to_string();
+        }
+
+        let truncated: String = text.chars().take(max_chars.saturating_sub(3)).collect();
+        format!("{}...", truncated)
     }
 
     /// Trim the history to fit within the max_tokens limit.

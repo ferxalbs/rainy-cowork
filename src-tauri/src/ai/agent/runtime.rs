@@ -259,6 +259,56 @@ Rules:
         )
     }
 
+    fn build_semantic_context_block(
+        &self,
+        context_window: &ContextWindow,
+        result: &crate::services::memory::SemanticSearchResult,
+    ) -> String {
+        if result.entries.is_empty() {
+            return String::new();
+        }
+
+        let budget_tokens = context_window.semantic_context_budget_tokens();
+        let mut remaining_chars = budget_tokens.saturating_mul(4);
+        let mut block = String::new();
+        let header = format!(
+            "\n\n--- RELEVANT CONTEXT FROM WORKSPACE MEMORY ({:?}) ---\n",
+            result.mode
+        );
+        block.push_str(&header);
+        remaining_chars = remaining_chars.saturating_sub(header.len());
+
+        for (i, entry) in result.entries.iter().enumerate() {
+            if remaining_chars < 32 {
+                break;
+            }
+
+            let prefix = format!("[{}] ", i + 1);
+            let content_budget_tokens = (remaining_chars / 4).saturating_sub(8);
+            let content = context_window.truncate_text_for_tokens(&entry.content, content_budget_tokens);
+            let line = format!("{}{}\n", prefix, content);
+            if line.len() > remaining_chars {
+                break;
+            }
+            block.push_str(&line);
+            remaining_chars = remaining_chars.saturating_sub(line.len());
+        }
+
+        if let Some(reason) = &result.reason {
+            let footer = format!("fallback_reason: {}\n", reason);
+            if footer.len() <= remaining_chars {
+                block.push_str(&footer);
+                remaining_chars = remaining_chars.saturating_sub(footer.len());
+            }
+        }
+
+        let end = "----------------------------------------------\n";
+        if end.len() <= remaining_chars {
+            block.push_str(end);
+        }
+        block
+    }
+
     /// Primary entry point: Run a workflow/turn
     pub async fn run<F>(&self, input: &str, on_event: F) -> Result<String, String>
     where
@@ -281,24 +331,20 @@ Rules:
             tool_call_id: None,
         });
 
+        let context_window =
+            ContextWindow::new(self.spec.memory_config.effective_max_tokens() as usize);
+
         // --- SEMANTIC RETRIEVAL (Hive Mind Seed) ---
         // Retrieve relevant context from the encrypted memory vault using the user input
         // Since we don't have direct access to memory_manager here, we use AgentMemory wrapped methods.
         // We'll add the semantic results as an invisible "system" state message or inject into the system prompt.
         let mut appended_context = String::new();
         if let Some(mm) = self.memory.manager() {
-            if let Ok(results) = mm
-                .search_semantic(&self.options.workspace_id, input, 5)
+            if let Ok(result) = mm
+                .search_semantic_detailed(&self.options.workspace_id, input, 5)
                 .await
             {
-                if !results.is_empty() {
-                    appended_context
-                        .push_str("\n\n--- RELEVANT CONTEXT FROM WORKSPACE MEMORY ---\n");
-                    for (i, entry) in results.iter().enumerate() {
-                        appended_context.push_str(&format!("[{}] {}\n", i + 1, entry.content));
-                    }
-                    appended_context.push_str("----------------------------------------------\n");
-                }
+                appended_context = self.build_semantic_context_block(&context_window, &result);
             }
         }
 
@@ -332,8 +378,6 @@ Rules:
         });
 
         // Apply sliding context window — trim old messages to stay within token budget
-        let context_window =
-            ContextWindow::new(self.spec.memory_config.effective_max_tokens() as usize);
         let pre_trim_len = state.messages.len();
         state.messages = context_window.trim_history(state.messages);
         let trimmed_count = pre_trim_len - state.messages.len();

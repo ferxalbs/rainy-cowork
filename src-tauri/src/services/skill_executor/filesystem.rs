@@ -1039,6 +1039,8 @@ impl SkillExecutor {
         allowed_paths: &[String],
         blocked_paths: &[String],
     ) -> CommandResult {
+        const MAX_INGEST_FILE_BYTES: u64 = 10 * 1024 * 1024;
+
         let args: IngestDocumentArgs = match serde_json::from_value(params.clone()) {
             Ok(a) => a,
             Err(e) => return self.error(&format!("Invalid parameters: {}", e)),
@@ -1059,6 +1061,18 @@ impl SkillExecutor {
 
         if !path.is_file() {
             return self.error("Path is not a regular file");
+        }
+
+        let metadata = match fs::metadata(&path).await {
+            Ok(meta) => meta,
+            Err(e) => return self.error(&format!("Failed to stat file: {}", e)),
+        };
+        if metadata.len() > MAX_INGEST_FILE_BYTES {
+            return self.error(&format!(
+                "File too large for ingestion ({} bytes > {} bytes limit)",
+                metadata.len(),
+                MAX_INGEST_FILE_BYTES
+            ));
         }
 
         let extension = path
@@ -1097,22 +1111,27 @@ impl SkillExecutor {
         // Send to MemoryManager to chunk, embed, and put in the vault
         let lock = self.memory_manager.read().await;
         if let Some(mm) = lock.as_ref() {
-            let num_chunks = match mm
-                .ingest_text(&workspace_id, &path.to_string_lossy(), &content, args.tags)
+            let result = match mm
+                .ingest_text_detailed(&workspace_id, &path.to_string_lossy(), &content, args.tags)
                 .await
             {
-                Ok(n) => n,
+                Ok(r) => r,
                 Err(e) => {
                     return self.error(&format!("Failed to ingest document into memory: {}", e))
                 }
             };
 
+            let mut msg = format!(
+                "Successfully ingested document {} into {} chunks (embedded: {}, mode: {})",
+                args.path, result.chunks_ingested, result.chunks_embedded, result.embedding_mode
+            );
+            if !result.warnings.is_empty() {
+                msg.push_str(&format!(". Warnings: {}", result.warnings.join(" | ")));
+            }
+
             CommandResult {
                 success: true,
-                output: Some(format!(
-                    "Successfully ingested document {} into {} chunks",
-                    args.path, num_chunks
-                )),
+                output: Some(msg),
                 error: None,
                 exit_code: Some(0),
             }
