@@ -134,7 +134,20 @@ pub async fn remove_installed_skill(
     req: RemoveInstalledSkillRequest,
 ) -> Result<(), String> {
     let registry = ThirdPartySkillRegistry::new()?;
+    let installed = registry
+        .list_skills()?
+        .into_iter()
+        .find(|skill| skill.id == req.skill_id && skill.version == req.version)
+        .ok_or_else(|| format!("Skill {}@{} not found", req.skill_id, req.version))?;
     registry.remove(&req.skill_id, &req.version)
+        .and_then(|_| {
+            let binary_path = std::path::Path::new(&installed.binary_path);
+            let install_dir = binary_path
+                .parent()
+                .ok_or_else(|| "Installed skill binary path has no parent directory".to_string())?;
+            std::fs::remove_dir_all(install_dir)
+                .map_err(|e| format!("Failed to remove installed skill directory: {}", e))
+        })
 }
 
 #[tauri::command]

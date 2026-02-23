@@ -1,6 +1,7 @@
 pub mod types;
 
 use self::types::SkillToml;
+use crate::services::SkillExecutor;
 use crate::services::third_party_skill_registry::{InstalledThirdPartySkill, ThirdPartySkillRegistry};
 use crate::services::wasm_sandbox::WasmSandboxService;
 use hmac::{Hmac, Mac};
@@ -48,6 +49,21 @@ impl SkillInstaller {
             || manifest.id == "memory"
         {
             return Err("Third-party skill id conflicts with built-in skill domain".to_string());
+        }
+        let built_in_methods = SkillExecutor::get_registered_tool_definitions()
+            .into_iter()
+            .map(|tool| tool.function.name)
+            .collect::<std::collections::HashSet<_>>();
+        if let Some(conflict) = manifest
+            .methods
+            .iter()
+            .find(|m| built_in_methods.contains(&m.name))
+            .map(|m| m.name.clone())
+        {
+            return Err(format!(
+                "Third-party skill method '{}' conflicts with a built-in tool method",
+                conflict
+            ));
         }
 
         if let Some(sig) = &manifest.signature {
@@ -221,4 +237,74 @@ pub fn verify_downloaded_bundle_signature(
     mac.update(wasm_bytes);
     let expected = hex::encode(mac.finalize().into_bytes());
     safe_equal_hex(&expected, provided_digest)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+    use crate::models::neural::AirlockLevel;
+    use crate::services::skill_installer::types::{
+        SkillBinary, SkillTomlFsPerm, SkillTomlMethod, SkillTomlNetworkPerm, SkillTomlParameter,
+        SkillTomlPermissions,
+    };
+
+    fn minimal_manifest_with_method(name: &str) -> SkillToml {
+        SkillToml {
+            id: "tp_demo".to_string(),
+            name: "Demo".to_string(),
+            version: "1.0.0".to_string(),
+            author: "tester".to_string(),
+            description: String::new(),
+            runtime: "wasi-core-v1".to_string(),
+            entry: None,
+            binary: SkillBinary {
+                path: "module.wasm".to_string(),
+                sha256: "00".to_string(),
+            },
+            permissions: SkillTomlPermissions {
+                filesystem: Vec::<SkillTomlFsPerm>::new(),
+                network: SkillTomlNetworkPerm { domains: vec![] },
+            },
+            methods: vec![SkillTomlMethod {
+                name: name.to_string(),
+                description: "demo".to_string(),
+                airlock_level: AirlockLevel::Safe,
+                parameters: HashMap::<String, SkillTomlParameter>::new(),
+            }],
+            signature: None,
+        }
+    }
+
+    #[test]
+    fn verifies_downloaded_bundle_signature() {
+        let manifest = "id = \"demo\"\nname = \"Demo\"\n";
+        let wasm = b"\0asm\x01\0\0\0";
+        let secret = "test-platform-key";
+
+        let mut mac = HmacSha256::new_from_slice(secret.as_bytes()).expect("hmac");
+        mac.update(manifest.as_bytes());
+        mac.update(b"\n");
+        mac.update(wasm);
+        let digest = hex::encode(mac.finalize().into_bytes());
+
+        assert!(verify_downloaded_bundle_signature(
+            manifest, wasm, &digest, secret
+        ));
+        assert!(!verify_downloaded_bundle_signature(
+            manifest,
+            wasm,
+            "00",
+            secret
+        ));
+    }
+
+    #[test]
+    fn manifest_hmac_changes_when_method_changes() {
+        let a = minimal_manifest_with_method("custom_read");
+        let b = minimal_manifest_with_method("custom_write");
+        let sig_a = compute_manifest_hmac(&a, "secret").expect("sig a");
+        let sig_b = compute_manifest_hmac(&b, "secret").expect("sig b");
+        assert_ne!(sig_a, sig_b);
+    }
 }

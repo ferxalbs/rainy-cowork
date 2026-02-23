@@ -15,6 +15,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `services/skill_installer/` to parse `skill.toml`, verify Wasm SHA-256, enforce built-in-domain collision checks, and persist installed packages in the local app data directory.
 - Added `services/wasm_sandbox/` execution host service with concurrency limits, Wasm binary validation, and a deny-first capability model (filesystem/network permissions remain fail-closed until host capability bindings are enabled).
 - Added Wasmtime/wasmtime-wasi runtime integration for QUARANTINE ZONE basic WASI execution (JSON stdin envelope with `method` + `params`, captured stdout/stderr, fuel limit, stack limit, bounded stdio).
+- Added WASI filesystem capability support via `WasiCtxBuilder::preopened_dir` with manifest permission-mode mapping (`read`, `read_write`) and fail-closed validation for invalid modes/paths.
+- Added fail-closed Wasm execution timeout enforcement (`spawn_blocking` + bounded timeout) so sandboxed skills cannot hang the desktop runtime indefinitely.
+- Added Wasm module compilation caching (shared Wasmtime engine + cached compiled modules by binary SHA-256) to improve repeat skill execution latency.
+- Hardened Step 4 skill lifecycle semantics:
+  - installer rejects third-party methods that collide with built-in tool method names
+  - skill removal now deletes the installed package directory from disk (not only the registry entry)
+- Added host-mediated network capability support for Wasm skills via declarative `networkRequests` prefetch in the WASI input envelope, with strict domain allowlist enforcement and SSRF/private-IP blocking.
 - Added Tauri commands for skill management:
   - `list_installed_skills`
   - `install_local_skill`
@@ -28,7 +35,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `tool_manifest.rs` now merges installed third-party skill manifests into the runtime-generated node skill manifest (built-ins remain canonical + fail-closed).
 - `SkillExecutor` now resolves unknown skill domains against the third-party skill registry and routes them to the Wasm sandbox service (currently fail-closed execution for undeployed ABI).
-- `SkillExecutor` third-party calls now execute in the Wasm sandbox for skills that declare no filesystem/network capabilities; capability-bearing skills remain fail-closed until those host capabilities are explicitly implemented in the runtime.
+- `SkillExecutor` third-party calls now execute in the Wasm sandbox for skills that declare no network capabilities; filesystem capabilities are enforced via WASI preopened directories at runtime.
+- Network capabilities remain fail-closed until explicit domain-checked host bindings are implemented in the Wasm runtime.
 - Added third-party skill pre-execution policy enforcement in `SkillExecutor`:
   - command Airlock level must satisfy installed method minimum level
   - declared filesystem/domain permissions must fit within current command Airlock scopes
@@ -54,11 +62,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `pnpm exec tsc --noEmit` — passes
 - `cd src-tauri && cargo check -q` — passes
+- `cd src-tauri && cargo test -q third_party_skill_registry::tests --lib` — passes (2/2)
+- `cd src-tauri && cargo test -q wasm_sandbox::tests --lib` — passes (2/2)
 - `cd src-tauri && cargo test -q manifest_covers_every_registered_tool --lib` — passes
 - `cd src-tauri && cargo test -q context_window --lib` — passes
-- `cd src-tauri && cargo test -q manifest_covers_every_registered_tool --lib` — passes
 - `cd rainy-atm && bun run build` — passes
-- `cd rainy-atm && bun test` — passes (39/39)
+- `cd rainy-atm && bun test` — passes (42/42)
 
 ## [0.5.92] - 2026-02-21 - HIVE MIND SEED (Vector Knowledge Graph)
 

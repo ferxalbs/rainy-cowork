@@ -71,13 +71,14 @@ impl ThirdPartySkillRegistry {
             .ok_or_else(|| "Could not resolve data directory".to_string())?
             .join("rainy-cowork")
             .join("third_party_skills");
-        fs::create_dir_all(&data_dir)
+        Self::new_with_root(data_dir)
+    }
+
+    pub(crate) fn new_with_root(root_dir: PathBuf) -> Result<Self, String> {
+        fs::create_dir_all(&root_dir)
             .map_err(|e| format!("Failed to create third-party skill dir: {}", e))?;
-        let index_path = data_dir.join("registry.json");
-        Ok(Self {
-            root_dir: data_dir,
-            index_path,
-        })
+        let index_path = root_dir.join("registry.json");
+        Ok(Self { root_dir, index_path })
     }
 
     pub fn root_dir(&self) -> &Path {
@@ -244,5 +245,67 @@ impl ThirdPartySkillRegistry {
             .duration_since(UNIX_EPOCH)
             .map(|d| d.as_secs() as i64)
             .unwrap_or(0)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::neural::AirlockLevel;
+
+    fn method(name: &str, level: AirlockLevel) -> InstalledThirdPartyMethod {
+        InstalledThirdPartyMethod {
+            name: name.to_string(),
+            description: "test".to_string(),
+            airlock_level: level,
+            parameters: HashMap::new(),
+        }
+    }
+
+    fn skill(id: &str, version: &str, methods: Vec<InstalledThirdPartyMethod>) -> InstalledThirdPartySkill {
+        InstalledThirdPartySkill {
+            id: id.to_string(),
+            name: id.to_string(),
+            version: version.to_string(),
+            author: "test".to_string(),
+            description: String::new(),
+            runtime: "wasi-core-v1".to_string(),
+            binary_path: "/tmp/test.wasm".to_string(),
+            binary_sha256: "deadbeef".to_string(),
+            enabled: true,
+            trust_state: "verified".to_string(),
+            install_source: "atm".to_string(),
+            installed_at: 0,
+            permissions: SkillPermissions::default(),
+            methods,
+        }
+    }
+
+    #[test]
+    fn registry_resolves_method_airlock_level() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let registry = ThirdPartySkillRegistry::new_with_root(temp.path().to_path_buf()).expect("registry");
+        registry
+            .upsert_skill(skill("alpha", "1.0.0", vec![method("alpha_run", AirlockLevel::Sensitive)]))
+            .expect("insert");
+
+        let level = registry
+            .find_method_airlock_level("alpha_run")
+            .expect("lookup");
+        assert_eq!(level, Some(AirlockLevel::Sensitive));
+    }
+
+    #[test]
+    fn registry_rejects_method_name_collisions_across_skills() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let registry = ThirdPartySkillRegistry::new_with_root(temp.path().to_path_buf()).expect("registry");
+        registry
+            .upsert_skill(skill("alpha", "1.0.0", vec![method("shared_method", AirlockLevel::Safe)]))
+            .expect("insert alpha");
+
+        let err = registry
+            .upsert_skill(skill("beta", "1.0.0", vec![method("shared_method", AirlockLevel::Dangerous)]))
+            .expect_err("collision should be rejected");
+        assert!(err.contains("Method name collision"));
     }
 }
