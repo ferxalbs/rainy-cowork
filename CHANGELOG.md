@@ -27,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `tool_manifest.rs` now merges installed third-party skill manifests into the runtime-generated node skill manifest (built-ins remain canonical + fail-closed).
 - `SkillExecutor` now resolves unknown skill domains against the third-party skill registry and routes them to the Wasm sandbox service (currently fail-closed execution for undeployed ABI).
+- Added third-party skill pre-execution policy enforcement in `SkillExecutor`:
+  - command Airlock level must satisfy installed method minimum level
+  - declared filesystem/domain permissions must fit within current command Airlock scopes
+- `AirlockService` now recognizes installed third-party skill methods for policy presence/effective level calculation instead of denying them as unknown tools.
 - Updated `tool_manifest` regression test to assert complete built-in coverage while allowing dynamic third-party skills.
 
 ### Changed - Desktop UI (Neural Settings)
@@ -50,6 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `cd src-tauri && cargo check -q` — passes
 - `cd src-tauri && cargo test -q manifest_covers_every_registered_tool --lib` — passes
 - `cd src-tauri && cargo test -q context_window --lib` — passes
+- `cd src-tauri && cargo test -q manifest_covers_every_registered_tool --lib` — passes
 - `cd rainy-atm && bun run build` — passes
 - `cd rainy-atm && bun test` — passes (39/39)
 

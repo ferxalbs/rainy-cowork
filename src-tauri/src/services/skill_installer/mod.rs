@@ -202,3 +202,23 @@ pub fn write_temp_downloaded_skill(
         .map_err(|e| format!("Failed to write temp wasm: {}", e))?;
     Ok(temp_dir)
 }
+
+pub fn verify_downloaded_bundle_signature(
+    manifest_toml: &str,
+    wasm_bytes: &[u8],
+    provided_digest: &str,
+    secret: &str,
+) -> bool {
+    if provided_digest.trim().is_empty() || secret.trim().is_empty() {
+        return false;
+    }
+    let mut mac = match HmacSha256::new_from_slice(secret.as_bytes()) {
+        Ok(m) => m,
+        Err(_) => return false,
+    };
+    mac.update(manifest_toml.as_bytes());
+    mac.update(b"\n");
+    mac.update(wasm_bytes);
+    let expected = hex::encode(mac.finalize().into_bytes());
+    safe_equal_hex(&expected, provided_digest)
+}

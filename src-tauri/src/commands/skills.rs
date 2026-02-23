@@ -1,7 +1,10 @@
 use crate::models::neural::{
     AirlockLevel, CommandPriority, CommandResult, CommandStatus, QueuedCommand, RainyPayload,
 };
-use crate::services::{skill_installer::write_temp_downloaded_skill, SkillExecutor, SkillInstaller};
+use crate::services::{
+    skill_installer::{verify_downloaded_bundle_signature, write_temp_downloaded_skill},
+    SkillExecutor, SkillInstaller,
+};
 use crate::services::ThirdPartySkillRegistry;
 use base64::Engine;
 use serde::{Deserialize, Serialize};
@@ -108,6 +111,8 @@ struct RemoteSkillBundleResponse {
     pub skill_id: String,
     pub manifest_toml: String,
     pub wasm_base64: String,
+    pub package_signature: String,
+    pub signature_algorithm: String,
 }
 
 #[tauri::command]
@@ -148,7 +153,7 @@ pub async fn install_skill_from_atm(
     req: RemoteSkillInstallRequest,
 ) -> Result<crate::services::third_party_skill_registry::InstalledThirdPartySkill, String> {
     let url = format!(
-        "{}/v1/skills/{}",
+        "{}/v1/skills/{}/download",
         req.base_url.trim_end_matches('/'),
         req.skill_id
     );
@@ -173,6 +178,20 @@ pub async fn install_skill_from_atm(
     let wasm_bytes = base64::engine::general_purpose::STANDARD
         .decode(bundle.wasm_base64.as_bytes())
         .map_err(|e| format!("Invalid wasm base64 payload: {}", e))?;
+    if bundle.signature_algorithm != "hmac-sha256" {
+        return Err(format!(
+            "Unsupported ATM bundle signature algorithm: {}",
+            bundle.signature_algorithm
+        ));
+    }
+    if !verify_downloaded_bundle_signature(
+        &bundle.manifest_toml,
+        &wasm_bytes,
+        &bundle.package_signature,
+        &req.platform_key,
+    ) {
+        return Err("ATM skill bundle signature verification failed".to_string());
+    }
 
     let temp_dir = write_temp_downloaded_skill(&bundle.skill_id, &bundle.manifest_toml, &wasm_bytes)?;
     let installer = SkillInstaller::new()?;

@@ -10,6 +10,7 @@
 //! - **Level 2 (Dangerous)**: Execution operations - requires explicit approval
 
 use crate::models::neural::{AirlockLevel, QueuedCommand};
+use crate::services::ThirdPartySkillRegistry;
 use crate::services::tool_policy::get_tool_policy;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -93,7 +94,11 @@ impl AirlockService {
         }
         let declared = command.airlock_level;
         let policy_level = Self::infer_tool_name(command)
-            .and_then(|tool| get_tool_policy(&tool).map(|policy| policy.airlock_level))
+            .and_then(|tool| {
+                get_tool_policy(&tool)
+                    .map(|policy| policy.airlock_level)
+                    .or_else(|| Self::third_party_tool_level(&tool))
+            })
             .unwrap_or(AirlockLevel::Dangerous);
 
         if policy_level > declared {
@@ -160,7 +165,7 @@ impl AirlockService {
         let inferred_tool = Self::infer_tool_name(command);
         let has_policy = inferred_tool
             .as_ref()
-            .and_then(|tool| get_tool_policy(tool))
+            .and_then(|tool| get_tool_policy(tool).map(|_| ()).or_else(|| Self::third_party_tool_level(tool).map(|_| ())))
             .is_some();
         if !has_policy {
             tracing::warn!(
@@ -220,6 +225,12 @@ impl AirlockService {
                 self.request_approval(command, effective_level, false).await
             }
         }
+    }
+
+    fn third_party_tool_level(tool: &str) -> Option<AirlockLevel> {
+        ThirdPartySkillRegistry::new()
+            .ok()
+            .and_then(|registry| registry.find_method_airlock_level(tool).ok().flatten())
     }
 
     // Internal implementation for user approval flow

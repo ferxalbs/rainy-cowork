@@ -8,13 +8,14 @@ mod web;
 use crate::models::neural::{CommandResult, QueuedCommand, ToolAccessPolicy};
 use crate::services::browser_controller::BrowserController;
 use crate::services::settings::SettingsManager;
-use crate::services::third_party_skill_registry::ThirdPartySkillRegistry;
+use crate::services::third_party_skill_registry::{InstalledThirdPartySkill, ThirdPartySkillRegistry};
 use crate::services::wasm_sandbox::{WasmExecutionRequest, WasmSandboxService};
 use crate::services::workspace::WorkspaceManager;
 use crate::services::ManagedResearchService;
 use crate::services::MemoryManager;
 use sha2::{Digest, Sha256};
 use std::net::IpAddr;
+use std::path::Path;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -217,7 +218,16 @@ impl SkillExecutor {
             }
             "memory" => self.execute_memory(method, &payload.params).await,
             _ => self
-                .execute_third_party_skill(skill, method, &payload.params)
+                .execute_third_party_skill(
+                    command,
+                    skill,
+                    method,
+                    &payload.params,
+                    allowed_paths,
+                    blocked_paths,
+                    allowed_domains,
+                    blocked_domains,
+                )
                 .await
                 .unwrap_or_else(|| CommandResult {
                     success: false,
@@ -356,9 +366,14 @@ impl SkillExecutor {
 
     async fn execute_third_party_skill(
         &self,
+        command: &QueuedCommand,
         skill: &str,
         method: &str,
         params: &Option<serde_json::Value>,
+        allowed_paths: &[String],
+        blocked_paths: &[String],
+        allowed_domains: &[String],
+        blocked_domains: &[String],
     ) -> Option<CommandResult> {
         let resolved = match self.third_party_registry.resolve_method(skill, method) {
             Ok(Some(r)) => r,
@@ -367,6 +382,21 @@ impl SkillExecutor {
         };
 
         let (skill_def, method_def) = resolved;
+        if command.airlock_level < method_def.airlock_level {
+            return Some(self.error(&format!(
+                "Command Airlock level {:?} is lower than third-party method '{}' required level {:?}",
+                command.airlock_level, method_def.name, method_def.airlock_level
+            )));
+        }
+        if let Err(e) = Self::validate_third_party_scopes(
+            &skill_def,
+            allowed_paths,
+            blocked_paths,
+            allowed_domains,
+            blocked_domains,
+        ) {
+            return Some(self.error(&e));
+        }
         let params_json = params
             .as_ref()
             .map(|v| v.to_string())
@@ -382,6 +412,63 @@ impl SkillExecutor {
             .await
             .into_command_result();
         Some(result)
+    }
+
+    fn validate_third_party_scopes(
+        skill: &InstalledThirdPartySkill,
+        allowed_paths: &[String],
+        blocked_paths: &[String],
+        allowed_domains: &[String],
+        blocked_domains: &[String],
+    ) -> Result<(), String> {
+        for fs_perm in &skill.permissions.filesystem {
+            let normalized_target = Self::normalize_absolute_path(Path::new(&fs_perm.host_path))
+                .map_err(|e| format!("Invalid third-party skill filesystem permission: {}", e))?;
+
+            if !allowed_paths.is_empty()
+                && !allowed_paths.iter().any(|allowed| {
+                    Self::normalize_absolute_path(Path::new(allowed))
+                        .map(|root| normalized_target.starts_with(root))
+                        .unwrap_or(false)
+                })
+            {
+                return Err(format!(
+                    "Third-party skill '{}' filesystem permission '{}' is outside command allowed paths",
+                    skill.id, fs_perm.host_path
+                ));
+            }
+
+            if Self::is_path_blocked(&normalized_target, blocked_paths, allowed_paths) {
+                return Err(format!(
+                    "Third-party skill '{}' filesystem permission '{}' is blocked by Airlock scopes",
+                    skill.id, fs_perm.host_path
+                ));
+            }
+        }
+
+        for domain in &skill.permissions.network_domains {
+            if blocked_domains
+                .iter()
+                .any(|rule| Self::domain_rule_matches(domain, rule))
+            {
+                return Err(format!(
+                    "Third-party skill '{}' network domain '{}' is blocked by Airlock scopes",
+                    skill.id, domain
+                ));
+            }
+            if !allowed_domains.is_empty()
+                && !allowed_domains
+                    .iter()
+                    .any(|rule| Self::domain_rule_matches(domain, rule))
+            {
+                return Err(format!(
+                    "Third-party skill '{}' network domain '{}' is outside Airlock allowed_domains",
+                    skill.id, domain
+                ));
+            }
+        }
+
+        Ok(())
     }
 }
 

@@ -166,6 +166,21 @@ impl ThirdPartySkillRegistry {
         Ok(None)
     }
 
+    pub fn find_method_airlock_level(&self, method: &str) -> Result<Option<AirlockLevel>, String> {
+        let file = self.load_index()?;
+        let mut found: Option<AirlockLevel> = None;
+        for skill in file.skills.into_iter().filter(|s| s.enabled) {
+            if let Some(m) = skill.methods.iter().find(|m| m.name == method) {
+                // Collisions are prevented at install time; keep fail-closed if somehow duplicated.
+                if found.is_some() {
+                    return Ok(Some(AirlockLevel::Dangerous));
+                }
+                found = Some(m.airlock_level);
+            }
+        }
+        Ok(found)
+    }
+
     pub fn dynamic_skill_manifests(&self) -> Result<Vec<SkillManifest>, String> {
         let mut manifests = Vec::new();
         for skill in self.list_skills()?.into_iter().filter(|s| s.enabled) {
