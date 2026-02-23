@@ -1,7 +1,11 @@
 use libsql::{params, Builder, Connection};
 use std::path::PathBuf;
+use tokio::sync::Mutex;
 
 const MEMORY_VAULT_VECTOR_INDEX: &str = "idx_memory_vault_embedding_gemini_3072";
+
+// Global mutex to serialize libsql initialization in tests/concurrent scenarios
+static LIBSQL_INIT_MUTEX: Mutex<()> = Mutex::const_new(());
 
 #[derive(Debug, Clone)]
 pub struct VaultRow {
@@ -39,6 +43,10 @@ impl MemoryVaultRepository {
         }
 
         let db_url = db_path.to_string_lossy().to_string();
+
+        // Guard initialization with mutex to prevent threading panic in libsql 0.9.29+
+        let _guard = LIBSQL_INIT_MUTEX.lock().await;
+
         let db = Builder::new_local(db_url)
             .build()
             .await
@@ -47,6 +55,9 @@ impl MemoryVaultRepository {
         let conn = db
             .connect()
             .map_err(|e| format!("Failed to connect to libsql: {}", e))?;
+
+        // Drop guard after connection is established
+        drop(_guard);
 
         conn.execute(
             "CREATE TABLE IF NOT EXISTS memory_vault_entries (
@@ -447,11 +458,17 @@ mod tests {
     async fn test_libsql_direct_vector_api() {
         let temp_dir = std::env::temp_dir().join(uuid::Uuid::new_v4().to_string());
 
-        let db = libsql::Builder::new_local(temp_dir.clone())
+        let db_url = temp_dir.to_string_lossy().to_string();
+
+        let _guard = LIBSQL_INIT_MUTEX.lock().await;
+
+        let db = libsql::Builder::new_local(db_url)
             .build()
             .await
             .unwrap();
         let conn = db.connect().unwrap();
+
+        drop(_guard);
 
         conn.execute("CREATE TABLE test_vec (id TEXT, embedding F32_BLOB(3))", ())
             .await
