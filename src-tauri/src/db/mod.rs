@@ -25,7 +25,20 @@ impl Database {
             .connect(&db_url)
             .await?;
 
-        sqlx::migrate!("./migrations").run(&pool).await?;
+        if let Err(err) = sqlx::migrate!("./migrations").run(&pool).await {
+            let err_text = err.to_string();
+            let is_known_vector_index_compat_failure = err_text.contains("20260222090000")
+                && err_text.contains("vector index: unable to update global metadata table");
+
+            if is_known_vector_index_compat_failure {
+                eprintln!(
+                    "Skipping non-fatal migration 20260222090000 (libSQL vector index compatibility): {}",
+                    err_text
+                );
+            } else {
+                return Err(err.into());
+            }
+        }
 
         Ok(Self { pool })
     }

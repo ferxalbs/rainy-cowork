@@ -31,6 +31,7 @@ pub fn get_tool_policy(function_name: &str) -> Option<ToolPolicy> {
     let policy = match function_name {
         // Level 0: read-only
         "read_file"
+        | "ingest_document"
         | "read_many_files"
         | "list_files"
         | "list_files_detailed"
