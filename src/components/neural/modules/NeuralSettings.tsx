@@ -6,9 +6,15 @@ import {
   AtmAdminPolicyAuditEvent,
   AtmToolAccessPolicy,
   AtmToolAccessPolicyState,
+  InstalledSkillRecord,
   getAtmAdminPermissions,
   getAtmToolAccessPolicy,
+  installLocalSkill,
+  installSkillFromAtm,
+  listInstalledSkills,
   listAtmAdminPolicyAudit,
+  removeInstalledSkill,
+  setInstalledSkillEnabled,
   updateAtmAdminPermissions,
   updateAtmToolAccessPolicy,
 } from "../../../services/tauri";
@@ -74,6 +80,16 @@ export function NeuralSettings({
   const [isLoadingPolicyAudit, setIsLoadingPolicyAudit] = useState(false);
   const [isSavingPermissions, setIsSavingPermissions] = useState(false);
   const [isSavingToolPolicy, setIsSavingToolPolicy] = useState(false);
+  const [installedSkills, setInstalledSkills] = useState<InstalledSkillRecord[]>(
+    [],
+  );
+  const [isLoadingSkills, setIsLoadingSkills] = useState(false);
+  const [localSkillDir, setLocalSkillDir] = useState("");
+  const [allowUnsignedDevInstall, setAllowUnsignedDevInstall] = useState(false);
+  const [remoteSkillId, setRemoteSkillId] = useState("");
+  const [remoteBaseUrl, setRemoteBaseUrl] = useState(
+    "https://rainy-atm-cfe3gvcwua-uc.a.run.app",
+  );
 
   const loadAdminPermissions = useCallback(async () => {
     try {
@@ -110,11 +126,24 @@ export function NeuralSettings({
     }
   }, []);
 
+  const loadInstalledSkills = useCallback(async () => {
+    setIsLoadingSkills(true);
+    try {
+      const skills = await listInstalledSkills();
+      setInstalledSkills(skills);
+    } catch (err) {
+      console.error("Failed to load installed skills:", err);
+    } finally {
+      setIsLoadingSkills(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadAdminPermissions();
     loadToolAccessPolicy();
     loadPolicyAudit();
-  }, [loadAdminPermissions, loadToolAccessPolicy, loadPolicyAudit]);
+    loadInstalledSkills();
+  }, [loadAdminPermissions, loadToolAccessPolicy, loadPolicyAudit, loadInstalledSkills]);
 
   const handleSavePermissions = async () => {
     if (!platformKey.trim() || !userApiKey.trim()) {
@@ -172,6 +201,81 @@ export function NeuralSettings({
       toast.error("Failed to update tool access policy");
     } finally {
       setIsSavingToolPolicy(false);
+    }
+  };
+
+  const handleInstallLocalSkill = async () => {
+    if (!localSkillDir.trim()) {
+      toast.error("Enter a local skill folder path");
+      return;
+    }
+    try {
+      await installLocalSkill({
+        sourceDir: localSkillDir.trim(),
+        allowUnsignedDev: allowUnsignedDevInstall,
+        platformKey: platformKey.trim() || undefined,
+      });
+      toast.success("Local skill installed");
+      setLocalSkillDir("");
+      await loadInstalledSkills();
+    } catch (err) {
+      console.error("Failed to install local skill:", err);
+      toast.error("Failed to install local skill");
+    }
+  };
+
+  const handleInstallFromAtm = async () => {
+    if (!remoteSkillId.trim()) {
+      toast.error("Enter a skill id");
+      return;
+    }
+    if (!platformKey.trim()) {
+      toast.error("Platform key required for ATM skill install");
+      return;
+    }
+    try {
+      await installSkillFromAtm({
+        baseUrl: remoteBaseUrl.trim(),
+        skillId: remoteSkillId.trim(),
+        platformKey: platformKey.trim(),
+      });
+      toast.success("Skill installed from ATM");
+      setRemoteSkillId("");
+      await loadInstalledSkills();
+    } catch (err) {
+      console.error("Failed to install ATM skill:", err);
+      toast.error("Failed to install ATM skill");
+    }
+  };
+
+  const handleToggleSkill = async (skill: InstalledSkillRecord, enabled: boolean) => {
+    try {
+      await setInstalledSkillEnabled({
+        skillId: skill.id,
+        version: skill.version,
+        enabled,
+      });
+      setInstalledSkills((prev) =>
+        prev.map((entry) =>
+          entry.id === skill.id && entry.version === skill.version
+            ? { ...entry, enabled }
+            : entry,
+        ),
+      );
+    } catch (err) {
+      console.error("Failed to update skill enabled state:", err);
+      toast.error("Failed to update skill state");
+    }
+  };
+
+  const handleRemoveSkill = async (skill: InstalledSkillRecord) => {
+    try {
+      await removeInstalledSkill({ skillId: skill.id, version: skill.version });
+      toast.success("Skill removed");
+      await loadInstalledSkills();
+    } catch (err) {
+      console.error("Failed to remove skill:", err);
+      toast.error("Failed to remove skill");
     }
   };
 
@@ -363,6 +467,183 @@ export function NeuralSettings({
               </p>
             </div>
           </div>
+        </div>
+
+        {/* Wasm Skills Registry */}
+        <div className="rounded-xl border border-border/20 bg-card/10 p-6 space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">
+                Wasm Skill Sandbox
+              </h4>
+              <p className="text-xs text-muted-foreground mt-1">
+                Install and manage third-party skills (hash/signature verified,
+                fail-closed runtime).
+              </p>
+            </div>
+            <Button
+              size="sm"
+              variant="ghost"
+              onPress={loadInstalledSkills}
+              isDisabled={isLoadingSkills}
+            >
+              {isLoadingSkills ? "Refreshing..." : "Refresh"}
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="rounded-lg border border-white/5 bg-background/20 p-4 space-y-3">
+              <div className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                Install Local Skill
+              </div>
+              <input
+                className={inputClass}
+                value={localSkillDir}
+                onChange={(e) => setLocalSkillDir(e.target.value)}
+                placeholder="/path/to/skill-folder"
+              />
+              <div className="flex items-center justify-between rounded-lg border border-white/5 bg-black/20 px-3 py-2">
+                <span className="text-xs text-foreground">
+                  Allow unsigned dev install
+                </span>
+                <NeuralSwitch
+                  checked={allowUnsignedDevInstall}
+                  onChange={setAllowUnsignedDevInstall}
+                />
+              </div>
+              <Button
+                size="sm"
+                onPress={handleInstallLocalSkill}
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                Install Local
+              </Button>
+            </div>
+
+            <div className="rounded-lg border border-white/5 bg-background/20 p-4 space-y-3">
+              <div className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                Install From ATM
+              </div>
+              <input
+                className={inputClass}
+                value={remoteBaseUrl}
+                onChange={(e) => setRemoteBaseUrl(e.target.value)}
+                placeholder="https://rainy-atm..."
+              />
+              <input
+                className={inputClass}
+                value={remoteSkillId}
+                onChange={(e) => setRemoteSkillId(e.target.value)}
+                placeholder="skill-id"
+              />
+              <Button
+                size="sm"
+                onPress={handleInstallFromAtm}
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                Install From ATM
+              </Button>
+            </div>
+          </div>
+
+          {installedSkills.length === 0 ? (
+            <div className="text-sm text-muted-foreground text-center py-6 border border-dashed border-border/20 rounded-lg">
+              {isLoadingSkills
+                ? "Loading installed skills..."
+                : "No third-party skills installed."}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {installedSkills.map((skill) => (
+                <div
+                  key={`${skill.id}@${skill.version}`}
+                  className="rounded-lg border border-white/5 bg-background/20 p-4 space-y-3"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-semibold text-foreground">
+                          {skill.name}
+                        </span>
+                        <NeuralChip variant="flat" className="bg-white/10">
+                          {skill.id}@{skill.version}
+                        </NeuralChip>
+                        <NeuralChip
+                          variant="flat"
+                          className={
+                            skill.trustState === "verified"
+                              ? "bg-emerald-500/15 text-emerald-300"
+                              : "bg-amber-500/15 text-amber-300"
+                          }
+                        >
+                          {skill.trustState}
+                        </NeuralChip>
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {skill.author} • {skill.runtime} • {skill.installSource}
+                      </div>
+                      {skill.description && (
+                        <div className="text-xs text-muted-foreground">
+                          {skill.description}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <NeuralSwitch
+                        checked={skill.enabled}
+                        onChange={(enabled) => handleToggleSkill(skill, enabled)}
+                      />
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onPress={() => handleRemoveSkill(skill)}
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="rounded-lg border border-white/5 bg-black/20 p-3">
+                      <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-2">
+                        Permissions
+                      </div>
+                      <div className="text-xs text-muted-foreground space-y-1">
+                        <div>
+                          FS:{" "}
+                          {skill.permissions.filesystem.length > 0
+                            ? skill.permissions.filesystem
+                                .map(
+                                  (p) =>
+                                    `${p.guestPath}→${p.hostPath} (${p.mode})`,
+                                )
+                                .join(", ")
+                            : "none"}
+                        </div>
+                        <div>
+                          Net:{" "}
+                          {skill.permissions.networkDomains.length > 0
+                            ? skill.permissions.networkDomains.join(", ")
+                            : "none"}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="rounded-lg border border-white/5 bg-black/20 p-3">
+                      <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-2">
+                        Methods
+                      </div>
+                      <div className="text-xs text-muted-foreground space-y-1">
+                        {skill.methods.map((method) => (
+                          <div key={`${skill.id}-${method.name}`}>
+                            {method.name} (L{method.airlockLevel})
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Audit Log */}

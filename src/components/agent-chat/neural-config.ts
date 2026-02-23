@@ -73,6 +73,11 @@ export const TOOL_STATE_MAP: Record<string, NeuralState> = {
   git_status: "executing",
   git_diff: "executing",
   git_log: "executing",
+  list_installed_skills: "observing",
+  install_local_skill: "creating",
+  install_skill_from_atm: "communicating",
+  set_installed_skill_enabled: "creating",
+  remove_installed_skill: "pruning",
 };
 
 /** Human-readable display names for raw tool function names */
@@ -102,6 +107,11 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
   http_get_json: "Fetching API",
   http_post_json: "Calling API",
   screenshot: "Taking Screenshot",
+  list_installed_skills: "Listing Installed Skills",
+  install_local_skill: "Installing Local Skill",
+  install_skill_from_atm: "Installing Skill From ATM",
+  set_installed_skill_enabled: "Updating Skill State",
+  remove_installed_skill: "Removing Installed Skill",
 };
 
 /** Resolves a function name to a human-readable display name */

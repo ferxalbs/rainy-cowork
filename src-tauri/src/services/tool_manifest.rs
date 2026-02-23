@@ -1,5 +1,6 @@
 use crate::models::neural::{ParameterSchema, SkillManifest, SkillMethod};
 use crate::services::tool_policy::get_tool_policy;
+use crate::services::ThirdPartySkillRegistry;
 use crate::services::SkillExecutor;
 use std::collections::{BTreeMap, HashMap};
 
@@ -71,7 +72,7 @@ pub fn build_skill_manifest_from_runtime() -> Result<Vec<SkillManifest>, String>
             });
     }
 
-    let manifests = grouped
+    let mut manifests = grouped
         .into_iter()
         .map(|(skill_name, mut methods)| {
             methods.sort_by(|a, b| a.name.cmp(&b.name));
@@ -82,6 +83,15 @@ pub fn build_skill_manifest_from_runtime() -> Result<Vec<SkillManifest>, String>
             }
         })
         .collect::<Vec<_>>();
+
+    // Merge installed third-party skills from local registry. These are already
+    // verified at install time and carry explicit per-method Airlock declarations.
+    if let Ok(registry) = ThirdPartySkillRegistry::new() {
+        let mut dynamic = registry.dynamic_skill_manifests()?;
+        manifests.append(&mut dynamic);
+    }
+
+    manifests.sort_by(|a, b| a.name.cmp(&b.name));
 
     Ok(manifests)
 }
@@ -94,19 +104,25 @@ mod tests {
     #[test]
     fn manifest_covers_every_registered_tool() {
         let manifests = build_skill_manifest_from_runtime().expect("manifest generation should work");
-        let mut from_manifest: Vec<String> = manifests
+        let from_manifest: std::collections::HashSet<String> = manifests
             .into_iter()
             .flat_map(|skill| skill.methods.into_iter().map(|method| method.name))
             .collect();
-        from_manifest.sort();
 
-        let mut from_registry: Vec<String> = SkillExecutor::get_registered_tool_definitions()
+        let from_registry: Vec<String> = SkillExecutor::get_registered_tool_definitions()
             .into_iter()
             .map(|tool| tool.function.name)
             .collect();
-        from_registry.sort();
 
-        assert_eq!(from_manifest, from_registry);
+        let missing: Vec<String> = from_registry
+            .into_iter()
+            .filter(|name| !from_manifest.contains(name))
+            .collect();
+        assert!(
+            missing.is_empty(),
+            "Built-in tools missing from manifest generation: {:?}",
+            missing
+        );
     }
 
     #[test]

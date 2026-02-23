@@ -1,6 +1,11 @@
 import { AirlockLevel, AirlockLevels } from "../services/tauri";
 
-export type ToolSkillName = "filesystem" | "shell" | "web" | "browser";
+export type ToolSkillName =
+  | "filesystem"
+  | "shell"
+  | "web"
+  | "browser"
+  | "skills";
 
 type ToolPolicy = {
   skill: ToolSkillName;
@@ -58,6 +63,15 @@ const TOOL_POLICY_MAP: Record<string, ToolPolicy> = {
   submit_form: { skill: "browser", airlockLevel: AirlockLevels.Dangerous },
   delete_file: { skill: "filesystem", airlockLevel: AirlockLevels.Dangerous },
   move_file: { skill: "filesystem", airlockLevel: AirlockLevels.Dangerous },
+  // Local skill management (desktop Tauri commands / sandbox registry operations)
+  list_installed_skills: { skill: "skills", airlockLevel: AirlockLevels.Safe },
+  install_local_skill: { skill: "skills", airlockLevel: AirlockLevels.Sensitive },
+  install_skill_from_atm: { skill: "skills", airlockLevel: AirlockLevels.Sensitive },
+  set_installed_skill_enabled: {
+    skill: "skills",
+    airlockLevel: AirlockLevels.Sensitive,
+  },
+  remove_installed_skill: { skill: "skills", airlockLevel: AirlockLevels.Dangerous },
 };
 
 export const KNOWN_TOOL_NAMES = Object.keys(TOOL_POLICY_MAP).sort((a, b) =>

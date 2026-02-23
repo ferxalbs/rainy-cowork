@@ -1786,6 +1786,83 @@ export async function executeSkill(
   });
 }
 
+export interface InstalledSkillPermissionFs {
+  guestPath: string;
+  hostPath: string;
+  mode: "read" | "read_write" | string;
+}
+
+export interface InstalledSkillPermissions {
+  filesystem: InstalledSkillPermissionFs[];
+  networkDomains: string[];
+}
+
+export interface InstalledSkillMethod {
+  name: string;
+  description: string;
+  airlockLevel: number;
+  parameters: Record<
+    string,
+    { type: string; required?: boolean; description?: string | null }
+  >;
+}
+
+export interface InstalledSkillRecord {
+  id: string;
+  name: string;
+  version: string;
+  author: string;
+  description: string;
+  runtime: string;
+  binaryPath: string;
+  binarySha256: string;
+  enabled: boolean;
+  trustState: "verified" | "unsigned_dev" | string;
+  installSource: "atm" | "local_dev" | string;
+  installedAt: number;
+  permissions: InstalledSkillPermissions;
+  methods: InstalledSkillMethod[];
+}
+
+export async function listInstalledSkills(): Promise<InstalledSkillRecord[]> {
+  return invoke<InstalledSkillRecord[]>("list_installed_skills");
+}
+
+export async function installLocalSkill(input: {
+  sourceDir: string;
+  allowUnsignedDev?: boolean;
+  platformKey?: string | null;
+}): Promise<InstalledSkillRecord> {
+  return invoke<InstalledSkillRecord>("install_local_skill", {
+    req: input,
+  });
+}
+
+export async function installSkillFromAtm(input: {
+  baseUrl: string;
+  skillId: string;
+  platformKey: string;
+}): Promise<InstalledSkillRecord> {
+  return invoke<InstalledSkillRecord>("install_skill_from_atm", {
+    req: input,
+  });
+}
+
+export async function setInstalledSkillEnabled(input: {
+  skillId: string;
+  version: string;
+  enabled: boolean;
+}): Promise<void> {
+  return invoke<void>("set_installed_skill_enabled", { req: input });
+}
+
+export async function removeInstalledSkill(input: {
+  skillId: string;
+  version: string;
+}): Promise<void> {
+  return invoke<void>("remove_installed_skill", { req: input });
+}
+
 export async function clearChatHistory(chatId: string): Promise<void> {
   return invoke<void>("clear_chat_history", { chatId });
 }

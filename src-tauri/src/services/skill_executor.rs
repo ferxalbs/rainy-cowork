@@ -8,6 +8,8 @@ mod web;
 use crate::models::neural::{CommandResult, QueuedCommand, ToolAccessPolicy};
 use crate::services::browser_controller::BrowserController;
 use crate::services::settings::SettingsManager;
+use crate::services::third_party_skill_registry::ThirdPartySkillRegistry;
+use crate::services::wasm_sandbox::{WasmExecutionRequest, WasmSandboxService};
 use crate::services::workspace::WorkspaceManager;
 use crate::services::ManagedResearchService;
 use crate::services::MemoryManager;
@@ -40,6 +42,8 @@ pub struct SkillExecutor {
     managed_research: Arc<ManagedResearchService>,
     browser: Arc<BrowserController>,
     memory_manager: Arc<RwLock<Option<Arc<MemoryManager>>>>,
+    third_party_registry: Arc<ThirdPartySkillRegistry>,
+    wasm_sandbox: Arc<WasmSandboxService>,
 }
 
 impl SkillExecutor {
@@ -96,11 +100,15 @@ impl SkillExecutor {
         managed_research: Arc<ManagedResearchService>,
         browser: Arc<BrowserController>,
     ) -> Self {
+        let third_party_registry =
+            Arc::new(ThirdPartySkillRegistry::new().expect("Failed to init third-party registry"));
         Self {
             workspace_manager,
             managed_research,
             browser,
             memory_manager: Arc::new(RwLock::new(None)),
+            third_party_registry,
+            wasm_sandbox: Arc::new(WasmSandboxService::new()),
         }
     }
 
@@ -123,6 +131,10 @@ impl SkillExecutor {
             managed_research: research,
             browser,
             memory_manager: Arc::new(RwLock::new(None)),
+            third_party_registry: Arc::new(
+                ThirdPartySkillRegistry::new().expect("mock third-party registry"),
+            ),
+            wasm_sandbox: Arc::new(WasmSandboxService::new()),
         }
     }
 
@@ -204,12 +216,15 @@ impl SkillExecutor {
                     .await
             }
             "memory" => self.execute_memory(method, &payload.params).await,
-            _ => CommandResult {
-                success: false,
-                output: None,
-                error: Some(format!("Unknown skill: {}", skill)),
-                exit_code: Some(1),
-            },
+            _ => self
+                .execute_third_party_skill(skill, method, &payload.params)
+                .await
+                .unwrap_or_else(|| CommandResult {
+                    success: false,
+                    output: None,
+                    error: Some(format!("Unknown skill: {}", skill)),
+                    exit_code: Some(1),
+                }),
         }
     }
 
@@ -337,6 +352,36 @@ impl SkillExecutor {
             // Add "add_memory" later if needed
             _ => self.error(&format!("Unknown memory method: {}", method)),
         }
+    }
+
+    async fn execute_third_party_skill(
+        &self,
+        skill: &str,
+        method: &str,
+        params: &Option<serde_json::Value>,
+    ) -> Option<CommandResult> {
+        let resolved = match self.third_party_registry.resolve_method(skill, method) {
+            Ok(Some(r)) => r,
+            Ok(None) => return None,
+            Err(e) => return Some(self.error(&format!("Failed to load third-party skill registry: {}", e))),
+        };
+
+        let (skill_def, method_def) = resolved;
+        let params_json = params
+            .as_ref()
+            .map(|v| v.to_string())
+            .unwrap_or_else(|| "{}".to_string());
+
+        let result = self
+            .wasm_sandbox
+            .execute(WasmExecutionRequest {
+                skill: skill_def,
+                method: method_def,
+                params_json,
+            })
+            .await
+            .into_command_result();
+        Some(result)
     }
 }
 

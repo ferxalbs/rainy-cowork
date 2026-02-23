@@ -1,9 +1,12 @@
 use crate::models::neural::{
     AirlockLevel, CommandPriority, CommandResult, CommandStatus, QueuedCommand, RainyPayload,
 };
-use crate::services::SkillExecutor;
+use crate::services::{skill_installer::write_temp_downloaded_skill, SkillExecutor, SkillInstaller};
+use crate::services::ThirdPartySkillRegistry;
+use base64::Engine;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use tauri::State;
+use tauri::{AppHandle, State};
 use uuid::Uuid;
 
 /// Execute a skill directly from the frontend (local Deep Mode execution).
@@ -64,4 +67,114 @@ pub async fn execute_skill(
     let result = skill_executor.execute(&command).await;
 
     Ok(result)
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SkillInstallRequest {
+    pub source_dir: String,
+    #[serde(default)]
+    pub allow_unsigned_dev: bool,
+    #[serde(default)]
+    pub platform_key: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoteSkillInstallRequest {
+    pub base_url: String,
+    pub skill_id: String,
+    pub platform_key: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetInstalledSkillEnabledRequest {
+    pub skill_id: String,
+    pub version: String,
+    pub enabled: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoveInstalledSkillRequest {
+    pub skill_id: String,
+    pub version: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RemoteSkillBundleResponse {
+    pub skill_id: String,
+    pub manifest_toml: String,
+    pub wasm_base64: String,
+}
+
+#[tauri::command]
+pub async fn list_installed_skills() -> Result<Vec<crate::services::third_party_skill_registry::InstalledThirdPartySkill>, String> {
+    let registry = ThirdPartySkillRegistry::new()?;
+    registry.list_skills()
+}
+
+#[tauri::command]
+pub async fn set_installed_skill_enabled(
+    req: SetInstalledSkillEnabledRequest,
+) -> Result<(), String> {
+    let registry = ThirdPartySkillRegistry::new()?;
+    registry.set_enabled(&req.skill_id, &req.version, req.enabled)
+}
+
+#[tauri::command]
+pub async fn remove_installed_skill(
+    req: RemoveInstalledSkillRequest,
+) -> Result<(), String> {
+    let registry = ThirdPartySkillRegistry::new()?;
+    registry.remove(&req.skill_id, &req.version)
+}
+
+#[tauri::command]
+pub async fn install_local_skill(req: SkillInstallRequest) -> Result<crate::services::third_party_skill_registry::InstalledThirdPartySkill, String> {
+    let installer = SkillInstaller::new()?;
+    installer.install_from_directory(
+        std::path::Path::new(&req.source_dir),
+        req.platform_key.as_deref(),
+        req.allow_unsigned_dev,
+    )
+}
+
+#[tauri::command]
+pub async fn install_skill_from_atm(
+    _app_handle: AppHandle,
+    req: RemoteSkillInstallRequest,
+) -> Result<crate::services::third_party_skill_registry::InstalledThirdPartySkill, String> {
+    let url = format!(
+        "{}/v1/skills/{}",
+        req.base_url.trim_end_matches('/'),
+        req.skill_id
+    );
+    let client = reqwest::Client::new();
+    let response = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", req.platform_key))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to fetch skill from ATM: {}", e))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        return Err(format!("ATM skill download failed ({}): {}", status, body));
+    }
+
+    let bundle: RemoteSkillBundleResponse = response
+        .json()
+        .await
+        .map_err(|e| format!("Invalid ATM skill response: {}", e))?;
+    let wasm_bytes = base64::engine::general_purpose::STANDARD
+        .decode(bundle.wasm_base64.as_bytes())
+        .map_err(|e| format!("Invalid wasm base64 payload: {}", e))?;
+
+    let temp_dir = write_temp_downloaded_skill(&bundle.skill_id, &bundle.manifest_toml, &wasm_bytes)?;
+    let installer = SkillInstaller::new()?;
+    installer.install_from_downloaded_bundle(&temp_dir, Some(&req.platform_key))
 }

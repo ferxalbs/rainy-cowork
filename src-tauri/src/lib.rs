@@ -499,6 +499,11 @@ pub fn run() {
             commands::set_headless_mode,
             // Skill Commands (Direct Local Execution)
             commands::execute_skill,
+            commands::list_installed_skills,
+            commands::install_local_skill,
+            commands::install_skill_from_atm,
+            commands::set_installed_skill_enabled,
+            commands::remove_installed_skill,
             // Agent Workflow (Native Rust)
             commands::agent::run_agent_workflow,
             // Deployment (Phase 1)

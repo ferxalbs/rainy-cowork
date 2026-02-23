@@ -5,6 +5,54 @@ All notable changes to Rainy Cowork will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - QUARANTINE ZONE (WASM Skill Sandbox) PT. 1
+
+### Added - Third-Party Wasm Skill Registry + Installer Foundation
+
+**Rust Backend (`src-tauri/src/`)**
+
+- Added modular third-party skill persistence and metadata registry in `services/third_party_skill_registry.rs`.
+- Added `services/skill_installer/` to parse `skill.toml`, verify Wasm SHA-256, enforce built-in-domain collision checks, and persist installed packages in the local app data directory.
+- Added `services/wasm_sandbox/` execution host service with concurrency limits, Wasm binary validation, and fail-closed execution path (runtime host ABI intentionally not enabled yet).
+- Added Tauri commands for skill management:
+  - `list_installed_skills`
+  - `install_local_skill`
+  - `install_skill_from_atm`
+  - `set_installed_skill_enabled`
+  - `remove_installed_skill`
+
+### Changed - Runtime Manifest + Skill Routing
+
+**Rust Backend (`src-tauri/src/`)**
+
+- `tool_manifest.rs` now merges installed third-party skill manifests into the runtime-generated node skill manifest (built-ins remain canonical + fail-closed).
+- `SkillExecutor` now resolves unknown skill domains against the third-party skill registry and routes them to the Wasm sandbox service (currently fail-closed execution for undeployed ABI).
+- Updated `tool_manifest` regression test to assert complete built-in coverage while allowing dynamic third-party skills.
+
+### Changed - Desktop UI (Neural Settings)
+
+**Frontend (`src/components/neural/modules/NeuralSettings.tsx`)**
+
+- Added a “Wasm Skill Sandbox” management section showing installed skills, trust state, permissions, methods, enable/disable toggles, local install, ATM install, and remove actions.
+- Added Tauri service wrappers in `src/services/tauri.ts` for the new skill-management commands.
+- Updated neural state/tool display mappings for skill management actions in `src/components/agent-chat/neural-config.ts`.
+
+### Changed - STEP 3 Production Gate Revalidation
+
+- Revalidated Step 3 (`HIVE MIND SEED`) baseline before Step 4 integration:
+  - semantic retrieval + context window tests still pass
+  - `cargo check`, `tsc`, and ATM build/tests remain green after Step 4 foundation wiring
+- Documented that current Step 3 retrieval remains Gemini-embedding-backed with lexical fallback when embedding credentials are unavailable.
+
+### Validation
+
+- `pnpm exec tsc --noEmit` — passes
+- `cd src-tauri && cargo check -q` — passes
+- `cd src-tauri && cargo test -q manifest_covers_every_registered_tool --lib` — passes
+- `cd src-tauri && cargo test -q context_window --lib` — passes
+- `cd rainy-atm && bun run build` — passes
+- `cd rainy-atm && bun test` — passes (39/39)
+
 ## [0.5.92] - 2026-02-21 - HIVE MIND SEED (Vector Knowledge Graph)
 
 ### Added - Knowledge Ingestion & Semantic Retrieval

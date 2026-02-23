@@ -20,11 +20,14 @@ pub mod memory_vault;
 pub mod neural_service;
 pub mod security;
 pub mod settings;
+pub mod skill_installer;
 pub mod skill_executor;
 pub mod socket_client;
 pub mod task_manager;
+pub mod third_party_skill_registry;
 pub mod tool_manifest;
 pub mod tool_policy;
+pub mod wasm_sandbox;
 
 pub mod workspace;
 
@@ -45,8 +48,10 @@ pub use skill_executor::SkillExecutor;
 
 pub use llm_client::LLMClient;
 pub use settings::SettingsManager;
+pub use skill_installer::SkillInstaller;
 pub use socket_client::SocketClient;
 pub use task_manager::TaskManager;
+pub use third_party_skill_registry::ThirdPartySkillRegistry;
 pub use tool_policy::get_tool_policy;
 
 pub use workspace::{
