@@ -394,9 +394,18 @@ fn row_to_vault(row: &libsql::Row) -> Result<VaultRow, String> {
 mod tests {
     use super::*;
     use std::fs;
+    use std::sync::Mutex;
+    use std::sync::OnceLock;
+
+    static TEST_MUTEX: OnceLock<Mutex<()>> = OnceLock::new();
+
+    fn get_test_lock() -> std::sync::MutexGuard<'static, ()> {
+        TEST_MUTEX.get_or_init(|| Mutex::new(())).lock().unwrap()
+    }
 
     #[tokio::test]
     async fn test_create_and_query_vault_schema() {
+        let _lock = get_test_lock();
         let temp_dir = std::env::temp_dir().join(uuid::Uuid::new_v4().to_string());
 
         // Initialize the DB
@@ -445,6 +454,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_libsql_direct_vector_api() {
+        let _lock = get_test_lock();
         let temp_dir = std::env::temp_dir().join(uuid::Uuid::new_v4().to_string());
 
         let db = libsql::Builder::new_local(temp_dir.clone())
