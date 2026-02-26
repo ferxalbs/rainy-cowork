@@ -10,8 +10,10 @@ mod tests {
     use crate::services::SkillExecutor;
     use std::sync::Arc;
     use tokio::sync::RwLock;
+    use serial_test::serial;
 
     #[tokio::test]
+    #[serial]
     async fn test_persisted_agent_execution() {
         // 1. Setup DB directly (Database struct needs AppHandle)
         let db_url = "sqlite::memory:";

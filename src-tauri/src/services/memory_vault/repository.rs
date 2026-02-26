@@ -394,8 +394,10 @@ fn row_to_vault(row: &libsql::Row) -> Result<VaultRow, String> {
 mod tests {
     use super::*;
     use std::fs;
+    use serial_test::serial;
 
     #[tokio::test]
+    #[serial]
     async fn test_create_and_query_vault_schema() {
         let temp_dir = std::env::temp_dir().join(uuid::Uuid::new_v4().to_string());
 
@@ -444,6 +446,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_libsql_direct_vector_api() {
         let temp_dir = std::env::temp_dir().join(uuid::Uuid::new_v4().to_string());
 
