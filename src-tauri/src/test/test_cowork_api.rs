@@ -1,5 +1,5 @@
-// Rainy Cowork - API Testing Utility
-// Tests actual rainy-sdk cowork endpoint functionality
+// Rainy Cowork - Legacy API Testing Utility
+// Tests legacy rainy-sdk cowork endpoint functionality (v2 compatibility only)
 
 use rainy_sdk::RainyClient;
 use std::env;

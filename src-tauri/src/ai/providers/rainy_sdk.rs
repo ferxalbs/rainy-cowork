@@ -1,6 +1,7 @@
-// Rainy SDK Provider
-// Wrapper around rainy-sdk v0.6.1 for the new provider abstraction layer
-// Enhanced with direct HTTP calls for tool calling support (SDK limitation bypass)
+// Rainy SDK Provider (legacy bridge during v2 -> v3 migration)
+// Wrapper around rainy-sdk used by the provider abstraction layer.
+// This bridge is retained temporarily while the dedicated Rainy v3 connector is rolled out.
+// It still performs direct HTTP calls for tool calling support (SDK limitation bypass).
 
 use crate::ai::provider_trait::{AIProvider, AIProviderFactory};
 use crate::ai::provider_types::{
@@ -394,12 +395,14 @@ impl AIProvider for RainySDKProvider {
             );
         }
 
-        // Make direct HTTP call to Rainy API
+        // Legacy bridge path: direct HTTP call until the dedicated Rainy v3 connector replaces this wrapper.
+        tracing::warn!("[RainySDK] Legacy bridge path in use (direct HTTP tool-call wrapper)");
         let base_url = self
             .config
             .base_url
-            .as_deref()
-            .unwrap_or(rainy_sdk::DEFAULT_BASE_URL);
+            .clone()
+            .or_else(|| std::env::var("RAINY_API_BASE_URL").ok())
+            .unwrap_or_else(|| rainy_sdk::DEFAULT_BASE_URL.to_string());
 
         let response = self
             .http_client
