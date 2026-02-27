@@ -40,7 +40,8 @@ interface MessageBubbleProps {
   workspaceId?: string;
 }
 
-export function MessageBubble({
+// Optimization: Memoize the component to prevent unnecessary re-renders of historical messages
+export const MessageBubble = React.memo(function MessageBubble({
   message,
   onExecute,
   onExecuteToolCalls,
@@ -208,7 +209,7 @@ export function MessageBubble({
       </div>
     </div>
   );
-}
+});
 
 function PlanCard({
   plan,
