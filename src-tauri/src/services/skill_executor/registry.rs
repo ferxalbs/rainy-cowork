@@ -161,9 +161,18 @@ pub fn registered_tool_definitions() -> Vec<Tool> {
 }
 
 impl SkillExecutor {
-    /// Get all available tools and their JSON schemas
+    /// Get all available tools and their JSON schemas,
+    /// including built-in tools and any installed third-party Wasm skills.
     pub fn get_tool_definitions(&self) -> Vec<Tool> {
-        registered_tool_definitions()
+        let mut tools = registered_tool_definitions();
+
+        // Merge installed and enabled third-party Wasm skills into the tool list
+        // so the LLM knows they exist and can call them.
+        if let Ok(dynamic) = self.third_party_registry.dynamic_tool_definitions() {
+            tools.extend(dynamic);
+        }
+
+        tools
     }
 }
 

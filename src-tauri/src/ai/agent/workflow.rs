@@ -646,43 +646,78 @@ impl WorkflowStep for ActStep {
                 continue;
             }
 
-            let Some(policy) = get_tool_policy(&function_name) else {
-                let blocked_msg = format!(
-                    "Tool '{}' blocked: no explicit policy entry (fail-closed)",
-                    function_name
-                );
-                on_event(AgentEvent::ToolResult {
-                    id: call.id.clone(),
-                    result: blocked_msg.clone(),
-                });
-                results.push(AgentMessage {
-                    role: "tool".to_string(),
-                    content: AgentContent::text(blocked_msg),
-                    tool_calls: None,
-                    tool_call_id: Some(call.id.clone()),
-                });
-                continue;
+            // Resolve the tool's skill/method routing.
+            // First try the static built-in policy map; if not found, look in the
+            // third-party Wasm skill registry. This makes Wasm skills fully first-class
+            // citizens in the agent chat loop.
+            let (skill, method_str, airlock_level) = if let Some(policy) =
+                get_tool_policy(&function_name)
+            {
+                let level = resolve_airlock_level_for_tool(state.spec.as_ref(), &function_name);
+                (
+                    policy.skill.as_str().to_string(),
+                    function_name.clone(),
+                    level,
+                )
+            } else {
+                // Check if it's a registered third-party Wasm skill method
+                let registry_check = crate::services::ThirdPartySkillRegistry::new()
+                    .ok()
+                    .and_then(|reg| reg.find_method_airlock_level(&function_name).ok().flatten());
+
+                let Some(wasm_airlock) = registry_check else {
+                    let blocked_msg = format!(
+                        "Tool '{}' blocked: no explicit policy entry (fail-closed)",
+                        function_name
+                    );
+                    on_event(AgentEvent::ToolResult {
+                        id: call.id.clone(),
+                        result: blocked_msg.clone(),
+                    });
+                    results.push(AgentMessage {
+                        role: "tool".to_string(),
+                        content: AgentContent::text(blocked_msg),
+                        tool_calls: None,
+                        tool_call_id: Some(call.id.clone()),
+                    });
+                    continue;
+                };
+
+                // For Wasm skills the skill_id is derived from the registry.
+                // `execute_third_party_skill` looks up the skill by (skill_id, method_name).
+                // We find the skill_id that owns this method.
+                let skill_id = crate::services::ThirdPartySkillRegistry::new()
+                    .ok()
+                    .and_then(|reg| reg.list_skills().ok())
+                    .and_then(|skills| {
+                        skills.into_iter().find(|s| {
+                            s.enabled && s.methods.iter().any(|m| m.name == function_name)
+                        })
+                    })
+                    .map(|s| s.id)
+                    .unwrap_or_else(|| function_name.clone());
+
+                let level = resolve_airlock_level_for_tool(state.spec.as_ref(), &function_name);
+                let effective = if level > wasm_airlock {
+                    level
+                } else {
+                    wasm_airlock
+                };
+                (skill_id, function_name.clone(), effective)
             };
-            let skill = policy.skill.as_str();
-            let method = function_name.as_str();
 
             on_event(AgentEvent::Status(format!(
                 "Executing tool: {}",
                 function_name
             )));
-            // We need to reconstruct the ToolCall for the event
-            // But we don't have the full object easily here without cloning from call
-            // Let's just create a simplified event or use what we have
             on_event(AgentEvent::ToolCall(call.clone()));
-
-            let airlock_level = resolve_airlock_level_for_tool(state.spec.as_ref(), &function_name);
 
             let command = QueuedCommand {
                 id: uuid::Uuid::new_v4().to_string(),
-                intent: format!("{}.{}", skill, method),
+                intent: format!("{}.{}", skill, method_str),
                 payload: RainyPayload {
                     skill: Some(skill.to_string()),
-                    method: Some(method.to_string()),
+                    method: Some(method_str.to_string()),
                     params: Some(params),
                     content: None,
                     allowed_paths: state.allowed_paths.clone(),
@@ -830,9 +865,9 @@ impl WorkflowStep for ActStep {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ai::AIProviderManager;
     use crate::ai::agent::memory::AgentMemory;
     use crate::ai::specs::manifest::AgentSpec;
+    use crate::ai::AIProviderManager;
     use crate::services::workspace::WorkspaceManager;
     use crate::services::{BrowserController, ManagedResearchService, SkillExecutor};
     use serial_test::serial;
