@@ -71,6 +71,8 @@ notify = "8.2.0"
 walkdir = "2.5.0"
 libsql = "0.9.29"
 pdf-extract = "0.7.0"
+# Prevent libsqlite3-sys from compiling/linking sqlite3 since libsql-ffi provides it
+libsqlite3-sys = { version = "0.30.1", features = ["in_gecko"] }
 wasmtime = "41.0.3"
 wasmtime-wasi = "41.0.3"
 ed25519-dalek = { version = "2.2.0", features = ["rand_core"] }
