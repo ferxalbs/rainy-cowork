@@ -1,13 +1,15 @@
-// Rainy Cowork - macOS Keychain Integration
-// Secure storage for API keys using security-framework
+// Rainy Cowork - Keychain Integration
+// Secure storage for API keys
 
+#[cfg(target_os = "macos")]
 use security_framework::passwords::{
     delete_generic_password, get_generic_password, set_generic_password,
 };
 
+#[cfg(target_os = "macos")]
 const SERVICE_NAME: &str = "com.enosislabs.rainycowork";
 
-/// Manager for secure API key storage via macOS Keychain
+/// Manager for secure API key storage
 pub struct KeychainManager;
 
 impl KeychainManager {
@@ -15,6 +17,7 @@ impl KeychainManager {
         Self
     }
 
+    #[cfg(target_os = "macos")]
     /// Store an API key in the Keychain
     pub fn store_key(&self, provider: &str, api_key: &str) -> Result<(), String> {
         let account = format!("api_key_{}", provider);
@@ -26,6 +29,14 @@ impl KeychainManager {
             .map_err(|e| format!("Failed to store API key: {}", e))
     }
 
+    #[cfg(not(target_os = "macos"))]
+    /// Store an API key in the Keychain (stub)
+    pub fn store_key(&self, _provider: &str, _api_key: &str) -> Result<(), String> {
+        // Stub implementation for non-macOS platforms
+        Err("Keychain storage is currently only supported on macOS".to_string())
+    }
+
+    #[cfg(target_os = "macos")]
     /// Retrieve an API key from the Keychain
     pub fn get_key(&self, provider: &str) -> Result<Option<String>, String> {
         let account = format!("api_key_{}", provider);
@@ -51,6 +62,14 @@ impl KeychainManager {
         }
     }
 
+    #[cfg(not(target_os = "macos"))]
+    /// Retrieve an API key from the Keychain (stub)
+    pub fn get_key(&self, _provider: &str) -> Result<Option<String>, String> {
+        // Stub implementation for non-macOS platforms
+        Ok(None)
+    }
+
+    #[cfg(target_os = "macos")]
     /// Delete an API key from the Keychain
     pub fn delete_key(&self, provider: &str) -> Result<(), String> {
         let account = format!("api_key_{}", provider);
@@ -70,6 +89,13 @@ impl KeychainManager {
                 }
             }
         }
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    /// Delete an API key from the Keychain (stub)
+    pub fn delete_key(&self, _provider: &str) -> Result<(), String> {
+        // Stub implementation for non-macOS platforms
+        Ok(())
     }
 
     /// Check if an API key exists for a provider
