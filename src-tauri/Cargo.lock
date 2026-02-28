@@ -5697,7 +5697,6 @@ dependencies = [
  "image",
  "kamadak-exif",
  "libsql",
- "libsqlite3-sys",
  "mac_address",
  "md5",
  "notify",
