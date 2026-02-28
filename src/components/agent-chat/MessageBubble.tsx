@@ -40,7 +40,9 @@ interface MessageBubbleProps {
   workspaceId?: string;
 }
 
-export function MessageBubble({
+// ⚡ Bolt Optimization: Wrap individual message bubbles in React.memo
+// This prevents historical messages from re-rendering when the parent updates to display the latest streaming chunk
+export const MessageBubble = React.memo(function MessageBubble({
   message,
   onExecute,
   onExecuteToolCalls,
@@ -208,7 +210,7 @@ export function MessageBubble({
       </div>
     </div>
   );
-}
+});
 
 function PlanCard({
   plan,
