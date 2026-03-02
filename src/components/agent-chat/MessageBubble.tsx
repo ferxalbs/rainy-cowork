@@ -40,13 +40,13 @@ interface MessageBubbleProps {
   workspaceId?: string;
 }
 
-export function MessageBubble({
+const MessageBubbleComponent = ({
   message,
   onExecute,
   onExecuteToolCalls,
   isExecuting,
   workspaceId,
-}: MessageBubbleProps) {
+}: MessageBubbleProps) => {
   const isUser = message.type === "user";
   const isSystem = message.type === "system";
 
@@ -209,6 +209,8 @@ export function MessageBubble({
     </div>
   );
 }
+
+export const MessageBubble = React.memo(MessageBubbleComponent);
 
 function PlanCard({
   plan,
