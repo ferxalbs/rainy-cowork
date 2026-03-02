@@ -1,15 +1,18 @@
 // Rainy Cowork - macOS Keychain Integration
 // Secure storage for API keys using security-framework
 
+#[cfg(target_os = "macos")]
 use security_framework::passwords::{
     delete_generic_password, get_generic_password, set_generic_password,
 };
 
+#[cfg(target_os = "macos")]
 const SERVICE_NAME: &str = "com.enosislabs.rainycowork";
 
 /// Manager for secure API key storage via macOS Keychain
 pub struct KeychainManager;
 
+#[cfg(target_os = "macos")]
 impl KeychainManager {
     pub fn new() -> Self {
         Self
@@ -78,6 +81,29 @@ impl KeychainManager {
     }
 }
 
+#[cfg(not(target_os = "macos"))]
+impl KeychainManager {
+    pub fn new() -> Self {
+        Self
+    }
+
+    pub fn store_key(&self, _provider: &str, _api_key: &str) -> Result<(), String> {
+        Err("Keychain storage is only supported on macOS".into())
+    }
+
+    pub fn get_key(&self, _provider: &str) -> Result<Option<String>, String> {
+        Ok(None)
+    }
+
+    pub fn delete_key(&self, _provider: &str) -> Result<(), String> {
+        Ok(())
+    }
+
+    pub fn has_key(&self, _provider: &str) -> bool {
+        false
+    }
+}
+
 impl Default for KeychainManager {
     fn default() -> Self {
         Self::new()
@@ -85,6 +111,7 @@ impl Default for KeychainManager {
 }
 
 #[cfg(test)]
+#[cfg(target_os = "macos")]
 mod tests {
     use super::*;
 
