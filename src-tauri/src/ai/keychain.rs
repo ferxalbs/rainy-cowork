@@ -30,8 +30,11 @@ impl KeychainManager {
     }
 
     #[cfg(not(target_os = "macos"))]
-    pub fn store_key(&self, _provider: &str, _api_key: &str) -> Result<(), String> {
-        Ok(())
+    pub fn store_key(&self, provider: &str, api_key: &str) -> Result<(), String> {
+        let account = format!("api_key_{}", provider);
+        let entry = keyring::Entry::new("com.enosislabs.rainycowork", &account)
+            .map_err(|e| format!("Failed to initialize keyring: {}", e))?;
+        entry.set_password(api_key).map_err(|e| format!("Failed to store API key: {}", e))
     }
 
     /// Retrieve an API key from the Keychain
@@ -61,8 +64,16 @@ impl KeychainManager {
     }
 
     #[cfg(not(target_os = "macos"))]
-    pub fn get_key(&self, _provider: &str) -> Result<Option<String>, String> {
-        Ok(None)
+    pub fn get_key(&self, provider: &str) -> Result<Option<String>, String> {
+        let account = format!("api_key_{}", provider);
+        let entry = keyring::Entry::new("com.enosislabs.rainycowork", &account)
+            .map_err(|e| format!("Failed to initialize keyring: {}", e))?;
+
+        match entry.get_password() {
+            Ok(key) => Ok(Some(key)),
+            Err(keyring::Error::NoEntry) => Ok(None),
+            Err(e) => Err(format!("Failed to retrieve API key: {}", e))
+        }
     }
 
     /// Delete an API key from the Keychain
@@ -88,8 +99,16 @@ impl KeychainManager {
     }
 
     #[cfg(not(target_os = "macos"))]
-    pub fn delete_key(&self, _provider: &str) -> Result<(), String> {
-        Ok(())
+    pub fn delete_key(&self, provider: &str) -> Result<(), String> {
+        let account = format!("api_key_{}", provider);
+        let entry = keyring::Entry::new("com.enosislabs.rainycowork", &account)
+            .map_err(|e| format!("Failed to initialize keyring: {}", e))?;
+
+        match entry.delete_credential() {
+            Ok(_) => Ok(()),
+            Err(keyring::Error::NoEntry) => Ok(()),
+            Err(e) => Err(format!("Failed to delete API key: {}", e))
+        }
     }
 
     /// Check if an API key exists for a provider
