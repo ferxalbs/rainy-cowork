@@ -1,7 +1,15 @@
 import { useEffect, useState } from "react";
 import { Button } from "@heroui/react";
 import { toast } from "sonner";
-import { Save, Bot, Shield, Network, Cpu, Rocket, ArrowLeft } from "lucide-react";
+import {
+  Save,
+  Bot,
+  Shield,
+  Network,
+  Cpu,
+  Rocket,
+  ArrowLeft,
+} from "lucide-react";
 import { AgentSpec } from "../../../types/agent-spec";
 import { SoulEditor } from "./SoulEditor";
 import { SkillsEditor } from "./SkillsEditor";
@@ -15,6 +23,53 @@ interface AgentBuilderProps {
   onBack: () => void;
   initialSpec?: AgentSpec;
 }
+
+const NavItem = ({
+  icon: Icon,
+  label,
+  description,
+  isActive,
+  onPress,
+}: {
+  icon: any;
+  label: string;
+  description: string;
+  isActive: boolean;
+  onPress: () => void;
+}) => {
+  return (
+    <button
+      onClick={onPress}
+      className={`w-full text-left px-4 py-3 rounded-2xl transition-all duration-300 group relative overflow-hidden ${
+        isActive
+          ? "bg-primary text-primary-foreground shadow-md shadow-primary/10"
+          : "hover:bg-foreground/5 text-muted-foreground hover:text-foreground"
+      }`}
+    >
+      <div className="flex items-center gap-3 relative z-10">
+        <div
+          className={`p-1.5 rounded-full ${
+            isActive ? "bg-black/10" : "bg-white/5 group-hover:bg-white/10"
+          }`}
+        >
+          <Icon className="size-4" />
+        </div>
+        <div>
+          <span
+            className={`block text-sm font-bold ${isActive ? "text-primary-foreground" : "text-foreground"}`}
+          >
+            {label}
+          </span>
+          <span
+            className={`text-[10px] uppercase tracking-wider ${isActive ? "text-primary-foreground/70" : "text-muted-foreground"}`}
+          >
+            {description}
+          </span>
+        </div>
+      </div>
+    </button>
+  );
+};
 
 export function AgentBuilder({ onBack, initialSpec }: AgentBuilderProps) {
   const [spec, setSpec] = useState<AgentSpec>(() =>
@@ -77,52 +132,6 @@ export function AgentBuilder({ onBack, initialSpec }: AgentBuilderProps) {
     }
   };
 
-  const NavItem = ({
-    id,
-    icon: Icon,
-    label,
-    description,
-  }: {
-    id: string;
-    icon: any;
-    label: string;
-    description: string;
-  }) => {
-    const isActive = activeTab === id;
-    return (
-      <button
-        onClick={() => setActiveTab(id)}
-        className={`w-full text-left px-4 py-3 rounded-2xl transition-all duration-300 group relative overflow-hidden ${
-          isActive
-            ? "bg-primary text-primary-foreground shadow-md shadow-primary/10"
-            : "hover:bg-foreground/5 text-muted-foreground hover:text-foreground"
-        }`}
-      >
-        <div className="flex items-center gap-3 relative z-10">
-          <div
-            className={`p-1.5 rounded-full ${
-              isActive ? "bg-black/10" : "bg-white/5 group-hover:bg-white/10"
-            }`}
-          >
-            <Icon className="size-4" />
-          </div>
-          <div>
-            <span
-              className={`block text-sm font-bold ${isActive ? "text-primary-foreground" : "text-foreground"}`}
-            >
-              {label}
-            </span>
-            <span
-              className={`text-[10px] uppercase tracking-wider ${isActive ? "text-primary-foreground/70" : "text-muted-foreground"}`}
-            >
-              {description}
-            </span>
-          </div>
-        </div>
-      </button>
-    );
-  };
-
   return (
     <div className="h-full w-full bg-background p-3 flex gap-3 overflow-hidden font-sans selection:bg-primary selection:text-primary-foreground relative">
       <div
@@ -152,28 +161,32 @@ export function AgentBuilder({ onBack, initialSpec }: AgentBuilderProps) {
 
         <div className="flex-1 px-3 space-y-1 overflow-y-auto relative z-20">
           <NavItem
-            id="soul"
             icon={Bot}
             label="Soul"
             description="Persona & core"
+            isActive={activeTab === "soul"}
+            onPress={() => setActiveTab("soul")}
           />
           <NavItem
-            id="skills"
             icon={Cpu}
             label="Skills"
             description="Workflows"
+            isActive={activeTab === "skills"}
+            onPress={() => setActiveTab("skills")}
           />
           <NavItem
-            id="memory"
             icon={Network}
             label="Memory"
             description="Knowledge"
+            isActive={activeTab === "memory"}
+            onPress={() => setActiveTab("memory")}
           />
           <NavItem
-            id="airlock"
             icon={Shield}
             label="Airlock"
             description="Permissions"
+            isActive={activeTab === "airlock"}
+            onPress={() => setActiveTab("airlock")}
           />
         </div>
 
@@ -254,7 +267,9 @@ export function AgentBuilder({ onBack, initialSpec }: AgentBuilderProps) {
               <MemoryPanel
                 agentId={spec.id}
                 memoryConfig={spec.memory_config}
-                onChange={(memoryConfig) => updateSpec({ memory_config: memoryConfig })}
+                onChange={(memoryConfig) =>
+                  updateSpec({ memory_config: memoryConfig })
+                }
               />
             )}
           </div>

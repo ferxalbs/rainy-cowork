@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Spinner, Label, TextField, Input, Button } from "@heroui/react";
 import { User, Mail, Building2, Briefcase, Check } from "lucide-react";
 import { useUserProfile } from "../../../hooks/useUserProfile";
@@ -11,19 +11,12 @@ export function ProfileTab() {
     saveProfile,
   } = useUserProfile();
   const [isSavingProfile, setIsSavingProfile] = useState(false);
-  const [profileForm, setProfileForm] = useState<UserProfile>({
-    displayName: "",
-    email: "",
-    organization: "",
-    role: "",
-  });
+  const [editedProfile, setEditedProfile] = useState<Partial<UserProfile>>({});
 
-  useEffect(() => {
-    setProfileForm(profile);
-  }, [profile]);
+  const profileForm = { ...profile, ...editedProfile };
 
   const updateProfileField = (key: keyof UserProfile, value: string) => {
-    setProfileForm((prev) => ({
+    setEditedProfile((prev) => ({
       ...prev,
       [key]: value,
     }));

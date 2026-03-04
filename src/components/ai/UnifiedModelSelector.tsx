@@ -45,6 +45,32 @@ interface UnifiedModelSelectorProps {
   filter?: "all" | "chat" | "processing";
 }
 
+// Helper for tinted SVG icons
+const RenderTintedIcon = ({
+  src,
+  colorClass,
+  className,
+}: {
+  src: string;
+  colorClass: string;
+  className?: string;
+}) => (
+  <div
+    className={`${className || ""} ${colorClass}`}
+    style={{
+      maskImage: `url(${src})`,
+      WebkitMaskImage: `url(${src})`,
+      maskSize: "contain",
+      WebkitMaskSize: "contain",
+      maskRepeat: "no-repeat",
+      WebkitMaskRepeat: "no-repeat",
+      maskPosition: "center",
+      WebkitMaskPosition: "center",
+      backgroundColor: "currentColor",
+    }}
+  />
+);
+
 export function UnifiedModelSelector({
   selectedModelId,
   onSelect,
@@ -134,35 +160,12 @@ export function UnifiedModelSelector({
     const normalizedProvider = model.provider.toLowerCase();
     const normalizedId = model.id.toLowerCase();
 
-    // Helper for tinted SVG icons
-    const RenderTintedIcon = ({
-      src,
-      colorClass,
-    }: {
-      src: string;
-      colorClass: string;
-    }) => (
-      <div
-        className={`${className} ${colorClass}`}
-        style={{
-          maskImage: `url(${src})`,
-          WebkitMaskImage: `url(${src})`,
-          maskSize: "contain",
-          WebkitMaskSize: "contain",
-          maskRepeat: "no-repeat",
-          WebkitMaskRepeat: "no-repeat",
-          maskPosition: "center",
-          WebkitMaskPosition: "center",
-          backgroundColor: "currentColor",
-        }}
-      />
-    );
-
     if (normalizedProvider.includes("openai") || normalizedId.includes("gpt")) {
       return (
         <RenderTintedIcon
           src="/openai.svg"
           colorClass="text-[#10a37f] dark:text-[#10a37f]"
+          className={className}
         />
       );
     }
@@ -175,6 +178,7 @@ export function UnifiedModelSelector({
         <RenderTintedIcon
           src="/antro.svg"
           colorClass="text-[#d97757] dark:text-[#cc785c]"
+          className={className}
         />
       );
     }
@@ -187,6 +191,7 @@ export function UnifiedModelSelector({
         <RenderTintedIcon
           src="/google.svg"
           colorClass="text-[#4285F4] dark:text-[#4285F4]"
+          className={className}
         />
       );
     }
@@ -199,6 +204,7 @@ export function UnifiedModelSelector({
         <RenderTintedIcon
           src="/moonshot.svg"
           colorClass="text-foreground dark:text-foreground"
+          className={className}
         />
       );
     }
@@ -208,6 +214,7 @@ export function UnifiedModelSelector({
         <RenderTintedIcon
           src="/meta.svg"
           colorClass="text-[#0668E1] dark:text-[#0668E1]"
+          className={className}
         />
       );
     }

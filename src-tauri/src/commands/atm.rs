@@ -163,6 +163,7 @@ pub async fn cleanup_atm_metrics_alerts(
     client.cleanup_metrics_alerts().await
 }
 
+// @RESERVED - UI removed as redundant settings, functionality reserved for future use
 #[command]
 pub async fn get_atm_admin_permissions(
     client: State<'_, ATMClient>,
@@ -170,6 +171,7 @@ pub async fn get_atm_admin_permissions(
     client.get_admin_permissions().await
 }
 
+// @RESERVED - UI removed as redundant settings, functionality reserved for future use
 #[command]
 pub async fn update_atm_admin_permissions(
     client: State<'_, ATMClient>,
@@ -182,6 +184,7 @@ pub async fn update_atm_admin_permissions(
         .await
 }
 
+// @RESERVED - UI removed as redundant settings, functionality reserved for future use
 #[command]
 pub async fn list_atm_admin_policy_audit(
     client: State<'_, ATMClient>,
@@ -190,6 +193,7 @@ pub async fn list_atm_admin_policy_audit(
     client.list_admin_policy_audit(limit).await
 }
 
+// @RESERVED - UI removed as redundant settings, functionality reserved for future use
 #[command]
 pub async fn get_atm_tool_access_policy(
     client: State<'_, ATMClient>,
@@ -197,6 +201,7 @@ pub async fn get_atm_tool_access_policy(
     client.get_tool_access_policy().await
 }
 
+// @RESERVED - UI removed as redundant settings, functionality reserved for future use
 #[command]
 pub async fn update_atm_tool_access_policy(
     client: State<'_, ATMClient>,

@@ -56,16 +56,6 @@ export function MessageBubble({
     }
   };
 
-  if (isSystem) {
-    return (
-      <div className="flex justify-center my-4">
-        <span className="text-xs text-muted-foreground bg-muted/30 px-3 py-1 rounded-full border border-border/20">
-          {message.content}
-        </span>
-      </div>
-    );
-  }
-
   // Determine Neural State
   const neuralState = useMemo((): NeuralState => {
     // 1. Top Priority: Real-time state from backend agent events
@@ -99,6 +89,16 @@ export function MessageBubble({
     message.isLoading,
     message.neuralState,
   ]);
+
+  if (isSystem) {
+    return (
+      <div className="flex justify-center my-4">
+        <span className="text-xs text-muted-foreground bg-muted/30 px-3 py-1 rounded-full border border-border/20">
+          {message.content}
+        </span>
+      </div>
+    );
+  }
 
   return (
     <div

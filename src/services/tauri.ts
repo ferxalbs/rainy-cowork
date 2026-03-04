@@ -1493,36 +1493,6 @@ export interface AtmMetricsAlertCleanupResponse {
   cutoffTs: number;
 }
 
-export interface AtmAdminPermissions {
-  canEditSlo: boolean;
-  canAckAlerts: boolean;
-  canEditAlertRetention: boolean;
-  canRunAlertCleanup: boolean;
-}
-
-export interface AtmToolAccessPolicy {
-  enabled: boolean;
-  mode: "all" | "allowlist";
-  allow: string[];
-  deny: string[];
-}
-
-export interface AtmToolAccessPolicyState {
-  toolAccessPolicy: AtmToolAccessPolicy;
-  toolAccessPolicyVersion: number;
-  toolAccessPolicyHash: string;
-}
-
-export interface AtmAdminPolicyAuditEvent {
-  id: string;
-  actor: string;
-  eventType: string;
-  previous?: any;
-  next?: any;
-  metadata?: any;
-  createdAt: number;
-}
-
 export async function createAtmAgent(
   name: string,
   type: string,
@@ -1622,44 +1592,6 @@ export async function updateAtmMetricsAlertRetention(
 
 export async function cleanupAtmMetricsAlerts(): Promise<AtmMetricsAlertCleanupResponse> {
   return invoke("cleanup_atm_metrics_alerts");
-}
-
-export async function getAtmAdminPermissions(): Promise<AtmAdminPermissions> {
-  return invoke("get_atm_admin_permissions");
-}
-
-export async function updateAtmAdminPermissions(
-  permissions: AtmAdminPermissions,
-  platformKey: string,
-  userApiKey: string,
-): Promise<AtmAdminPermissions> {
-  return invoke("update_atm_admin_permissions", {
-    permissions,
-    platformKey,
-    userApiKey,
-  });
-}
-
-export async function listAtmAdminPolicyAudit(
-  limit = 50,
-): Promise<AtmAdminPolicyAuditEvent[]> {
-  return invoke("list_atm_admin_policy_audit", { limit });
-}
-
-export async function getAtmToolAccessPolicy(): Promise<AtmToolAccessPolicyState> {
-  return invoke("get_atm_tool_access_policy");
-}
-
-export async function updateAtmToolAccessPolicy(
-  toolAccessPolicy: AtmToolAccessPolicy,
-  platformKey: string,
-  userApiKey: string,
-): Promise<AtmToolAccessPolicyState> {
-  return invoke("update_atm_tool_access_policy", {
-    toolAccessPolicy,
-    platformKey,
-    userApiKey,
-  });
 }
 
 // ============ ATM Bootstrap Commands ============

@@ -52,6 +52,73 @@ type UpdateStatus =
   | "up-to-date"
   | "error";
 
+const NavItem = ({
+  id,
+  label,
+  icon: Icon,
+  colorClass,
+  badge,
+  isActive,
+  isCollapsed,
+  onNavigate,
+}: {
+  id: string;
+  label: string;
+  icon: any;
+  colorClass?: string;
+  badge?: number;
+  isActive: boolean;
+  isCollapsed: boolean;
+  onNavigate?: (id: string) => void;
+}) => {
+  const content = (
+    <Button
+      variant={isActive ? "secondary" : "ghost"}
+      isIconOnly={isCollapsed}
+      className={`transition-all duration-200 group relative ${
+        isCollapsed
+          ? "w-10 h-10 justify-center mx-auto rounded-xl mb-1"
+          : "w-full justify-start gap-3 h-10 px-3"
+      } ${
+        isActive
+          ? "bg-primary/10 text-primary font-medium shadow-sm"
+          : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+      }`}
+      onPress={() => onNavigate?.(id)}
+    >
+      <Icon
+        className={`size-4 shrink-0 ${colorClass && !isActive ? colorClass : ""}`}
+      />
+      {!isCollapsed && (
+        <>
+          <span className="truncate flex-1 text-left">{label}</span>
+          {badge !== undefined && badge > 0 && (
+            <span
+              className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
+                id === "running"
+                  ? "bg-blue-500/10 text-blue-500"
+                  : "bg-default-100 text-default-500"
+              }`}
+            >
+              {badge}
+            </span>
+          )}
+        </>
+      )}
+    </Button>
+  );
+
+  if (isCollapsed) {
+    return (
+      <Tooltip delay={0}>
+        {content}
+        <Tooltip.Content placement="right">{label}</Tooltip.Content>
+      </Tooltip>
+    );
+  }
+  return content;
+};
+
 export function AppSidebar({
   folders = [],
   onFolderSelect,
@@ -137,68 +204,6 @@ export function AppSidebar({
     downloadProgress.total && downloadProgress.total > 0
       ? Math.round((downloadProgress.downloaded / downloadProgress.total) * 100)
       : null;
-  const NavItem = ({
-    id,
-    label,
-    icon: Icon,
-    colorClass,
-    badge,
-  }: {
-    id: string;
-    label: string;
-    icon: any;
-    colorClass?: string;
-    badge?: number;
-  }) => {
-    const isActive = activeSection === id;
-
-    const content = (
-      <Button
-        variant={isActive ? "secondary" : "ghost"}
-        isIconOnly={isCollapsed}
-        className={`transition-all duration-200 group relative ${
-          isCollapsed
-            ? "w-10 h-10 justify-center mx-auto rounded-xl mb-1"
-            : "w-full justify-start gap-3 h-10 px-3"
-        } ${
-          isActive
-            ? "bg-primary/10 text-primary font-medium shadow-sm"
-            : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-        }`}
-        onPress={() => onNavigate?.(id)}
-      >
-        <Icon
-          className={`size-4 shrink-0 ${colorClass && !isActive ? colorClass : ""}`}
-        />
-        {!isCollapsed && (
-          <>
-            <span className="truncate flex-1 text-left">{label}</span>
-            {badge !== undefined && badge > 0 && (
-              <span
-                className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
-                  id === "running"
-                    ? "bg-blue-500/10 text-blue-500"
-                    : "bg-default-100 text-default-500"
-                }`}
-              >
-                {badge}
-              </span>
-            )}
-          </>
-        )}
-      </Button>
-    );
-
-    if (isCollapsed) {
-      return (
-        <Tooltip delay={0}>
-          {content}
-          <Tooltip.Content placement="right">{label}</Tooltip.Content>
-        </Tooltip>
-      );
-    }
-    return content;
-  };
 
   return (
     <>
@@ -339,6 +344,9 @@ export function AppSidebar({
               label="Agent Chat"
               icon={MessageSquare}
               colorClass="text-purple-500"
+              isActive={activeSection === "agent-chat"}
+              isCollapsed={isCollapsed}
+              onNavigate={onNavigate}
             />
 
             <NavItem
@@ -346,24 +354,36 @@ export function AppSidebar({
               label="Rainy ATM"
               icon={Network}
               colorClass="text-purple-500"
+              isActive={activeSection === "neural-link"}
+              isCollapsed={isCollapsed}
+              onNavigate={onNavigate}
             />
             <NavItem
               id="agent-builder"
               label="Agent Builder"
               icon={Bot}
               colorClass="text-orange-500"
+              isActive={activeSection === "agent-builder"}
+              isCollapsed={isCollapsed}
+              onNavigate={onNavigate}
             />
             <NavItem
               id="agent-store"
               label="Agents Store"
               icon={Library}
               colorClass="text-amber-500"
+              isActive={activeSection === "agent-store"}
+              isCollapsed={isCollapsed}
+              onNavigate={onNavigate}
             />
             <NavItem
               id="wasm-skills"
               label="Wasm Skills"
               icon={CpuIcon}
               colorClass="text-cyan-500"
+              isActive={activeSection === "wasm-skills"}
+              isCollapsed={isCollapsed}
+              onNavigate={onNavigate}
             />
           </div>
         </div>
@@ -373,11 +393,21 @@ export function AppSidebar({
 
           {/* Settings Submenu */}
           <div className="space-y-1 pt-2">
-            <NavItem id="settings-models" label="AI Provider" icon={Sparkles} />
+            <NavItem
+              id="settings-models"
+              label="AI Provider"
+              icon={Sparkles}
+              isActive={activeSection === "settings-models"}
+              isCollapsed={isCollapsed}
+              onNavigate={onNavigate}
+            />
             <NavItem
               id="settings-appearance"
               label="Appearance"
               icon={Palette}
+              isActive={activeSection === "settings-appearance"}
+              isCollapsed={isCollapsed}
+              onNavigate={onNavigate}
             />
           </div>
 

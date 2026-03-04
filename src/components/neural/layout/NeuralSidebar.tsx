@@ -1,4 +1,4 @@
-import { Activity, LayoutDashboard, Settings, Users } from "lucide-react";
+import { Activity, LayoutDashboard, Users } from "lucide-react";
 import { Button } from "@heroui/react";
 
 interface NeuralSidebarProps {
@@ -6,54 +6,54 @@ interface NeuralSidebarProps {
   onTabChange: (tab: string) => void;
 }
 
-export function NeuralSidebar({ activeTab, onTabChange }: NeuralSidebarProps) {
-  const NavItem = ({
-    id,
-    icon: Icon,
-    label,
-    description,
-  }: {
-    id: string;
-    icon: any;
-    label: string;
-    description: string;
-  }) => {
-    const isActive = activeTab === id;
-
-    return (
-      <Button
-        variant={isActive ? "secondary" : "ghost"}
-        className={`w-full justify-start gap-3 h-auto py-3 px-3 transition-all duration-200 group relative mb-1 ${
+const NavItem = ({
+  icon: Icon,
+  label,
+  description,
+  isActive,
+  onPress,
+}: {
+  icon: any;
+  label: string;
+  description: string;
+  isActive: boolean;
+  onPress: () => void;
+}) => {
+  return (
+    <Button
+      variant={isActive ? "secondary" : "ghost"}
+      className={`w-full justify-start gap-3 h-auto py-3 px-3 transition-all duration-200 group relative mb-1 ${
+        isActive
+          ? "bg-primary/10 text-primary font-medium shadow-sm"
+          : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+      }`}
+      onPress={onPress}
+    >
+      <div
+        className={`p-1 rounded-lg shrink-0 transition-colors ${
           isActive
-            ? "bg-primary/10 text-primary font-medium shadow-sm"
-            : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+            ? "bg-primary/10 text-primary"
+            : "bg-transparent group-hover:bg-muted"
         }`}
-        onPress={() => onTabChange(id)}
       >
-        <div
-          className={`p-1 rounded-lg shrink-0 transition-colors ${
-            isActive
-              ? "bg-primary/10 text-primary"
-              : "bg-transparent group-hover:bg-muted"
-          }`}
+        <Icon className="size-5" />
+      </div>
+
+      <div className="flex flex-col items-start min-w-0 text-left">
+        <span
+          className={`text-sm font-medium ${isActive ? "text-primary" : "text-foreground"}`}
         >
-          <Icon className="size-5" />
-        </div>
+          {label}
+        </span>
+        <span className="text-[10px] text-muted-foreground/80 font-normal truncate w-full">
+          {description}
+        </span>
+      </div>
+    </Button>
+  );
+};
 
-        <div className="flex flex-col items-start min-w-0 text-left">
-          <span
-            className={`text-sm font-medium ${isActive ? "text-primary" : "text-foreground"}`}
-          >
-            {label}
-          </span>
-          <span className="text-[10px] text-muted-foreground/80 font-normal truncate w-full">
-            {description}
-          </span>
-        </div>
-      </Button>
-    );
-  };
-
+export function NeuralSidebar({ activeTab, onTabChange }: NeuralSidebarProps) {
   return (
     <aside className="flex flex-col h-full border-r border-border/50 bg-sidebar w-[260px] pb-4 transition-all duration-300">
       {/* Sidebar Header */}
@@ -87,28 +87,25 @@ export function NeuralSidebar({ activeTab, onTabChange }: NeuralSidebarProps) {
         </div>
 
         <NavItem
-          id="dashboard"
           icon={LayoutDashboard}
           label="Dashboard"
           description="Overview & Status"
+          isActive={activeTab === "dashboard"}
+          onPress={() => onTabChange("dashboard")}
         />
         <NavItem
-          id="agents"
           icon={Users}
           label="Agents"
           description="Manage Fleet"
+          isActive={activeTab === "agents"}
+          onPress={() => onTabChange("agents")}
         />
         <NavItem
-          id="activity"
           icon={Activity}
           label="Activity"
           description="Command History"
-        />
-        <NavItem
-          id="settings"
-          icon={Settings}
-          label="Settings"
-          description="Policies & Skills"
+          isActive={activeTab === "activity"}
+          onPress={() => onTabChange("activity")}
         />
       </div>
 
