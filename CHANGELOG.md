@@ -5,7 +5,58 @@ All notable changes to Rainy Cowork will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.5.93] - QUARANTINE ZONE (WASM Skill Sandbox) PT. 1 - 2026-02-25
+## [0.5.94] - 2026-03-04 - THE DIRECTOR
+
+### Fixed - Step 4 Production Closure
+
+- Closed the ATM-hosted Wasm skill installation trust chain by switching desktop remote installs to verify `ed25519` bundle signatures against an ATM-served public key instead of the workspace platform key.
+- Hardened `src-tauri/src/services/neural_service.rs` heartbeat behavior so runtime skill manifests are re-signed and refreshed whenever the manifest hash changes, keeping the node advertisement aligned with installed/enabled third-party skills.
+- Aligned Wasm sandbox resource limits in `src-tauri/src/services/wasm_sandbox/mod.rs` with the production Step 4 profile by reducing the per-instance memory ceiling to `50 MB`.
+- Fixed keychain-dependent Rust tests to run deterministically in the local test environment by adding a test-only in-memory keychain fallback in `src-tauri/src/ai/keychain.rs`.
+- Tightened the built-in tool policy regression in `src-tauri/src/services/skill_executor/registry.rs` so the explicit-policy invariant validates registered built-ins without being polluted by installed third-party skills.
+
+### Added - Supervisor Agent Layer
+
+- Added modular Supervisor runtime building blocks in:
+  - `src-tauri/src/ai/agent/events.rs`
+  - `src-tauri/src/ai/agent/protocol.rs`
+  - `src-tauri/src/ai/agent/runtime_registry.rs`
+  - `src-tauri/src/ai/agent/specialist.rs`
+  - `src-tauri/src/ai/agent/supervisor.rs`
+- Added `runtime` configuration to `AgentSpec` in `src-tauri/src/ai/specs/manifest.rs` with `single` and `supervisor` modes, bounded specialist count, and verifier gating.
+- Added first-class specialist roles:
+  - `ResearchAgent`
+  - `ExecutorAgent`
+  - `VerifierAgent`
+- Added Supervisor event emission for real-time plan/status visibility:
+  - `supervisor_plan_created`
+  - `specialist_spawned`
+  - `specialist_status_changed`
+  - `specialist_completed`
+  - `specialist_failed`
+  - `supervisor_summary`
+
+### Changed - Runtime, UI, and Telemetry
+
+- `src-tauri/src/ai/agent/runtime.rs` now routes to the Supervisor layer when an agent spec declares `runtime.mode = supervisor`; existing agents continue to use the single-agent path by default.
+- `src-tauri/src/commands/agent.rs` and `src-tauri/src/services/command_poller.rs` now inject a shared runtime registry so local and cloud-triggered agent runs can report Supervisor activity consistently.
+- `src-tauri/src/models/neural.rs` and `src-tauri/src/services/neural_service.rs` now include `runtimeStats` in node heartbeats, exposing active supervisor runs, specialist counts, and tool usage by role.
+- Updated the chat UI to visualize Supervisor execution rails and per-specialist status in:
+  - `src/hooks/useAgentChat.ts`
+  - `src/components/agent-chat/MessageBubble.tsx`
+  - `src/types/agent.ts`
+  - `src/hooks/useAgentRuntime.ts`
+
+### Validation
+
+- `pnpm exec tsc --noEmit` — passes
+- `pnpm run build` — passes
+- `cd src-tauri && cargo check -q` — passes
+- `cd src-tauri && cargo test -q` — passes (111/111)
+- `cd rainy-atm && bun test` — passes (43/43)
+- `cd rainy-atm && bun run build` — passes
+
+## [0.5.93] - QUARANTINE ZONE (WASM Skill Sandbox) - 2026-02-25
 
 ### Fixed - 0.5.93 Stabilizations
 

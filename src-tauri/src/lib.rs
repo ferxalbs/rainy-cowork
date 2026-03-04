@@ -9,6 +9,7 @@ mod models;
 mod services;
 
 use crate::ai::agent::manager::{self, AgentManager};
+use crate::ai::agent::runtime_registry::RuntimeRegistry;
 use crate::db::Database;
 use ai::{AIProviderManager, IntelligentRouter, ProviderRegistry};
 use services::{
@@ -64,12 +65,14 @@ pub fn run() {
 
     // Initialize Node Authenticator
     let authenticator = NodeAuthenticator::new();
+    let runtime_registry = Arc::new(RuntimeRegistry::new());
 
     // Initialize Neural Service (Distributed Neural System)
     let neural_service = NeuralService::new(
         "https://rainy-atm-cfe3gvcwua-uc.a.run.app".to_string(),
         "pending-pairing".to_string(), // Initial state, will be updated after pairing
         authenticator,
+        Some(runtime_registry.clone()),
     );
 
     // Initialize Browser Controller (Native CDP)
@@ -128,6 +131,7 @@ pub fn run() {
         .manage(browser_controller) // Arc<BrowserController>
         .manage(command_poller) // Arc<CommandPoller>
         .manage(skill_executor) // Arc<SkillExecutor>
+        .manage(runtime_registry.clone()) // Arc<RuntimeRegistry>
         .manage(socket_client) // SocketClient
         .manage(llm_client) // Arc<Mutex<LLMClient>>
         .manage(commands::airlock::AirlockServiceState(Arc::new(
@@ -243,6 +247,7 @@ pub fn run() {
                 .expect("Failed to get app data dir for CommandPoller");
 
             let agent_manager_for_poller = Arc::new(agent_manager);
+            let runtime_registry_for_poller = runtime_registry.clone();
 
             tauri::async_runtime::spawn(async move {
                 // Inject Airlock service
@@ -254,6 +259,7 @@ pub fn run() {
                         router_for_poller,
                         app_data_for_poller,
                         agent_manager_for_poller,
+                        runtime_registry_for_poller,
                     )
                     .await;
 

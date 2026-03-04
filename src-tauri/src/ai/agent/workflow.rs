@@ -1,7 +1,8 @@
 // Workflow Engine v2 — Step-based execution model for the agent's ReAct loop.
 // Contains ThinkStep (LLM interaction) and ActStep (tool execution) with memory persistence.
 use crate::ai::agent::memory::AgentMemory;
-use crate::ai::agent::runtime::{AgentContent, AgentEvent, AgentMessage, RuntimeOptions};
+use crate::ai::agent::events::AgentEvent;
+use crate::ai::agent::runtime::{AgentContent, AgentMessage, RuntimeOptions};
 use crate::ai::router::IntelligentRouter;
 use crate::ai::specs::manifest::AgentSpec;
 use crate::models::neural::{
@@ -922,6 +923,7 @@ mod tests {
             airlock: Default::default(),
             memory_config: Default::default(),
             connectors: Default::default(),
+            runtime: Default::default(),
             signature: None,
         };
 

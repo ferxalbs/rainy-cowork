@@ -194,8 +194,7 @@ mod tests {
 
     #[test]
     fn every_registered_tool_has_explicit_policy_entry() {
-        let executor = SkillExecutor::mock();
-        let tools = executor.get_tool_definitions();
+        let tools = registered_tool_definitions();
 
         let missing: Vec<String> = tools
             .iter()

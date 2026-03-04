@@ -113,6 +113,15 @@ struct RemoteSkillBundleResponse {
     pub wasm_base64: String,
     pub package_signature: String,
     pub signature_algorithm: String,
+    pub key_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SkillPublicKeyResponse {
+    pub algorithm: String,
+    pub public_key_hex: String,
+    pub key_id: String,
 }
 
 #[tauri::command]
@@ -165,12 +174,40 @@ pub async fn install_skill_from_atm(
     _app_handle: AppHandle,
     req: RemoteSkillInstallRequest,
 ) -> Result<crate::services::third_party_skill_registry::InstalledThirdPartySkill, String> {
+    let public_key_url = format!(
+        "{}/v1/skills/public-key",
+        req.base_url.trim_end_matches('/')
+    );
     let url = format!(
         "{}/v1/skills/{}/download",
         req.base_url.trim_end_matches('/'),
         req.skill_id
     );
     let client = reqwest::Client::new();
+    let key_response = client
+        .get(&public_key_url)
+        .header("Authorization", format!("Bearer {}", req.platform_key))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to fetch ATM public key: {}", e))?;
+
+    if !key_response.status().is_success() {
+        let status = key_response.status();
+        let body = key_response.text().await.unwrap_or_default();
+        return Err(format!("ATM public key fetch failed ({}): {}", status, body));
+    }
+
+    let public_key: SkillPublicKeyResponse = key_response
+        .json()
+        .await
+        .map_err(|e| format!("Invalid ATM public key response: {}", e))?;
+    if public_key.algorithm != "ed25519" {
+        return Err(format!(
+            "Unsupported ATM public key algorithm: {}",
+            public_key.algorithm
+        ));
+    }
+
     let response = client
         .get(&url)
         .header("Authorization", format!("Bearer {}", req.platform_key))
@@ -191,22 +228,30 @@ pub async fn install_skill_from_atm(
     let wasm_bytes = base64::engine::general_purpose::STANDARD
         .decode(bundle.wasm_base64.as_bytes())
         .map_err(|e| format!("Invalid wasm base64 payload: {}", e))?;
-    if bundle.signature_algorithm != "hmac-sha256" {
+    if bundle.signature_algorithm != "ed25519" {
         return Err(format!(
             "Unsupported ATM bundle signature algorithm: {}",
             bundle.signature_algorithm
         ));
     }
+    if let Some(bundle_key_id) = &bundle.key_id {
+        if *bundle_key_id != public_key.key_id {
+            return Err(format!(
+                "ATM bundle key mismatch: bundle={} public-key={}",
+                bundle_key_id, public_key.key_id
+            ));
+        }
+    }
     if !verify_downloaded_bundle_signature(
         &bundle.manifest_toml,
         &wasm_bytes,
         &bundle.package_signature,
-        &req.platform_key,
+        &public_key.public_key_hex,
     ) {
         return Err("ATM skill bundle signature verification failed".to_string());
     }
 
     let temp_dir = write_temp_downloaded_skill(&bundle.skill_id, &bundle.manifest_toml, &wasm_bytes)?;
     let installer = SkillInstaller::new()?;
-    installer.install_from_downloaded_bundle(&temp_dir, Some(&req.platform_key))
+    installer.install_from_downloaded_bundle(&temp_dir, Some(&public_key.public_key_hex))
 }

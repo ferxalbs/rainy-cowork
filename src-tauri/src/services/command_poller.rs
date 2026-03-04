@@ -1,5 +1,7 @@
 use crate::ai::agent::memory::AgentMemory;
-use crate::ai::agent::runtime::{AgentEvent, AgentRuntime};
+use crate::ai::agent::events::AgentEvent;
+use crate::ai::agent::runtime::AgentRuntime;
+use crate::ai::agent::runtime_registry::RuntimeRegistry;
 use crate::ai::router::IntelligentRouter;
 use crate::models::neural::CommandResult;
 use crate::services::airlock::AirlockService;
@@ -100,6 +102,66 @@ fn map_agent_event(event: &AgentEvent) -> (String, serde_json::Value) {
                 "text": text,
             }),
         ),
+        AgentEvent::SupervisorPlanCreated(plan) => (
+            "Supervisor plan".to_string(),
+            serde_json::json!({
+                "type": "supervisor_plan_created",
+                "summary": plan.summary,
+                "steps": plan.steps,
+            }),
+        ),
+        AgentEvent::SpecialistSpawned(payload) => (
+            format!("Specialist spawned: {}", payload.role.as_str()),
+            serde_json::json!({
+                "type": "specialist_spawned",
+                "runId": payload.run_id,
+                "agentId": payload.agent_id,
+                "role": payload.role,
+                "status": payload.status,
+                "detail": payload.detail,
+            }),
+        ),
+        AgentEvent::SpecialistStatusChanged(payload) => (
+            format!("Specialist status: {}", payload.role.as_str()),
+            serde_json::json!({
+                "type": "specialist_status_changed",
+                "runId": payload.run_id,
+                "agentId": payload.agent_id,
+                "role": payload.role,
+                "status": payload.status,
+                "detail": payload.detail,
+                "activeTool": payload.active_tool,
+            }),
+        ),
+        AgentEvent::SpecialistCompleted(payload) => (
+            format!("Specialist completed: {}", payload.role.as_str()),
+            serde_json::json!({
+                "type": "specialist_completed",
+                "runId": payload.run_id,
+                "agentId": payload.agent_id,
+                "role": payload.role,
+                "summary": payload.summary,
+                "responsePreview": payload.response_preview,
+            }),
+        ),
+        AgentEvent::SpecialistFailed(payload) => (
+            format!("Specialist failed: {}", payload.role.as_str()),
+            serde_json::json!({
+                "type": "specialist_failed",
+                "runId": payload.run_id,
+                "agentId": payload.agent_id,
+                "role": payload.role,
+                "error": payload.error,
+            }),
+        ),
+        AgentEvent::SupervisorSummary(payload) => (
+            "Supervisor summary".to_string(),
+            serde_json::json!({
+                "type": "supervisor_summary",
+                "runId": payload.run_id,
+                "summary": payload.summary,
+            }),
+        ),
     }
 }
 
@@ -163,6 +225,7 @@ pub struct AgentRuntimeContext {
     pub router: Arc<RwLock<IntelligentRouter>>,
     pub app_data_dir: PathBuf,
     pub agent_manager: Arc<AgentManager>,
+    pub runtime_registry: Arc<RuntimeRegistry>,
 }
 
 #[derive(Clone)]
@@ -197,12 +260,14 @@ impl CommandPoller {
         router: Arc<RwLock<IntelligentRouter>>,
         app_data_dir: PathBuf,
         agent_manager: Arc<AgentManager>,
+        runtime_registry: Arc<RuntimeRegistry>,
     ) {
         let mut lock = self.agent_context.write().await;
         *lock = Some(AgentRuntimeContext {
             router,
             app_data_dir,
             agent_manager,
+            runtime_registry,
         });
     }
 
@@ -613,6 +678,7 @@ GUIDELINES:
                                 airlock: Default::default(),
                                 memory_config: Default::default(),
                                 connectors: Default::default(),
+                                runtime: Default::default(),
                                 signature: None,
                             }
                         };
@@ -637,6 +703,7 @@ GUIDELINES:
                             self.skill_executor.clone(),
                             memory,
                             Arc::new(airlock),
+                            Some(ctx.runtime_registry.clone()),
                         );
 
                         // Run the agent with bounded event streaming to avoid ATM overload under heavy loops.

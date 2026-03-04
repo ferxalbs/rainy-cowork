@@ -1,7 +1,11 @@
 import { useState, useCallback } from "react";
 import { useStreaming } from "./useStreaming";
 import { useTauriTask } from "./useTauriTask";
-import type { AgentMessage, TaskPlan } from "../types/agent";
+import type {
+  AgentMessage,
+  SpecialistRunState,
+  TaskPlan,
+} from "../types/agent";
 import * as tauri from "../services/tauri";
 import { runAgentWorkflow } from "../services/tauri";
 import {
@@ -537,11 +541,94 @@ export function useAgentChat() {
         }>("agent://event", (event) => {
           const payload = event.payload;
 
+          const upsertSpecialist = (
+            specialists: SpecialistRunState[] | undefined,
+            next: Partial<SpecialistRunState> & {
+              agentId: string;
+              role: SpecialistRunState["role"];
+              status: SpecialistRunState["status"];
+            },
+          ): SpecialistRunState[] => {
+            const current = specialists ? [...specialists] : [];
+            const idx = current.findIndex((item) => item.agentId === next.agentId);
+            const merged = {
+              ...(idx >= 0 ? current[idx] : {}),
+              ...next,
+            } as SpecialistRunState;
+            if (idx >= 0) {
+              current[idx] = merged;
+            } else {
+              current.push(merged);
+            }
+            return current;
+          };
+
           setMessages((prev) =>
             prev.map((m) => {
               if (m.id !== agentMsgId) return m;
 
               switch (payload.type) {
+                case "supervisor_plan_created": {
+                  return {
+                    ...m,
+                    neuralState: "planning",
+                    supervisorPlan: {
+                      summary: payload.data?.summary || "Supervisor plan ready",
+                      steps: Array.isArray(payload.data?.steps)
+                        ? payload.data.steps
+                        : [],
+                      verificationRequired:
+                        payload.data?.verificationRequired || false,
+                    },
+                  };
+                }
+                case "specialist_spawned":
+                case "specialist_status_changed": {
+                  const activeTool = payload.data?.activeTool || undefined;
+                  return {
+                    ...m,
+                    neuralState: activeTool
+                      ? resolveNeuralState(activeTool)
+                      : "planning",
+                    activeToolName: activeTool
+                      ? getToolDisplayName(activeTool)
+                      : undefined,
+                    specialists: upsertSpecialist(m.specialists, {
+                      agentId: payload.data?.agentId,
+                      role: payload.data?.role,
+                      status: payload.data?.status,
+                      detail: payload.data?.detail,
+                      activeTool,
+                    }),
+                  };
+                }
+                case "specialist_completed": {
+                  return {
+                    ...m,
+                    neuralState: "thinking",
+                    activeToolName: undefined,
+                    specialists: upsertSpecialist(m.specialists, {
+                      agentId: payload.data?.agentId,
+                      role: payload.data?.role,
+                      status: "completed",
+                      summary: payload.data?.summary,
+                      responsePreview: payload.data?.responsePreview,
+                    }),
+                  };
+                }
+                case "specialist_failed": {
+                  return {
+                    ...m,
+                    neuralState: "thinking",
+                    activeToolName: undefined,
+                    specialists: upsertSpecialist(m.specialists, {
+                      agentId: payload.data?.agentId,
+                      role: payload.data?.role,
+                      status: "failed",
+                      error: payload.data?.error,
+                    }),
+                  };
+                }
                 case "tool_call": {
                   // payload.data is a ToolCall: { id, type, function: { name, arguments } }
                   const functionName = payload.data?.function?.name || "";
@@ -561,6 +648,13 @@ export function useAgentChat() {
                 }
                 case "thought":
                 case "stream_chunk": {
+                  return {
+                    ...m,
+                    neuralState: "thinking",
+                    activeToolName: undefined,
+                  };
+                }
+                case "supervisor_summary": {
                   return {
                     ...m,
                     neuralState: "thinking",
@@ -597,6 +691,8 @@ export function useAgentChat() {
                   isLoading: false,
                   neuralState: undefined,
                   activeToolName: undefined,
+                  specialists: m.specialists,
+                  supervisorPlan: m.supervisorPlan,
                 }
               : m,
           ),
@@ -612,6 +708,8 @@ export function useAgentChat() {
                   isLoading: false,
                   neuralState: undefined,
                   activeToolName: undefined,
+                  specialists: m.specialists,
+                  supervisorPlan: m.supervisorPlan,
                 }
               : m,
           ),

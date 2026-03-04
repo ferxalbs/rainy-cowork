@@ -26,6 +26,8 @@ pub struct DesktopNode {
     pub status: DesktopNodeStatus,
     pub last_heartbeat: i64,
     pub paired_at: i64,
+    #[serde(default)]
+    pub runtime_stats: RuntimeStats,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -204,6 +206,33 @@ pub struct CommandResult {
     pub output: Option<String>,
     pub error: Option<String>,
     pub exit_code: Option<i32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeStats {
+    pub active_supervisor_runs: usize,
+    pub active_specialists: usize,
+    #[serde(default)]
+    pub supervisors: Vec<SupervisorRunStatus>,
+    #[serde(default)]
+    pub tool_usage_by_role: ToolUsageByRole,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SupervisorRunStatus {
+    pub run_id: String,
+    pub status: String,
+    pub specialist_count: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ToolUsageByRole {
+    pub research: u64,
+    pub executor: u64,
+    pub verifier: u64,
 }
 
 #[cfg(test)]

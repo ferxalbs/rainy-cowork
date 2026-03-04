@@ -1,10 +1,13 @@
 // AgentRuntime v2 — Core runtime orchestrating the agent's ReAct workflow.
 // Manages state, history, memory persistence, and the Think→Act execution loop.
 use crate::ai::agent::context_window::ContextWindow;
+use crate::ai::agent::events::AgentEvent;
 use crate::ai::agent::memory::AgentMemory;
+use crate::ai::agent::runtime_registry::RuntimeRegistry;
+use crate::ai::agent::supervisor::SupervisorAgent;
 use crate::ai::agent::workflow::{ActStep, AgentState, ThinkStep, Workflow};
 use crate::ai::router::IntelligentRouter;
-use crate::ai::specs::manifest::AgentSpec;
+use crate::ai::specs::manifest::{AgentSpec, RuntimeMode};
 use crate::services::SkillExecutor;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -27,6 +30,7 @@ pub struct AgentRuntime {
     skills: Arc<SkillExecutor>,
     memory: Arc<AgentMemory>,
     airlock_service: Arc<Option<crate::services::airlock::AirlockService>>,
+    runtime_registry: Option<Arc<RuntimeRegistry>>,
     history: Arc<Mutex<Vec<AgentMessage>>>,
 }
 
@@ -46,24 +50,6 @@ pub enum AgentContent {
     Text(String),
     /// Multimodal content with text and/or images
     Parts(Vec<AgentContentPart>),
-}
-
-#[derive(Clone, Debug, Serialize)]
-#[serde(tag = "type", content = "data", rename_all = "snake_case")]
-pub enum AgentEvent {
-    Status(String),
-    Thought(String),
-    /// Token-by-token streaming chunks during LLM generation
-    StreamChunk(String),
-    ToolCall(crate::ai::provider_types::ToolCall),
-    ToolResult {
-        id: String,
-        result: String,
-    },
-    #[allow(dead_code)] // @RESERVED — will be emitted by error handling in workflow
-    Error(String),
-    /// Emitted when the agent stores a memory entry
-    MemoryStored(String),
 }
 
 impl AgentContent {
@@ -170,6 +156,7 @@ impl AgentRuntime {
         skills: Arc<SkillExecutor>,
         memory: Arc<AgentMemory>,
         airlock_service: Arc<Option<crate::services::airlock::AirlockService>>,
+        runtime_registry: Option<Arc<RuntimeRegistry>>,
     ) -> Self {
         Self {
             spec,
@@ -178,6 +165,7 @@ impl AgentRuntime {
             skills,
             memory,
             airlock_service,
+            runtime_registry,
             history: Arc::new(Mutex::new(Vec::new())),
         }
     }
@@ -321,6 +309,25 @@ Rules:
 
     /// Primary entry point: Run a workflow/turn
     pub async fn run<F>(&self, input: &str, on_event: F) -> Result<String, String>
+    where
+        F: Fn(AgentEvent) + Send + Sync + 'static + Clone,
+    {
+        if self.spec.runtime.mode == RuntimeMode::Supervisor {
+            let supervisor = SupervisorAgent {
+                spec: self.spec.clone(),
+                options: self.options.clone(),
+                router: self.router.clone(),
+                skills: self.skills.clone(),
+                memory: self.memory.clone(),
+                airlock_service: self.airlock_service.clone(),
+                runtime_registry: self.runtime_registry.clone(),
+            };
+            return supervisor.run(input, on_event).await;
+        }
+        self.run_single(input, on_event).await
+    }
+
+    pub async fn run_single<F>(&self, input: &str, on_event: F) -> Result<String, String>
     where
         F: Fn(AgentEvent) + Send + Sync + 'static + Clone,
     {

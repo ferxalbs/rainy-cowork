@@ -12,6 +12,7 @@ import {
 } from "./neural-config";
 
 import { ThoughtDisplay, ThoughtBadge } from "./ThoughtDisplay";
+import type { SpecialistRunState } from "../../types/agent";
 
 // Map step types to icons
 const stepIcons: Record<string, React.ElementType> = {
@@ -160,6 +161,16 @@ export function MessageBubble({
           <ThoughtBadge thinkingLevel={message.thinkingLevel || "medium"} />
         )}
 
+        {!isUser &&
+          (message.supervisorPlan ||
+            (message.specialists && message.specialists.length > 0)) && (
+            <SupervisorRail
+              summary={message.supervisorPlan?.summary}
+              steps={message.supervisorPlan?.steps || []}
+              specialists={message.specialists || []}
+            />
+          )}
+
         {/* New Plan Confirmation Card (Deep Mode) */}
         {!isUser && message.toolCalls && !message.isExecuted && (
           <PlanConfirmationCard
@@ -206,6 +217,103 @@ export function MessageBubble({
           })}
         </span>
       </div>
+    </div>
+  );
+}
+
+function SupervisorRail({
+  summary,
+  steps,
+  specialists,
+}: {
+  summary?: string;
+  steps: string[];
+  specialists: SpecialistRunState[];
+}) {
+  const roleLabel: Record<SpecialistRunState["role"], string> = {
+    research: "Research",
+    executor: "Executor",
+    verifier: "Verifier",
+  };
+
+  const statusTone: Record<
+    SpecialistRunState["status"],
+    string
+  > = {
+    pending: "text-muted-foreground",
+    planning: "text-amber-500",
+    running: "text-cyan-500",
+    waiting_on_airlock: "text-orange-500",
+    verifying: "text-emerald-500",
+    completed: "text-green-500",
+    failed: "text-red-500",
+    cancelled: "text-muted-foreground",
+  };
+
+  return (
+    <div className="w-full rounded-2xl border border-primary/15 bg-background/50 p-4 backdrop-blur-md">
+      {summary && (
+        <div className="mb-3">
+          <p className="text-xs uppercase tracking-[0.18em] text-primary/70">
+            Supervisor
+          </p>
+          <p className="mt-1 text-sm text-foreground">{summary}</p>
+        </div>
+      )}
+
+      {steps.length > 0 && (
+        <div className="mb-3 flex flex-wrap gap-2">
+          {steps.map((step, index) => (
+            <span
+              key={`${index}-${step}`}
+              className="rounded-full border border-border/40 bg-background/70 px-3 py-1 text-[11px] text-muted-foreground"
+            >
+              {step}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {specialists.length > 0 && (
+        <div className="grid gap-2 md:grid-cols-3">
+          {specialists.map((specialist) => (
+            <div
+              key={specialist.agentId}
+              className="rounded-xl border border-border/30 bg-background/70 p-3"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-medium text-foreground">
+                  {roleLabel[specialist.role]}
+                </span>
+                <span
+                  className={`text-[11px] font-medium uppercase tracking-wide ${statusTone[specialist.status]}`}
+                >
+                  {specialist.status.replace(/_/g, " ")}
+                </span>
+              </div>
+
+              {specialist.detail && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {specialist.detail}
+                </p>
+              )}
+              {specialist.activeTool && (
+                <p className="mt-2 text-xs text-primary/80">
+                  Tool: {specialist.activeTool}
+                </p>
+              )}
+              {specialist.responsePreview && (
+                <p className="mt-2 line-clamp-3 text-xs text-foreground/80">
+                  {specialist.responsePreview}
+                </p>
+              )}
+              {specialist.error && (
+                <p className="mt-2 text-xs text-red-500">{specialist.error}</p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

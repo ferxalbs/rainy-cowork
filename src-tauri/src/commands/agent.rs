@@ -1,4 +1,5 @@
 use crate::ai::agent::runtime::{AgentContent, AgentMessage, AgentRuntime, RuntimeOptions};
+use crate::ai::agent::runtime_registry::RuntimeRegistry;
 use crate::ai::specs::AgentSpec;
 use crate::commands::router::IntelligentRouterState;
 use crate::services::SkillExecutor;
@@ -79,6 +80,7 @@ pub async fn run_agent_workflow(
     router: State<'_, IntelligentRouterState>,
     skills: State<'_, Arc<SkillExecutor>>,
     agent_manager: State<'_, crate::ai::agent::manager::AgentManager>,
+    runtime_registry: State<'_, Arc<RuntimeRegistry>>,
 ) -> Result<String, String> {
     // 0. Ensure Chat Session Exists (Persist Metadata)
     // We use workspace_id as the chat_id for this simple implementation
@@ -142,6 +144,7 @@ pub async fn run_agent_workflow(
                         airlock: Default::default(),
                         memory_config: Default::default(),
                         connectors: Default::default(),
+                        runtime: Default::default(),
                         signature: None,
                     }
                 }
@@ -164,6 +167,7 @@ pub async fn run_agent_workflow(
             airlock: Default::default(),
             memory_config: Default::default(),
             connectors: Default::default(),
+            runtime: Default::default(),
             signature: None,
         }
     };
@@ -198,6 +202,7 @@ pub async fn run_agent_workflow(
         skills.inner().clone(),
         memory,
         Arc::new(None),
+        Some(runtime_registry.inner().clone()),
     );
 
     // Load persisted conversation history into runtime so local Native Runtime

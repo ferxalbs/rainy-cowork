@@ -49,6 +49,7 @@ mod tests {
             airlock: Default::default(),
             memory_config: Default::default(),
             connectors: Default::default(),
+            runtime: Default::default(),
             signature: None,
         };
 
@@ -101,6 +102,7 @@ mod tests {
             // If not, we can just stop here as the goal was Persistence -> Spec Loading.
             memory,
             Arc::new(None),
+            None,
         );
 
         assert_eq!(runtime.spec.soul.name, "Test Agent");

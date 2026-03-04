@@ -174,6 +174,7 @@ impl AgentManager {
                 airlock: Default::default(),
                 memory_config: Default::default(),
                 connectors: Default::default(),
+                runtime: Default::default(),
                 signature: None,
             };
             Ok(Some(spec))
@@ -211,6 +212,7 @@ pub async fn save_agent_to_db(
         airlock: Default::default(),
         memory_config: Default::default(),
         connectors: Default::default(),
+        runtime: Default::default(),
         signature: None,
     };
 

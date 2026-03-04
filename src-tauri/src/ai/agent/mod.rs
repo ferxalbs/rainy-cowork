@@ -1,8 +1,13 @@
+pub mod events;
 pub mod context_window;
 pub mod error;
 pub mod manager;
 pub mod memory;
+pub mod protocol;
 pub mod runtime;
+pub mod runtime_registry;
+pub mod specialist;
+pub mod supervisor;
 pub mod workflow;
 
 #[cfg(test)]

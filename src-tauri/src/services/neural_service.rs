@@ -1,6 +1,10 @@
-use crate::models::neural::{CommandResult, DesktopNodeStatus, QueuedCommand, SkillManifest};
+use crate::ai::agent::runtime_registry::RuntimeRegistry;
+use crate::models::neural::{
+    CommandResult, DesktopNodeStatus, QueuedCommand, RuntimeStats, SkillManifest,
+};
 use crate::services::manifest_signing::sign_skills_manifest;
 use crate::services::security::NodeAuthenticator;
+use crate::services::tool_manifest::build_skill_manifest_from_runtime;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -13,6 +17,8 @@ pub struct NeuralService {
     base_url: String,
     metadata: Arc<Mutex<NodeMetadata>>,
     authenticator: NodeAuthenticator,
+    manifest_state: Arc<Mutex<ManifestState>>,
+    runtime_registry: Option<Arc<RuntimeRegistry>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -54,6 +60,12 @@ struct AuthContextResponse {
     workspace_name: String,
 }
 
+#[derive(Debug, Default)]
+struct ManifestState {
+    last_hash: Option<String>,
+    dirty: bool,
+}
+
 impl NeuralService {
     async fn clear_node_id(&self) {
         let mut metadata = self.metadata.lock().await;
@@ -92,7 +104,12 @@ impl NeuralService {
             .ok_or("Node not registered".to_string())
     }
 
-    pub fn new(base_url: String, workspace_id: String, authenticator: NodeAuthenticator) -> Self {
+    pub fn new(
+        base_url: String,
+        workspace_id: String,
+        authenticator: NodeAuthenticator,
+        runtime_registry: Option<Arc<RuntimeRegistry>>,
+    ) -> Self {
         let hostname = std::env::var("HOSTNAME")
             .or_else(|_| std::env::var("COMPUTERNAME"))
             .unwrap_or_else(|_| "unknown-host".to_string());
@@ -111,6 +128,8 @@ impl NeuralService {
                 user_api_key: None,
             })),
             authenticator,
+            manifest_state: Arc::new(Mutex::new(ManifestState::default())),
+            runtime_registry,
         }
     }
 
@@ -334,6 +353,9 @@ impl NeuralService {
         if data.success {
             let mut metadata = self.metadata.lock().await;
             metadata.node_id = Some(data.node_id.clone());
+            let mut manifest_state = self.manifest_state.lock().await;
+            manifest_state.last_hash = Some(skills_signature);
+            manifest_state.dirty = false;
             Ok(data.node_id)
         } else {
             Err(data.message)
@@ -346,14 +368,58 @@ impl NeuralService {
 
         let url = format!("{}/v1/nodes/{}/heartbeat", self.base_url, node_id);
 
-        let body = serde_json::json!({
-            "status": status // Serializes based on enum config (lowercase)
-        });
+        let manifests = build_skill_manifest_from_runtime()?;
+        let manifest_hash = sign_skills_manifest(&manifests, &platform_key);
+        let include_manifest = {
+            let state = self.manifest_state.lock().await;
+            state.dirty || state.last_hash.as_deref() != Some(manifest_hash.as_str())
+        };
 
-        let res = self
+        let runtime_stats: RuntimeStats = if let Some(registry) = self.runtime_registry.as_ref() {
+            let snapshot = registry.snapshot().await;
+            RuntimeStats {
+                active_supervisor_runs: snapshot.active_supervisor_runs,
+                active_specialists: snapshot.active_specialists,
+                supervisors: snapshot
+                    .supervisors
+                    .into_iter()
+                    .map(|run| crate::models::neural::SupervisorRunStatus {
+                        run_id: run.run_id,
+                        status: run.status,
+                        specialist_count: run.specialist_count,
+                    })
+                    .collect(),
+                tool_usage_by_role: crate::models::neural::ToolUsageByRole {
+                    research: snapshot.tool_usage_by_role.research,
+                    executor: snapshot.tool_usage_by_role.executor,
+                    verifier: snapshot.tool_usage_by_role.verifier,
+                },
+            }
+        } else {
+            RuntimeStats::default()
+        };
+
+        let body = if include_manifest {
+            serde_json::json!({
+                "status": status,
+                "skills": manifests,
+                "runtimeStats": runtime_stats,
+            })
+        } else {
+            serde_json::json!({
+                "status": status,
+                "runtimeStats": runtime_stats,
+            })
+        };
+
+        let mut request = self
             .http
             .post(&url)
-            .header("Authorization", format!("Bearer {}", platform_key))
+            .header("Authorization", format!("Bearer {}", platform_key));
+        if include_manifest {
+            request = request.header("x-skills-signature", &manifest_hash);
+        }
+        let res = request
             .json(&body)
             .send()
             .await
@@ -364,6 +430,12 @@ impl NeuralService {
             self.reset_node_on_status(status).await;
             let err_text = res.text().await.unwrap_or_default();
             return Err(format!("Heartbeat failed: {} - {}", status, err_text));
+        }
+
+        if include_manifest {
+            let mut state = self.manifest_state.lock().await;
+            state.last_hash = Some(manifest_hash);
+            state.dirty = false;
         }
 
         let data: HeartbeatResponse = res.json().await.map_err(|e| e.to_string())?;

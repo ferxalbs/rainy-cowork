@@ -79,7 +79,7 @@ impl WasmSandboxService {
             module_cache: Arc::new(DashMap::new()),
             max_binary_bytes: 8 * 1024 * 1024,
             max_stdio_bytes: 64 * 1024,
-            max_memory_bytes: 128 * 1024 * 1024, // 128 MB max memory
+            max_memory_bytes: 50 * 1024 * 1024, // 50 MB max memory
             fuel_limit: 5_000_000,
             exec_timeout_ms: 3_000,
         }

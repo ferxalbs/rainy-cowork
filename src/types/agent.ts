@@ -148,4 +148,29 @@ export interface AgentMessage {
   neuralState?: string;
   /** Name of the tool currently being executed by the agent */
   activeToolName?: string;
+  supervisorPlan?: {
+    summary: string;
+    steps: string[];
+    verificationRequired?: boolean;
+  };
+  specialists?: SpecialistRunState[];
+}
+
+export interface SpecialistRunState {
+  agentId: string;
+  role: "research" | "executor" | "verifier";
+  status:
+    | "pending"
+    | "planning"
+    | "running"
+    | "waiting_on_airlock"
+    | "verifying"
+    | "completed"
+    | "failed"
+    | "cancelled";
+  detail?: string;
+  activeTool?: string;
+  summary?: string;
+  responsePreview?: string;
+  error?: string;
 }

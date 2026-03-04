@@ -21,8 +21,48 @@ pub struct AgentSpec {
     #[serde(default)]
     pub connectors: ConnectorsConfig,
 
+    #[serde(default)]
+    pub runtime: RuntimeConfig,
+
     // Security layer
     pub signature: Option<AgentSignature>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum RuntimeMode {
+    #[default]
+    Single,
+    Supervisor,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeConfig {
+    #[serde(default)]
+    pub mode: RuntimeMode,
+    #[serde(default = "default_max_specialists")]
+    pub max_specialists: u8,
+    #[serde(default = "default_verification_required")]
+    pub verification_required: bool,
+}
+
+fn default_max_specialists() -> u8 {
+    3
+}
+
+fn default_verification_required() -> bool {
+    true
+}
+
+impl Default for RuntimeConfig {
+    fn default() -> Self {
+        Self {
+            mode: RuntimeMode::Single,
+            max_specialists: default_max_specialists(),
+            verification_required: default_verification_required(),
+        }
+    }
 }
 
 // ──────────────────────────────────────────────────────────────────────────
