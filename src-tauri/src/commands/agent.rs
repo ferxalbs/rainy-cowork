@@ -1,5 +1,9 @@
 use crate::ai::agent::runtime::{AgentContent, AgentMessage, AgentRuntime, RuntimeOptions};
 use crate::ai::agent::runtime_registry::RuntimeRegistry;
+use crate::ai::keychain::KeychainManager;
+use crate::ai::provider_trait::ProviderWithStats;
+use crate::ai::provider_types::{ProviderConfig, ProviderId, ProviderType};
+use crate::ai::providers::GeminiProviderAdapter;
 use crate::ai::specs::AgentSpec;
 use crate::commands::router::IntelligentRouterState;
 use crate::services::SkillExecutor;
@@ -175,7 +179,7 @@ pub async fn run_agent_workflow(
     // Extract allowed_paths from spec's airlock scopes
     let airlock_paths = &spec.airlock.scopes.allowed_paths;
     let options = RuntimeOptions {
-        model: Some(model_id),
+        model: Some(model_id.clone()),
         workspace_id: workspace_id.clone(),
         max_steps: None,
         allowed_paths: if airlock_paths.is_empty() {
@@ -185,6 +189,71 @@ pub async fn run_agent_workflow(
         },
         custom_system_prompt: None,
     };
+
+    // ── Gemini BYOK provider injection ────────────────────────────────────────
+    // When a pure Gemini model is selected (e.g. gemini-3.1-flash-lite-preview),
+    // we ensure the IntelligentRouter has a GeminiProviderAdapter registered.
+    // This is done lazily here to avoid requiring a "google" provider at startup.
+    {
+        let gemini_model_id = model_id.trim().to_lowercase();
+        let is_pure_gemini = (gemini_model_id.starts_with("gemini-")
+            || gemini_model_id.starts_with("gemini/"))
+            && !gemini_model_id.contains("rainy");
+
+        if is_pure_gemini {
+            const GEMINI_PROVIDER_ID: &str = "gemini_byok";
+
+            // Check if already registered to avoid double-adding
+            let already_in_router = {
+                let guard = router.0.read().await;
+                guard
+                    .get_all_providers()
+                    .iter()
+                    .any(|p| p.provider().id().as_str() == GEMINI_PROVIDER_ID)
+            };
+
+            if !already_in_router {
+                // Try to load the Gemini API key from keychain
+                let keychain = KeychainManager::new();
+                if let Ok(Some(api_key)) = keychain.get_key("gemini") {
+                    let config = ProviderConfig {
+                        id: ProviderId::new(GEMINI_PROVIDER_ID),
+                        provider_type: ProviderType::Google,
+                        api_key: Some(api_key),
+                        base_url: None,
+                        model: model_id.clone(),
+                        params: std::collections::HashMap::new(),
+                        enabled: true,
+                        priority: 50,
+                        rate_limit: None,
+                        timeout: 120,
+                    };
+
+                    match GeminiProviderAdapter::new(config) {
+                        Ok(adapter) => {
+                            let provider_arc =
+                                Arc::new(adapter) as Arc<dyn crate::ai::provider_trait::AIProvider>;
+                            let with_stats = Arc::new(ProviderWithStats::new(provider_arc));
+                            router.0.write().await.add_provider(with_stats);
+                            eprintln!("[AgentWorkflow] Registered gemini_byok provider for router");
+                        }
+                        Err(e) => {
+                            eprintln!(
+                                "[AgentWorkflow] Failed to create GeminiProviderAdapter: {}",
+                                e
+                            );
+                        }
+                    }
+                } else {
+                    eprintln!(
+                        "[AgentWorkflow] No Gemini API key found in keychain — cannot route {} to Gemini BYOK",
+                        model_id
+                    );
+                }
+            }
+        }
+    }
+    // ─────────────────────────────────────────────────────────────────────────
 
     // Initialize Persistent Memory
     let app_data_dir = app_handle

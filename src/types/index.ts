@@ -160,8 +160,8 @@ export const PROVIDER_MODELS: Record<ProviderType, string[]> = {
     "gemini-3-flash-preview",
     // Gemini 2.5 - Thinking budget
     "gemini-2.5-pro",
-    "gemini-2.5-flash",
-    "gemini-2.5-flash-lite",
+    "gemini-3-flash-preview",
+    "gemini-3.1-flash-lite-preview",
   ],
 };
 
@@ -195,12 +195,9 @@ export const GEMINI_MODEL_INFO: Record<
     name: "Gemini 2.5 Pro",
     description: "Deep analysis, long context",
   },
-  "gemini-2.5-flash": {
-    name: "Gemini 2.5 Flash",
-    description: "General backend, high QPS",
-  },
-  "gemini-2.5-flash-lite": {
-    name: "Gemini 2.5 Flash Lite",
+
+  "gemini-3.1-flash-lite-preview": {
+    name: "Gemini 3.1 Flash Lite",
     description: "Cost-sensitive, minimal latency",
   },
 };

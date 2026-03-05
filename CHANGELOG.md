@@ -42,6 +42,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `src-tauri/Cargo.toml` -> `0.5.95`
 - `src-tauri/tauri.conf.json` -> `0.5.95`
 
+### Changed - AI Model Slugs
+
+- Updated `gemini-2.5-flash` to `gemini-3-flash-preview` across the Rust engine and frontend hooks/types.
+- Updated `gemini-2.5-flash-lite` to `gemini-3.1-flash-lite-preview` across the Rust engine and frontend hooks/types.
+- Updated model registry metadata, frontend selection logic, and thinking capability flags for the new preview series.
+
 ### Validation
 
 - `cd src-tauri && cargo check -q` — passes

@@ -108,7 +108,7 @@ impl AIProviderManager {
         providers.push(AIProviderConfig {
             provider: ProviderType::Gemini,
             name: "Google Gemini".to_string(),
-            model: "gemini-2.5-flash".to_string(),
+            model: "gemini-3-flash-preview".to_string(),
             is_available: true,
             requires_api_key: true,
         });
@@ -129,7 +129,7 @@ impl AIProviderManager {
             AIProviderConfig {
                 provider: ProviderType::RainyApi,
                 name: "Rainy API".to_string(),
-                model: "gemini-2.5-flash".to_string(),
+                model: "gemini-3-flash-preview".to_string(),
                 is_available: true,
                 requires_api_key: true,
             },
@@ -173,8 +173,8 @@ impl AIProviderManager {
                     "gemini-3-pro-image-preview".to_string(),
                     // Gemini 2.5 Series - Stable production models
                     "gemini-2.5-pro".to_string(),
-                    "gemini-2.5-flash".to_string(),
-                    "gemini-2.5-flash-lite".to_string(),
+                    "gemini-3-flash-preview".to_string(),
+                    "gemini-3.1-flash-lite-preview".to_string(),
                     // Groq Models - High-speed inference
                     "llama-3.1-8b-instant".to_string(),
                     "llama-3.3-70b-versatile".to_string(),

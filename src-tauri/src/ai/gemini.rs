@@ -29,7 +29,7 @@ impl Default for ThinkingLevel {
 /// **Free Tier Models (Gemini BYOK)**:
 /// - `gemini-3-flash-minimal` - Fast responses with minimal thinking
 /// - `gemini-3-flash-high` - Deep reasoning for complex tasks
-/// - `gemini-2.5-flash-lite` - Lightweight, fast responses
+/// - `gemini-3.1-flash-lite-preview` - Lightweight, fast responses
 ///
 /// All other models require Rainy API subscription.
 pub struct GeminiProvider {
@@ -48,14 +48,14 @@ impl GeminiProvider {
     /// Only 3 models are available for free users with their own Gemini API key:
     /// - Gemini 3 Flash with Minimal thinking (fast)
     /// - Gemini 3 Flash with High thinking (accurate)
-    /// - Gemini 2.5 Flash Lite (lightweight)
+    /// - Gemini 3.1 Flash Lite (lightweight)
     ///
     /// All other models (GPT-4o, GPT-5, Claude, Gemini Pro, etc.) require Rainy API.
     pub fn available_models(&self) -> Vec<String> {
         vec![
             "gemini-3-flash-minimal".to_string(),
             "gemini-3-flash-high".to_string(),
-            "gemini-2.5-flash-lite".to_string(),
+            "gemini-3.1-flash-lite-preview".to_string(),
         ]
     }
 
@@ -64,7 +64,7 @@ impl GeminiProvider {
         match model {
             "gemini-3-flash-minimal" => "gemini-3-flash-preview",
             "gemini-3-flash-high" => "gemini-3-flash-preview",
-            "gemini-2.5-flash-lite" => "gemini-2.5-flash-lite",
+            "gemini-3.1-flash-lite-preview" => "gemini-3.1-flash-lite-preview",
             // Unknown models - use high-quality default
             _ => "gemini-3-flash-preview",
         }
@@ -81,7 +81,7 @@ impl GeminiProvider {
                 thinking_level: Some(ThinkingLevel::High),
                 thinking_budget: None,
             }),
-            "gemini-2.5-flash-lite" => Some(ThinkingConfig {
+            "gemini-3.1-flash-lite-preview" => Some(ThinkingConfig {
                 thinking_level: None,
                 thinking_budget: Some(0), // Disable thinking for lite
             }),

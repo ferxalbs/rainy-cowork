@@ -2,6 +2,7 @@
 // Individual provider implementations
 
 pub mod anthropic;
+pub mod gemini_adapter;
 pub mod moonshot;
 pub mod openai;
 pub mod rainy_sdk;
@@ -9,6 +10,7 @@ pub mod xai;
 
 // Only re-export factories (which are used for registration)
 pub use anthropic::AnthropicProviderFactory;
+pub use gemini_adapter::GeminiProviderAdapter;
 pub use moonshot::MoonshotProviderFactory;
 pub use openai::OpenAIProviderFactory;
 pub use rainy_sdk::RainySDKProviderFactory;

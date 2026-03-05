@@ -309,6 +309,47 @@ impl IntelligentRouter {
         &self,
         request: &ChatCompletionRequest,
     ) -> Option<Arc<ProviderWithStats>> {
+        // ── Model-aware provider pinning ──────────────────────────────────────
+        // Route by model name BEFORE cost/capability logic so that BYOK Gemini
+        // models (e.g. gemini-3.1-flash-lite-preview) are never sent to Rainy API.
+        let model = request.model.to_lowercase();
+        let all_providers = self.load_balancer.providers();
+
+        // Pure-Gemini BYOK models: route to provider whose ID contains "gemini"
+        // (but not "rainy") — these use the user's own Google API key.
+        let is_pure_gemini = (model.starts_with("gemini-") || model.starts_with("gemini/"))
+            && !model.contains("rainy");
+
+        if is_pure_gemini {
+            if let Some(p) = all_providers
+                .iter()
+                .find(|p| {
+                    let id = p.provider().id().to_string().to_lowercase();
+                    id.contains("gemini") && !id.contains("rainy")
+                })
+                .cloned()
+            {
+                return Some(p);
+            }
+        }
+
+        // Rainy API models: prefer the rainy_api provider.
+        let is_rainy_model = model.starts_with("rainy-api/") || model.starts_with("rainy:");
+
+        if is_rainy_model {
+            if let Some(p) = all_providers
+                .iter()
+                .find(|p| {
+                    let id = p.provider().id().to_string().to_lowercase();
+                    id.contains("rainy")
+                })
+                .cloned()
+            {
+                return Some(p);
+            }
+        }
+        // ─────────────────────────────────────────────────────────────────────
+
         // Build required capabilities
         let mut required = crate::ai::router::capability_matcher::RequiredCapabilities::new()
             .require_chat_completions();

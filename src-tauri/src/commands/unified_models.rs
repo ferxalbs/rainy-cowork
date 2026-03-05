@@ -127,8 +127,8 @@ async fn get_rainy_sdk_models(_app: &AppHandle) -> Result<Vec<UnifiedModel>, Str
             "claude-opus-4-1",
             // Google Gemini 2.5 models
             "gemini-2.5-pro",
-            "gemini-2.5-flash",
-            "gemini-2.5-flash-lite",
+            "gemini-3-flash-preview",
+            "gemini-3.1-flash-lite-preview",
             // Google Gemini 3 Flash with thinking levels
             "gemini-3-flash-minimal",
             "gemini-3-flash-low",
@@ -452,10 +452,10 @@ pub async fn get_recommended_model(
 
     // Fallback to default
     Ok(UnifiedModel {
-        id: "rainy:gemini-2.5-flash".to_string(),
-        name: "Gemini 2.5 Flash".to_string(),
+        id: "rainy:gemini-3-flash-preview".to_string(),
+        name: "Gemini 3 Flash".to_string(),
         provider: "rainy".to_string(),
-        capabilities: get_model_capabilities("gemini-2.5-flash"),
+        capabilities: get_model_capabilities("gemini-3-flash-preview"),
         enabled: true,
         processing_mode: "rainy_api".to_string(),
     })

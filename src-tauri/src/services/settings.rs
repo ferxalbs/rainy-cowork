@@ -274,13 +274,13 @@ impl SettingsManager {
                 "Google's most capable model",
             ),
             (
-                "gemini-2.5-flash",
-                "Gemini 2.5 Flash",
+                "gemini-3-flash-preview",
+                "Gemini 3 Flash",
                 "Fast multimodal responses",
             ),
             (
-                "gemini-2.5-flash-lite",
-                "Gemini 2.5 Flash Lite",
+                "gemini-3.1-flash-lite-preview",
+                "Gemini 3.1 Flash Lite",
                 "Lightweight cost-effective AI",
             ),
         ] {
@@ -490,8 +490,8 @@ impl SettingsManager {
                 "Gemini 2.5 Pro".to_string(),
                 "Google's most capable model".to_string(),
             ),
-            "gemini-2.5-flash" => (
-                "Gemini 2.5 Flash".to_string(),
+            "gemini-3-flash-preview" => (
+                "Gemini 3 Flash".to_string(),
                 "Fast multimodal responses".to_string(),
             ),
             _ => (model_id.to_string(), "Premium AI model".to_string()),

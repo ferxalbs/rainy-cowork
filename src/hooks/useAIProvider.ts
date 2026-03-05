@@ -146,7 +146,7 @@ export function useAIProvider(): UseAIProviderResult {
           await tauri.registerProvider({
             id: RAINY_PROVIDER_ID,
             provider_type: "rainy-sdk",
-            model: "gemini-2.5-flash", // Reverting to known working model for bootstrap
+            model: "gemini-3-flash-preview", // Reverting to known working model for bootstrap
             enabled,
             priority: 10,
             timeout: 60000,

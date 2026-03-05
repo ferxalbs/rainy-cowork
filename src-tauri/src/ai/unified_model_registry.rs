@@ -94,7 +94,7 @@ impl Default for UserModelPreferences {
     fn default() -> Self {
         Self {
             enabled_models: vec![],
-            default_chat_model: "rainy-api/gemini-2.5-flash".to_string(),
+            default_chat_model: "rainy-api/gemini-3-flash-preview".to_string(),
             default_processing_model: "cowork/gemini-2.5-pro".to_string(),
             hidden_models: vec![],
             provider_priorities: vec![

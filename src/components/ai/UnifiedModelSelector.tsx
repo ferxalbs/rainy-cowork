@@ -268,7 +268,7 @@ export function UnifiedModelSelector({
     if (modelId.includes("gemini-3-pro")) return "high";
     if (modelId.includes("gemini-3-flash")) return "medium";
     if (modelId.includes("gemini-2.5-pro")) return "high";
-    if (modelId.includes("gemini-2.5-flash")) return "medium";
+    if (modelId.includes("gemini-3.1-flash-lite")) return null;
     return null;
   };
 
