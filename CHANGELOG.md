@@ -5,6 +5,92 @@ All notable changes to Rainy Cowork will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.99] - 2026-03-05 - AIRLOCK ENFORCEMENT + MODEL LABEL
+
+### Fixed
+
+- Fixed local `run_agent_workflow` Airlock bypass by injecting the initialized `AirlockService` state into `AgentRuntime` instead of running with `None`.
+- Restored effective permission gating for tool execution in local native agent loops (Airlock checks now execute for local chat runs too).
+
+### Added
+
+- Added model label rendering under agent chat bubbles so each assistant response shows the model used.
+
+### Changed
+
+- `src-tauri/src/commands/agent.rs`
+  - `run_agent_workflow` now receives `AirlockServiceState`.
+  - runtime construction now passes the real shared Airlock service instance.
+- `src/components/agent-chat/MessageBubble.tsx`
+  - shows `message.modelUsed.name` below non-user bubbles alongside timestamp.
+
+### Changed - Versioning
+
+- `package.json` -> `0.5.99`
+- `src-tauri/Cargo.toml` -> `0.5.99`
+- `src-tauri/tauri.conf.json` -> `0.5.99`
+
+### Validation
+
+- `cd src-tauri && cargo check -q` — passes
+- `pnpm exec tsc --noEmit` — passes
+
+## [0.5.98] - 2026-03-05 - SQLITE STARTUP GUARD
+
+### Fixed
+
+- Fixed startup-time `libsql` panic caused by threading initialization race with `sqlx` SQLite pools:
+  - `assertion left == right failed` in `libsql::local::database` with poisoned `Once`.
+- Added deterministic early `libsql` warm-up in app setup before any `sqlx` pool initialization to enforce safe initialization order.
+
+### Changed
+
+- `src-tauri/src/lib.rs`
+  - setup now performs `libsql::Builder::new_local(\":memory:\").build().await` before DB and service initialization that may touch SQLite from `sqlx`.
+
+### Changed - Versioning
+
+- `package.json` -> `0.5.98`
+- `src-tauri/Cargo.toml` -> `0.5.98`
+- `src-tauri/tauri.conf.json` -> `0.5.98`
+
+### Validation
+
+- `cd src-tauri && cargo check -q` — passes
+- `pnpm exec tsc --noEmit` — passes
+
+## [0.5.97] - 2026-03-05 - PHASE 2 STABILIZATION (PROVIDER NORMALIZATION)
+
+### Fixed
+
+- Fixed Gemini BYOK request model normalization so Google API receives clean model IDs (for example `gemini-3.1-flash-lite-preview`) instead of prefixed IDs like `gemini:gemini-3.1-flash-lite-preview`.
+- Prevented invalid Gemini URLs like `models/gemini:...` that caused `404 NOT_FOUND` responses in runtime chat.
+- Normalized incoming model IDs at router command boundaries to avoid prefixed model propagation through runtime.
+
+### Changed
+
+- `src-tauri/src/ai/providers/gemini_adapter.rs`
+  - `resolve_model_id` now strips provider prefixes before URL construction.
+- `src-tauri/src/ai/gemini.rs`
+  - legacy Gemini provider now normalizes prefixed model IDs before API mapping.
+- `src-tauri/src/commands/router.rs`
+  - `complete_with_routing` and `stream_with_routing` now normalize model IDs before dispatch.
+- `src-tauri/src/commands/agent.rs`
+  - runtime options now use normalized model IDs for agent execution.
+- `src-tauri/src/ai/router/router.rs`
+  - provider pinning recognizes `gemini:` prefixed model IDs as Gemini BYOK candidates.
+
+### Changed - Versioning
+
+- `package.json` -> `0.5.97`
+- `src-tauri/Cargo.toml` -> `0.5.97`
+- `src-tauri/tauri.conf.json` -> `0.5.97`
+
+### Validation
+
+- `cd src-tauri && cargo check -q` — passes
+- `pnpm exec tsc --noEmit` — passes
+
 ## [0.5.96] - 2026-03-05 - MODEL CORE UNIFICATION
 
 ### Added

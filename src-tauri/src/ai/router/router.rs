@@ -325,7 +325,9 @@ impl IntelligentRouter {
 
         // Pure-Gemini BYOK models: route to provider whose ID contains "gemini"
         // (but not "rainy") — these use the user's own Google API key.
-        let is_pure_gemini = (model.starts_with("gemini-") || model.starts_with("gemini/"))
+        let is_pure_gemini = (model.starts_with("gemini-")
+            || model.starts_with("gemini/")
+            || model.starts_with("gemini:"))
             && !model.contains("rainy");
 
         if is_pure_gemini {

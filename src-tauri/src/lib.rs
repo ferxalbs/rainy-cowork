@@ -147,6 +147,13 @@ pub fn run() {
             app.handle()
                 .plugin(tauri_plugin_updater::Builder::new().build())?;
 
+            // IMPORTANT: Initialize libsql global C-state before any sqlx SQLite pool.
+            // This prevents libsql/sqlx threading initialization conflicts that can
+            // panic at runtime (libsql local database assertion + poisoned Once).
+            tauri::async_runtime::block_on(async {
+                let _ = libsql::Builder::new_local(":memory:").build().await;
+            });
+
             // Initialize folder manager with app data dir
             let app_data_dir = app
                 .path()

@@ -1,6 +1,7 @@
 use crate::ai::agent::runtime::{AgentContent, AgentMessage, AgentRuntime, RuntimeOptions};
 use crate::ai::agent::runtime_registry::RuntimeRegistry;
 use crate::ai::specs::AgentSpec;
+use crate::commands::airlock::AirlockServiceState;
 use crate::commands::router::IntelligentRouterState;
 use crate::services::SkillExecutor;
 use std::sync::Arc;
@@ -78,11 +79,13 @@ pub async fn run_agent_workflow(
     workspace_id: String,
     agent_spec_id: Option<String>,
     router: State<'_, IntelligentRouterState>,
+    airlock_state: State<'_, AirlockServiceState>,
     skills: State<'_, Arc<SkillExecutor>>,
     agent_manager: State<'_, crate::ai::agent::manager::AgentManager>,
     runtime_registry: State<'_, Arc<RuntimeRegistry>>,
 ) -> Result<String, String> {
     crate::ai::model_catalog::ensure_supported_model_slug(&model_id)?;
+    let normalized_model_id = crate::ai::model_catalog::normalize_model_slug(&model_id).to_string();
 
     // 0. Ensure Chat Session Exists (Persist Metadata)
     // We use workspace_id as the chat_id for this simple implementation
@@ -177,7 +180,7 @@ pub async fn run_agent_workflow(
     // Extract allowed_paths from spec's airlock scopes
     let airlock_paths = &spec.airlock.scopes.allowed_paths;
     let options = RuntimeOptions {
-        model: Some(model_id.clone()),
+        model: Some(normalized_model_id.clone()),
         workspace_id: workspace_id.clone(),
         max_steps: None,
         allowed_paths: if airlock_paths.is_empty() {
@@ -197,13 +200,18 @@ pub async fn run_agent_workflow(
     let memory =
         Arc::new(crate::ai::agent::memory::AgentMemory::new(&workspace_id, app_data_dir).await);
 
+    let airlock_service = {
+        let guard = airlock_state.0.lock().await;
+        Arc::new(guard.clone())
+    };
+
     let runtime = AgentRuntime::new(
         spec,
         options,
         router.0.clone(),
         skills.inner().clone(),
         memory,
-        Arc::new(None),
+        airlock_service,
         Some(runtime_registry.inner().clone()),
     );
 

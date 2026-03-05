@@ -86,7 +86,8 @@ struct GeminiStreamChunk {
 
 /// Map our internal model slug to the actual Gemini API model ID.
 fn resolve_model_id(model: &str) -> String {
-    match model {
+    let normalized = crate::ai::model_catalog::normalize_model_slug(model);
+    match normalized {
         "gemini-3-flash-minimal" | "gemini-3-flash-high" | "gemini-3-flash-preview" => {
             "gemini-3-flash-preview".to_string()
         }

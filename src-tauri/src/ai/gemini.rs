@@ -60,9 +60,10 @@ impl GeminiProvider {
 
     /// Map user-friendly model names to actual API model IDs
     fn get_api_model_id(&self, model: &str) -> &'static str {
-        match model {
+        match crate::ai::model_catalog::normalize_model_slug(model) {
             "gemini-3-flash-minimal" => "gemini-3-flash-preview",
             "gemini-3-flash-high" => "gemini-3-flash-preview",
+            "gemini-3-flash-preview" => "gemini-3-flash-preview",
             "gemini-3.1-flash-lite-preview" => "gemini-3.1-flash-lite-preview",
             // Unknown models - use high-quality default
             _ => "gemini-3-flash-preview",

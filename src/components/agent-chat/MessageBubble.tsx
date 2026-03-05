@@ -11,7 +11,7 @@ import {
   getNeuralStateConfig,
 } from "./neural-config";
 
-import { ThoughtDisplay, ThoughtBadge } from "./ThoughtDisplay";
+import { ThoughtDisplay } from "./ThoughtDisplay";
 import type { SpecialistRunState } from "../../types/agent";
 
 // Map step types to icons
@@ -156,11 +156,6 @@ export function MessageBubble({
           />
         )}
 
-        {/* Compact Thought Badge (when thinking is enabled but content not shown) */}
-        {!isUser && !message.thought && message.modelUsed?.thinkingEnabled && (
-          <ThoughtBadge thinkingLevel={message.thinkingLevel || "medium"} />
-        )}
-
         {!isUser &&
           (message.supervisorPlan ||
             (message.specialists && message.specialists.length > 0)) && (
@@ -210,12 +205,19 @@ export function MessageBubble({
         )}
 
         {/* Timestamp */}
-        <span className="text-[10px] text-muted-foreground/50 px-1">
-          {message.timestamp.toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          })}
-        </span>
+        <div className="flex items-center gap-2 px-1">
+          {!isUser && message.modelUsed?.name && (
+            <span className="text-[10px] text-muted-foreground/70 font-medium">
+              {message.modelUsed.name}
+            </span>
+          )}
+          <span className="text-[10px] text-muted-foreground/50">
+            {message.timestamp.toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </span>
+        </div>
       </div>
     </div>
   );
@@ -241,7 +243,7 @@ function SupervisorRail({
     string
   > = {
     pending: "text-muted-foreground",
-    planning: "text-amber-500",
+    planning: "text-amber-400",
     running: "text-cyan-500",
     waiting_on_airlock: "text-orange-500",
     verifying: "text-emerald-500",
