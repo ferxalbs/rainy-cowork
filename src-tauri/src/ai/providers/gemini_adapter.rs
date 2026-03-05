@@ -56,7 +56,17 @@ struct GeminiTextPart {
 #[serde(untagged)]
 enum GeminiPart {
     Text { text: String },
-    FunctionCall { function_call: GeminiFunctionCall },
+    FunctionCall {
+        function_call: GeminiFunctionCall,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        thought_signature: Option<String>,
+        #[serde(
+            rename = "thoughtSignature",
+            skip_serializing_if = "Option::is_none",
+            default
+        )]
+        thought_signature_camel: Option<String>,
+    },
     FunctionResponse { function_response: GeminiFunctionResponse },
     // Catch-all for unknown part types (e.g. inlineData) — skip text extraction.
     Unknown(serde_json::Value),
@@ -222,11 +232,21 @@ fn build_gemini_request_parts(
                             })
                         });
                         tool_name_by_id.insert(call.id.clone(), call.function.name.clone());
+                        let thought_signature = call
+                            .extra_content
+                            .as_ref()
+                            .and_then(|extra| extra.get("google"))
+                            .and_then(|google| google.get("thought_signature"))
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string());
+
                         parts.push(GeminiPart::FunctionCall {
                             function_call: GeminiFunctionCall {
                                 name: call.function.name.clone(),
                                 args,
                             },
+                            thought_signature: thought_signature.clone(),
+                            thought_signature_camel: thought_signature,
                         });
                     }
                 }
@@ -258,11 +278,13 @@ fn build_gemini_request_parts(
                 };
 
                 contents.push(GeminiContent {
-                    role: "user".to_string(),
+                    role: "tool".to_string(),
                     parts: vec![GeminiPart::FunctionResponse {
                         function_response: GeminiFunctionResponse {
                             name: tool_name,
-                            response: tool_payload,
+                            response: serde_json::json!({
+                                "result": tool_payload
+                            }),
                         },
                     }],
                 });
@@ -578,11 +600,22 @@ impl AIProvider for GeminiProviderAdapter {
         for part in candidate.content.parts {
             match part {
                 GeminiPart::Text { text } => text_parts.push(text),
-                GeminiPart::FunctionCall { function_call } => {
+                GeminiPart::FunctionCall {
+                    function_call,
+                    thought_signature,
+                    thought_signature_camel,
+                } => {
+                    let signature = thought_signature.or(thought_signature_camel);
                     tool_calls.push(crate::ai::provider_types::ToolCall {
                         id: uuid::Uuid::new_v4().to_string(),
                         r#type: "function".to_string(),
-                        extra_content: None,
+                        extra_content: signature.map(|sig| {
+                            serde_json::json!({
+                                "google": {
+                                    "thought_signature": sig
+                                }
+                            })
+                        }),
                         function: crate::ai::provider_types::FunctionCall {
                             name: function_call.name,
                             arguments: function_call.args.to_string(),

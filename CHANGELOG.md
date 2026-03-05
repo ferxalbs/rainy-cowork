@@ -30,6 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - ThinkStep streaming path is now gated by `allow_streaming` and remains non-streaming for tool turns.
 - `src-tauri/src/ai/providers/gemini_adapter.rs`
   - added Gemini-native `function_response` support.
+  - switched tool result role serialization to `tool` for `functionResponse` history turns.
+  - wrapped function responses under `response.result` for Gemini manual orchestration compatibility.
+  - preserved and rehydrated Gemini `thought_signature` metadata across assistant tool-call turns.
   - improved schema sanitizer for Gemini OpenAPI subset compatibility.
   - tool schema conversion now fail-fast on invalid root schema shapes.
 - `src-tauri/src/ai/model_catalog.rs`
