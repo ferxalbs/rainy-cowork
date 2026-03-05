@@ -177,16 +177,28 @@ pub async fn run_agent_workflow(
         }
     };
 
-    // Extract allowed_paths from spec's airlock scopes
-    let airlock_paths = &spec.airlock.scopes.allowed_paths;
+    // Extract allowed paths from spec. If absent, derive a safe local default
+    // from the provided workspace identifier when it looks like an absolute path.
+    // Without at least one allowed path, filesystem tools are intentionally filtered
+    // out in ThinkStep, which leads to "simulated" responses instead of real tool calls.
+    let mut derived_allowed_paths = spec.airlock.scopes.allowed_paths.clone();
+    if derived_allowed_paths.is_empty() {
+        let ws = workspace_id.trim();
+        let is_unix_abs = ws.starts_with('/');
+        let is_windows_abs = ws.len() > 2 && ws.as_bytes()[1] == b':' && ws.as_bytes()[2] == b'\\';
+        if is_unix_abs || is_windows_abs {
+            derived_allowed_paths.push(ws.to_string());
+        }
+    }
+
     let options = RuntimeOptions {
         model: Some(normalized_model_id.clone()),
         workspace_id: workspace_id.clone(),
         max_steps: None,
-        allowed_paths: if airlock_paths.is_empty() {
+        allowed_paths: if derived_allowed_paths.is_empty() {
             None
         } else {
-            Some(airlock_paths.clone())
+            Some(derived_allowed_paths.clone())
         },
         custom_system_prompt: None,
     };

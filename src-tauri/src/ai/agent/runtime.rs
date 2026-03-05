@@ -187,13 +187,21 @@ impl AgentRuntime {
         let workspace_id = &self.options.workspace_id;
         let allowed_paths = self.options.allowed_paths.clone().unwrap_or_default();
         let workspace_scope = if allowed_paths.is_empty() {
-            "(none provided)".to_string()
+            let ws = workspace_id.trim();
+            let is_unix_abs = ws.starts_with('/');
+            let is_windows_abs = ws.len() > 2 && ws.as_bytes()[1] == b':' && ws.as_bytes()[2] == b'\\';
+            if is_unix_abs || is_windows_abs {
+                format!("{} (derived from workspace)", ws)
+            } else {
+                "(workspace root — use tools to explore)".to_string()
+            }
         } else {
             allowed_paths.join(", ")
         };
 
         let capability_lines = if spec.skills.capabilities.is_empty() {
-            "- No explicit capabilities configured".to_string()
+            "- Native built-in tool suite (filesystem, shell, memory — use them freely)"
+                .to_string()
         } else {
             spec.skills
                 .capabilities
