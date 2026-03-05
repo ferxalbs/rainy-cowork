@@ -28,6 +28,8 @@ struct GeminiRequest {
     system_instruction: Option<GeminiSystemInstruction>,
     #[serde(skip_serializing_if = "Option::is_none")]
     generation_config: Option<GeminiGenerationConfig>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tools: Option<Vec<GeminiTool>>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -39,12 +41,61 @@ struct GeminiContent {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct GeminiSystemInstruction {
-    parts: Vec<GeminiPart>,
+    parts: Vec<GeminiTextPart>,
 }
 
+/// A text-only part used for system instructions (always text).
 #[derive(Debug, Serialize, Deserialize)]
-struct GeminiPart {
+struct GeminiTextPart {
     text: String,
+}
+
+/// A part in a message — can be text or a function call from the model.
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(untagged)]
+enum GeminiPart {
+    Text { text: String },
+    FunctionCall { function_call: GeminiFunctionCall },
+    // Catch-all for unknown part types (e.g. inlineData) — skip text extraction.
+    Unknown(serde_json::Value),
+}
+
+impl GeminiPart {
+    fn as_text(&self) -> Option<&str> {
+        if let GeminiPart::Text { text } = self {
+            Some(text.as_str())
+        } else {
+            None
+        }
+    }
+}
+
+/// Function call issued by the model (inside a GeminiPart).
+#[derive(Debug, Serialize, Deserialize)]
+struct GeminiFunctionCall {
+    name: String,
+    args: serde_json::Value,
+}
+
+// ─── Gemini Tool declaration types ──────────────────────────────────────────
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct GeminiTool {
+    function_declarations: Vec<GeminiFunctionDeclaration>,
+}
+
+#[derive(Debug, Serialize)]
+struct GeminiFunctionDeclaration {
+    name: String,
+    description: String,
+    parameters: serde_json::Value,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct GeminiThinkingConfig {
+    thinking_level: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -54,6 +105,8 @@ struct GeminiGenerationConfig {
     temperature: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     max_output_tokens: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    thinking_config: Option<GeminiThinkingConfig>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -97,43 +150,60 @@ fn resolve_model_id(model: &str) -> String {
     }
 }
 
+/// Extract thinking level from user-provided model slug if available
+fn extract_thinking_level(model: &str) -> Option<String> {
+    let normalized = crate::ai::model_catalog::normalize_model_slug(model);
+    if normalized.contains("-minimal") {
+        Some("minimal".to_string())
+    } else if normalized.contains("-low") {
+        Some("low".to_string())
+    } else if normalized.contains("-medium") {
+        Some("medium".to_string())
+    } else if normalized.contains("-high") {
+        Some("high".to_string())
+    } else {
+        None
+    }
+}
+
 /// Convert our ChatMessage list to Gemini's `contents` array.
 /// System messages are extracted separately into `system_instruction`.
 fn build_gemini_request_parts(
     messages: &[crate::ai::provider_types::ChatMessage],
     temperature: Option<f32>,
     max_tokens: Option<u32>,
+    thinking_level: Option<String>,
 ) -> (
     Option<GeminiSystemInstruction>,
     Vec<GeminiContent>,
     Option<GeminiGenerationConfig>,
 ) {
-    let mut system_parts: Vec<GeminiPart> = Vec::new();
+    let mut system_text_parts: Vec<GeminiTextPart> = Vec::new();
     let mut contents: Vec<GeminiContent> = Vec::new();
 
     for msg in messages {
         let text = msg.content.text();
         match msg.role.as_str() {
             "system" => {
-                system_parts.push(GeminiPart { text });
+                system_text_parts.push(GeminiTextPart { text });
             }
             "user" => {
                 contents.push(GeminiContent {
                     role: "user".to_string(),
-                    parts: vec![GeminiPart { text }],
+                    parts: vec![GeminiPart::Text { text }],
                 });
             }
             "assistant" => {
                 contents.push(GeminiContent {
                     role: "model".to_string(),
-                    parts: vec![GeminiPart { text }],
+                    parts: vec![GeminiPart::Text { text }],
                 });
             }
-            // tool / other roles — append as user turn so the conversation stays coherent
+            // tool / other roles — append as user turn so the conversation stays coherent.
             _ => {
                 contents.push(GeminiContent {
                     role: "user".to_string(),
-                    parts: vec![GeminiPart {
+                    parts: vec![GeminiPart::Text {
                         text: format!("[tool result]\n{}", text),
                     }],
                 });
@@ -141,24 +211,92 @@ fn build_gemini_request_parts(
         }
     }
 
-    let system_instruction = if system_parts.is_empty() {
+    let system_instruction = if system_text_parts.is_empty() {
         None
     } else {
         Some(GeminiSystemInstruction {
-            parts: system_parts,
+            parts: system_text_parts,
         })
     };
 
-    let generation_config = if temperature.is_some() || max_tokens.is_some() {
-        Some(GeminiGenerationConfig {
-            temperature,
-            max_output_tokens: max_tokens,
-        })
-    } else {
-        None
-    };
+    let generation_config =
+        if temperature.is_some() || max_tokens.is_some() || thinking_level.is_some() {
+            Some(GeminiGenerationConfig {
+                temperature,
+                max_output_tokens: max_tokens,
+                thinking_config: thinking_level.map(|lvl| GeminiThinkingConfig {
+                    thinking_level: lvl,
+                }),
+            })
+        } else {
+            None
+        };
 
     (system_instruction, contents, generation_config)
+}
+
+/// Recursively clean JSON Schema to match Gemini's strict OpenAPI 3.0 subset requirements.
+fn clean_schema_for_gemini(value: &mut serde_json::Value) {
+    if let serde_json::Value::Object(map) = value {
+        // Remove unsupported JSON Schema features
+        map.remove("$schema");
+        map.remove("default");
+        map.remove("additionalProperties");
+
+        // Ensure type is a single uppercase string (Gemini's protobuf requirement)
+        if let Some(type_val) = map.get_mut("type") {
+            if let serde_json::Value::Array(arr) = type_val {
+                // If it's something like ["string", "null"], take the first element
+                if let Some(first) = arr.first() {
+                    *type_val = first.clone();
+                }
+            }
+            if let serde_json::Value::String(s) = type_val {
+                // Gemini supports STRING, INTEGER, NUMBER, BOOLEAN, ARRAY, OBJECT
+                *type_val = serde_json::Value::String(s.to_uppercase());
+            }
+        }
+
+        // Recursively clean nested properties and items
+        if let Some(properties) = map.get_mut("properties") {
+            if let serde_json::Value::Object(props) = properties {
+                for (_, prop_schema) in props.iter_mut() {
+                    clean_schema_for_gemini(prop_schema);
+                }
+            }
+        }
+        if let Some(items) = map.get_mut("items") {
+            clean_schema_for_gemini(items);
+        }
+    }
+}
+
+/// Convert our internal Tool list to Gemini's functionDeclarations format.
+fn build_gemini_tools(tools: &[crate::ai::provider_types::Tool]) -> Option<Vec<GeminiTool>> {
+    if tools.is_empty() {
+        return None;
+    }
+    Some(vec![GeminiTool {
+        function_declarations: tools
+            .iter()
+            .map(|t| {
+                let mut parameters = t.function.parameters.clone();
+                clean_schema_for_gemini(&mut parameters);
+                // Ensure the root object type is upper case OBJECT
+                if let serde_json::Value::Object(ref mut map) = parameters {
+                    map.insert(
+                        "type".to_string(),
+                        serde_json::Value::String("OBJECT".to_string()),
+                    );
+                }
+                GeminiFunctionDeclaration {
+                    name: t.function.name.clone(),
+                    description: t.function.description.clone(),
+                    parameters,
+                }
+            })
+            .collect(),
+    }])
 }
 
 // ─── Adapter struct ──────────────────────────────────────────────────────────
@@ -212,7 +350,7 @@ impl AIProvider for GeminiProviderAdapter {
             chat_completions: true,
             embeddings: false,
             streaming: true,
-            function_calling: false, // Gemini native function calling uses different format
+            function_calling: true,
             vision: false,
             web_search: false,
             max_context_tokens: 1_000_000,
@@ -239,13 +377,29 @@ impl AIProvider for GeminiProviderAdapter {
         &self,
         request: ChatCompletionRequest,
     ) -> ProviderResult<ChatCompletionResponse> {
-        let (system_instruction, contents, generation_config) =
-            build_gemini_request_parts(&request.messages, request.temperature, request.max_tokens);
+        let thinking_level = self
+            .config
+            .params
+            .get("thinkingLevel")
+            .or_else(|| self.config.params.get("thinking_level"))
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
+            .or_else(|| extract_thinking_level(&request.model));
+
+        let (system_instruction, contents, generation_config) = build_gemini_request_parts(
+            &request.messages,
+            request.temperature,
+            request.max_tokens,
+            thinking_level,
+        );
+
+        let gemini_tools = request.tools.as_deref().and_then(build_gemini_tools);
 
         let body = GeminiRequest {
             contents,
             system_instruction,
             generation_config,
+            tools: gemini_tools,
         };
 
         let url = self.model_url(&request.model, "generateContent");
@@ -260,10 +414,10 @@ impl AIProvider for GeminiProviderAdapter {
 
         let status = response.status();
         if !status.is_success() {
-            let text = response.text().await.unwrap_or_default();
+            let error_text = response.text().await.unwrap_or_default();
             return Err(AIError::APIError(format!(
                 "Gemini API error {}: {}",
-                status, text
+                status, error_text
             )));
         }
 
@@ -278,17 +432,34 @@ impl AIProvider for GeminiProviderAdapter {
             .next()
             .ok_or_else(|| AIError::APIError("No candidates in Gemini response".to_string()))?;
 
-        let text = candidate
-            .content
-            .parts
-            .into_iter()
-            .map(|p| p.text)
-            .collect::<Vec<_>>()
-            .join("");
-
         let finish_reason = candidate
             .finish_reason
+            .clone()
             .unwrap_or_else(|| "stop".to_string());
+
+        // Separate text parts from functionCall parts.
+        let mut text_parts: Vec<String> = Vec::new();
+        let mut tool_calls: Vec<crate::ai::provider_types::ToolCall> = Vec::new();
+
+        for part in candidate.content.parts {
+            match part {
+                GeminiPart::Text { text } => text_parts.push(text),
+                GeminiPart::FunctionCall { function_call } => {
+                    tool_calls.push(crate::ai::provider_types::ToolCall {
+                        id: uuid::Uuid::new_v4().to_string(),
+                        r#type: "function".to_string(),
+                        extra_content: None,
+                        function: crate::ai::provider_types::FunctionCall {
+                            name: function_call.name,
+                            arguments: function_call.args.to_string(),
+                        },
+                    });
+                }
+                GeminiPart::Unknown(_) => {}
+            }
+        }
+
+        let text = text_parts.join("");
 
         let (prompt_tokens, completion_tokens, total_tokens) =
             if let Some(usage) = gemini_response.usage_metadata {
@@ -302,8 +473,12 @@ impl AIProvider for GeminiProviderAdapter {
             };
 
         Ok(ChatCompletionResponse {
-            content: Some(text),
-            tool_calls: None,
+            content: if text.is_empty() { None } else { Some(text) },
+            tool_calls: if tool_calls.is_empty() {
+                None
+            } else {
+                Some(tool_calls)
+            },
             model: request.model,
             usage: TokenUsage {
                 prompt_tokens,
@@ -319,13 +494,29 @@ impl AIProvider for GeminiProviderAdapter {
         request: ChatCompletionRequest,
         callback: StreamingCallback,
     ) -> ProviderResult<()> {
-        let (system_instruction, contents, generation_config) =
-            build_gemini_request_parts(&request.messages, request.temperature, request.max_tokens);
+        let thinking_level = self
+            .config
+            .params
+            .get("thinkingLevel")
+            .or_else(|| self.config.params.get("thinking_level"))
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
+            .or_else(|| extract_thinking_level(&request.model));
+
+        let (system_instruction, contents, generation_config) = build_gemini_request_parts(
+            &request.messages,
+            request.temperature,
+            request.max_tokens,
+            thinking_level,
+        );
+
+        let gemini_tools = request.tools.as_deref().and_then(build_gemini_tools);
 
         let body = GeminiRequest {
             contents,
             system_instruction,
             generation_config,
+            tools: gemini_tools,
         };
 
         let url = self.model_url(&request.model, "streamGenerateContent?alt=sse");
@@ -374,11 +565,13 @@ impl AIProvider for GeminiProviderAdapter {
                     if let Ok(parsed) = serde_json::from_str::<GeminiStreamChunk>(data) {
                         if let Some(candidates) = parsed.candidates {
                             for candidate in candidates {
+                                // Only stream text parts — skip functionCall parts
+                                // (function calls are resolved via the finalize complete() call).
                                 let text = candidate
                                     .content
                                     .parts
-                                    .into_iter()
-                                    .map(|p| p.text)
+                                    .iter()
+                                    .filter_map(|p| p.as_text())
                                     .collect::<Vec<_>>()
                                     .join("");
 

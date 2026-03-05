@@ -475,59 +475,27 @@ impl WorkflowStep for ThinkStep {
         let router_guard = self.router.read().await;
 
         let (assistant_content, tool_calls) = if has_tools {
-            // Buffered interleaving strategy:
-            // 1) stream text to avoid "frozen" UX during tool-capable turns
-            // 2) finalize with non-stream completion to resolve tool calls
-            let accumulated = Arc::new(std::sync::Mutex::new(String::new()));
-            let acc_clone = Arc::clone(&accumulated);
             let event_fn: Arc<dyn Fn(AgentEvent) + Send + Sync> = Arc::from(on_event);
 
-            // Pre-stream: accumulate silently — do NOT emit StreamChunks here.
-            // Models like Gemini emit internal tool_code blocks as streaming text before
-            // issuing a structured tool call; surfacing those chunks produces visual noise.
-            // The real response (with tool_calls resolved) comes from the finalize call below.
-            let callback: crate::ai::provider_types::StreamingCallback =
-                Arc::new(move |chunk: crate::ai::provider_types::StreamingChunk| {
-                    if !chunk.content.is_empty() {
-                        if let Ok(mut guard) = acc_clone.lock() {
-                            guard.push_str(&chunk.content);
-                        }
-                    }
-                });
+            // Emit a single status so the UI shows active planning.
+            event_fn(AgentEvent::Status(
+                "Analizando y planificando herramientas...".to_string(),
+            ));
 
-            // Emit a single status so the UI doesn't appear frozen while streaming.
-            event_fn(AgentEvent::Status("Preparing tool calls...".to_string()));
+            let mut blocking_request = request.clone();
+            blocking_request.stream = false; // explicitly disable streaming for robust tool execution
 
-            let mut stream_request = request.clone();
-            stream_request.stream = true;
-            if let Err(e) = router_guard.complete_stream(stream_request, callback).await {
-                event_fn(AgentEvent::Status(format!(
-                    "Streaming fallback engaged: {}",
-                    e
-                )));
-            }
-
-            let streamed_content = accumulated
-                .lock()
-                .unwrap_or_else(|e| e.into_inner())
-                .clone();
-
-            let mut finalize_request = request.clone();
-            finalize_request.stream = false;
             let response = router_guard
-                .complete(finalize_request)
+                .complete(blocking_request)
                 .await
                 .map_err(|e| format!("ThinkStep Failed: {}", e))?;
 
-            let finalized_content = response.content.clone().unwrap_or_default();
-            let content = if finalized_content.is_empty() {
-                streamed_content
-            } else {
-                finalized_content
-            };
+            let content = response.content.clone().unwrap_or_default();
+
             if !content.is_empty() {
                 event_fn(AgentEvent::Thought(content.clone()));
             }
+
             (content, response.tool_calls.clone())
         } else {
             // Streaming path: emit token-by-token chunks to the frontend

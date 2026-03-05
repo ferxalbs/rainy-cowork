@@ -418,7 +418,7 @@ When adding or modifying tools, update `src/components/agent-chat/neural-config.
 
 ## 14. Versioning & Changelog Protocol
 
-For **every significant change** (new features, breaking fixes, architectural changes):
+For **every significant change** (new features, breaking fixes, architectural changes) (but first you need the confirmation of the user):
 
 1. **Update `CHANGELOG.md`** — use the existing format:
    ```
