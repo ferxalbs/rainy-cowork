@@ -20,6 +20,7 @@ pub struct RuntimeOptions {
     pub max_steps: Option<usize>,
     pub allowed_paths: Option<Vec<String>>,
     pub custom_system_prompt: Option<String>,
+    pub streaming_enabled: Option<bool>,
 }
 
 /// The core runtime that orchestrates the agent's thinking process
@@ -451,6 +452,7 @@ Rules:
                 .model
                 .clone()
                 .unwrap_or("gemini-2.0-flash".to_string()),
+            allow_streaming: self.options.streaming_enabled.unwrap_or(false),
         });
         workflow.add_step(think_step);
 
@@ -478,7 +480,21 @@ Rules:
 
         // 5. Persist the assistant's final response into long-term memory
         if last_message.role == "assistant" {
-            let response_text = last_message.content.as_text();
+            let mut response_text = last_message.content.as_text();
+            if response_text.trim().is_empty() {
+                if let Some(previous_non_empty) = final_state
+                    .messages
+                    .iter()
+                    .rev()
+                    .find(|m| m.role == "assistant" && !m.content.as_text().trim().is_empty())
+                {
+                    response_text = previous_non_empty.content.as_text();
+                }
+            }
+            if response_text.trim().is_empty() {
+                response_text =
+                    "No final textual response was generated after tool execution.".to_string();
+            }
             if !response_text.is_empty() && response_text.len() > 20 {
                 // Airlock Gatekeeping: Check if Agent has permission to write memory.
                 // We construct a synthetic command representing a memory write.
@@ -548,7 +564,7 @@ Rules:
                     ));
                 }
             }
-            Ok(last_message.content.as_text())
+            Ok(response_text)
         } else {
             Ok("Workflow completed without final response".to_string())
         }

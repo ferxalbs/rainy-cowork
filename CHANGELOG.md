@@ -5,6 +5,55 @@ All notable changes to Rainy Cowork will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.100] - 2026-03-05 - GEMINI TOOLCHAIN HARDENING
+
+### Fixed
+
+- Fixed deterministic provider routing so explicit model prefixes are authoritative:
+  - `rainy:` / `rainy-api/` now pin to Rainy provider.
+  - `gemini:` now pins to Gemini BYOK provider.
+- Fixed Gemini BYOK multi-turn tool continuity by serializing assistant tool calls and tool results using Gemini-native parts (`function_call` + `function_response`) instead of flattening tool messages into plain text.
+- Fixed empty final-response regressions by adding backend and frontend guardrails when a run ends with empty assistant text.
+
+### Changed
+
+- `src-tauri/src/commands/agent.rs`
+  - runtime now preserves full `model_id` (including provider prefix) instead of stripping it.
+  - native agent runtime sets `streaming_enabled: false` by default.
+- `src-tauri/src/ai/router/router.rs`
+  - provider selection now honors explicit prefixes before heuristic capability routing.
+- `src-tauri/src/ai/agent/runtime.rs`
+  - added `RuntimeOptions.streaming_enabled`.
+  - ThinkStep wiring now supports explicit streaming opt-in.
+  - final response selection now falls back to latest non-empty assistant output.
+- `src-tauri/src/ai/agent/workflow.rs`
+  - ThinkStep streaming path is now gated by `allow_streaming` and remains non-streaming for tool turns.
+- `src-tauri/src/ai/providers/gemini_adapter.rs`
+  - added Gemini-native `function_response` support.
+  - improved schema sanitizer for Gemini OpenAPI subset compatibility.
+  - tool schema conversion now fail-fast on invalid root schema shapes.
+- `src-tauri/src/ai/model_catalog.rs`
+  - Gemini BYOK entries now advertise `function_calling: true`.
+- `src/hooks/useAgentChat.ts`
+  - added UI fallback text to prevent blank assistant bubbles on empty backend result.
+- `src-tauri/src/commands/router.rs`
+  - routing commands now preserve explicit prefixed model IDs.
+- `src-tauri/src/services/command_poller.rs`
+  - cloud runtime options now set `streaming_enabled: false` by default.
+
+### Changed - Versioning
+
+- `package.json` -> `0.5.100`
+- `src-tauri/Cargo.toml` -> `0.5.100`
+- `src-tauri/tauri.conf.json` -> `0.5.100`
+
+### Validation
+
+- `cd src-tauri && cargo check -q` — passes
+- `cd src-tauri && cargo test -q agent::workflow::tests::test_workflow_execution --lib` — passes
+- `cd src-tauri && cargo test -q router::router::tests --lib` — passes
+- `pnpm exec tsc --noEmit` — passes
+
 ## [0.5.99] - 2026-03-05 - AIRLOCK ENFORCEMENT + MODEL LABEL
 
 ### Fixed

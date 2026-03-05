@@ -269,6 +269,7 @@ Please narrow the task or ask me to continue with a focused next step.]",
 pub struct ThinkStep {
     pub router: Arc<RwLock<IntelligentRouter>>,
     pub model: String,
+    pub allow_streaming: bool,
 }
 
 #[async_trait::async_trait]
@@ -458,7 +459,7 @@ impl WorkflowStep for ThinkStep {
             temperature: Some(0.7),
             max_tokens: None,
             top_p: None,
-            stream: !has_tools,
+            stream: self.allow_streaming && !has_tools,
             tools: if has_tools { Some(tools) } else { None },
             tool_choice: if has_tools {
                 Some(crate::ai::provider_types::ToolChoice::Auto)
@@ -474,7 +475,7 @@ impl WorkflowStep for ThinkStep {
         // 3. Call Router — streaming when no tools, blocking otherwise
         let router_guard = self.router.read().await;
 
-        let (assistant_content, tool_calls) = if has_tools {
+        let (assistant_content, tool_calls) = if has_tools || !self.allow_streaming {
             let event_fn: Arc<dyn Fn(AgentEvent) + Send + Sync> = Arc::from(on_event);
 
             // Emit a single status so the UI shows active planning.
@@ -483,7 +484,7 @@ impl WorkflowStep for ThinkStep {
             ));
 
             let mut blocking_request = request.clone();
-            blocking_request.stream = false; // explicitly disable streaming for robust tool execution
+            blocking_request.stream = false;
 
             let response = router_guard
                 .complete(blocking_request)
@@ -942,6 +943,7 @@ mod tests {
             max_steps: Some(10),
             allowed_paths: None,
             custom_system_prompt: None,
+            streaming_enabled: Some(false),
         };
 
         let mut workflow = Workflow::new(spec.clone(), options, "start".to_string());

@@ -14,6 +14,7 @@ use crate::ai::provider_types::{
 use async_trait::async_trait;
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::Arc;
 
 const GEMINI_API_BASE: &str = "https://generativelanguage.googleapis.com/v1beta";
@@ -56,6 +57,7 @@ struct GeminiTextPart {
 enum GeminiPart {
     Text { text: String },
     FunctionCall { function_call: GeminiFunctionCall },
+    FunctionResponse { function_response: GeminiFunctionResponse },
     // Catch-all for unknown part types (e.g. inlineData) — skip text extraction.
     Unknown(serde_json::Value),
 }
@@ -75,6 +77,14 @@ impl GeminiPart {
 struct GeminiFunctionCall {
     name: String,
     args: serde_json::Value,
+}
+
+/// Function response sent back to Gemini after executing a tool.
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct GeminiFunctionResponse {
+    name: String,
+    response: serde_json::Value,
 }
 
 // ─── Gemini Tool declaration types ──────────────────────────────────────────
@@ -180,6 +190,7 @@ fn build_gemini_request_parts(
 ) {
     let mut system_text_parts: Vec<GeminiTextPart> = Vec::new();
     let mut contents: Vec<GeminiContent> = Vec::new();
+    let mut tool_name_by_id: HashMap<String, String> = HashMap::new();
 
     for msg in messages {
         let text = msg.content.text();
@@ -194,9 +205,66 @@ fn build_gemini_request_parts(
                 });
             }
             "assistant" => {
+                let mut parts: Vec<GeminiPart> = Vec::new();
+
+                if !text.is_empty() {
+                    parts.push(GeminiPart::Text { text });
+                }
+
+                if let Some(calls) = msg.tool_calls.as_ref() {
+                    for call in calls {
+                        let args = serde_json::from_str::<serde_json::Value>(
+                            &call.function.arguments,
+                        )
+                        .unwrap_or_else(|_| {
+                            serde_json::json!({
+                                "raw_arguments": call.function.arguments
+                            })
+                        });
+                        tool_name_by_id.insert(call.id.clone(), call.function.name.clone());
+                        parts.push(GeminiPart::FunctionCall {
+                            function_call: GeminiFunctionCall {
+                                name: call.function.name.clone(),
+                                args,
+                            },
+                        });
+                    }
+                }
+
+                if !parts.is_empty() {
+                    contents.push(GeminiContent {
+                        role: "model".to_string(),
+                        parts,
+                    });
+                }
+            }
+            "tool" => {
+                let tool_name = msg
+                    .tool_call_id
+                    .as_ref()
+                    .and_then(|id| tool_name_by_id.get(id))
+                    .cloned()
+                    .or_else(|| msg.name.clone())
+                    .unwrap_or_else(|| "tool_result".to_string());
+
+                let tool_payload = if text.is_empty() {
+                    serde_json::json!({})
+                } else {
+                    serde_json::from_str::<serde_json::Value>(&text).unwrap_or_else(|_| {
+                        serde_json::json!({
+                            "content": text
+                        })
+                    })
+                };
+
                 contents.push(GeminiContent {
-                    role: "model".to_string(),
-                    parts: vec![GeminiPart::Text { text }],
+                    role: "user".to_string(),
+                    parts: vec![GeminiPart::FunctionResponse {
+                        function_response: GeminiFunctionResponse {
+                            name: tool_name,
+                            response: tool_payload,
+                        },
+                    }],
                 });
             }
             // tool / other roles — append as user turn so the conversation stays coherent.
@@ -235,6 +303,18 @@ fn build_gemini_request_parts(
     (system_instruction, contents, generation_config)
 }
 
+fn normalize_gemini_type(value: &str) -> Option<&'static str> {
+    match value.to_ascii_lowercase().as_str() {
+        "string" => Some("STRING"),
+        "integer" => Some("INTEGER"),
+        "number" => Some("NUMBER"),
+        "boolean" => Some("BOOLEAN"),
+        "array" => Some("ARRAY"),
+        "object" => Some("OBJECT"),
+        _ => None,
+    }
+}
+
 /// Recursively clean JSON Schema to match Gemini's strict OpenAPI 3.0 subset requirements.
 fn clean_schema_for_gemini(value: &mut serde_json::Value) {
     if let serde_json::Value::Object(map) = value {
@@ -242,18 +322,29 @@ fn clean_schema_for_gemini(value: &mut serde_json::Value) {
         map.remove("$schema");
         map.remove("default");
         map.remove("additionalProperties");
+        map.remove("oneOf");
+        map.remove("anyOf");
+        map.remove("allOf");
+        map.remove("not");
+        map.remove("nullable");
 
         // Ensure type is a single uppercase string (Gemini's protobuf requirement)
         if let Some(type_val) = map.get_mut("type") {
             if let serde_json::Value::Array(arr) = type_val {
-                // If it's something like ["string", "null"], take the first element
-                if let Some(first) = arr.first() {
-                    *type_val = first.clone();
+                // If it's something like ["string", "null"], use the first supported type.
+                if let Some(supported) = arr.iter().find_map(|entry| match entry {
+                    serde_json::Value::String(s) => normalize_gemini_type(s),
+                    _ => None,
+                }) {
+                    *type_val = serde_json::Value::String(supported.to_string());
                 }
             }
             if let serde_json::Value::String(s) = type_val {
-                // Gemini supports STRING, INTEGER, NUMBER, BOOLEAN, ARRAY, OBJECT
-                *type_val = serde_json::Value::String(s.to_uppercase());
+                if let Some(normalized) = normalize_gemini_type(s) {
+                    *type_val = serde_json::Value::String(normalized.to_string());
+                } else {
+                    map.remove("type");
+                }
             }
         }
 
@@ -268,35 +359,75 @@ fn clean_schema_for_gemini(value: &mut serde_json::Value) {
         if let Some(items) = map.get_mut("items") {
             clean_schema_for_gemini(items);
         }
+
+        // Keep `required` entries aligned with declared properties.
+        let property_names: Vec<String> = map
+            .get("properties")
+            .and_then(|v| v.as_object())
+            .map(|props| props.keys().cloned().collect())
+            .unwrap_or_default();
+        if let Some(required) = map.get_mut("required") {
+            if let serde_json::Value::Array(entries) = required {
+                entries.retain(|entry| {
+                    entry
+                        .as_str()
+                        .map(|name| property_names.iter().any(|p| p == name))
+                        .unwrap_or(false)
+                });
+            }
+        }
+
+        if map.contains_key("properties") && !map.contains_key("type") {
+            map.insert(
+                "type".to_string(),
+                serde_json::Value::String("OBJECT".to_string()),
+            );
+        } else if map.contains_key("items") && !map.contains_key("type") {
+            map.insert(
+                "type".to_string(),
+                serde_json::Value::String("ARRAY".to_string()),
+            );
+        }
     }
 }
 
 /// Convert our internal Tool list to Gemini's functionDeclarations format.
-fn build_gemini_tools(tools: &[crate::ai::provider_types::Tool]) -> Option<Vec<GeminiTool>> {
+fn build_gemini_tools(
+    tools: &[crate::ai::provider_types::Tool],
+) -> ProviderResult<Option<Vec<GeminiTool>>> {
     if tools.is_empty() {
-        return None;
+        return Ok(None);
     }
-    Some(vec![GeminiTool {
-        function_declarations: tools
-            .iter()
-            .map(|t| {
-                let mut parameters = t.function.parameters.clone();
-                clean_schema_for_gemini(&mut parameters);
-                // Ensure the root object type is upper case OBJECT
-                if let serde_json::Value::Object(ref mut map) = parameters {
-                    map.insert(
-                        "type".to_string(),
-                        serde_json::Value::String("OBJECT".to_string()),
-                    );
-                }
-                GeminiFunctionDeclaration {
-                    name: t.function.name.clone(),
-                    description: t.function.description.clone(),
-                    parameters,
-                }
-            })
-            .collect(),
-    }])
+    let mut declarations = Vec::with_capacity(tools.len());
+
+    for tool in tools {
+        let mut parameters = tool.function.parameters.clone();
+        clean_schema_for_gemini(&mut parameters);
+        let Some(root) = parameters.as_object_mut() else {
+            return Err(AIError::InvalidRequest(format!(
+                "Gemini schema conversion failed for '{}': root parameters must be an object",
+                tool.function.name
+            )));
+        };
+
+        root.insert(
+            "type".to_string(),
+            serde_json::Value::String("OBJECT".to_string()),
+        );
+        if !root.contains_key("properties") {
+            root.insert("properties".to_string(), serde_json::json!({}));
+        }
+
+        declarations.push(GeminiFunctionDeclaration {
+            name: tool.function.name.clone(),
+            description: tool.function.description.clone(),
+            parameters,
+        });
+    }
+
+    Ok(Some(vec![GeminiTool {
+        function_declarations: declarations,
+    }]))
 }
 
 // ─── Adapter struct ──────────────────────────────────────────────────────────
@@ -393,7 +524,10 @@ impl AIProvider for GeminiProviderAdapter {
             thinking_level,
         );
 
-        let gemini_tools = request.tools.as_deref().and_then(build_gemini_tools);
+        let gemini_tools = match request.tools.as_deref() {
+            Some(tools) => build_gemini_tools(tools)?,
+            None => None,
+        };
 
         let body = GeminiRequest {
             contents,
@@ -455,6 +589,7 @@ impl AIProvider for GeminiProviderAdapter {
                         },
                     });
                 }
+                GeminiPart::FunctionResponse { .. } => {}
                 GeminiPart::Unknown(_) => {}
             }
         }
@@ -510,7 +645,10 @@ impl AIProvider for GeminiProviderAdapter {
             thinking_level,
         );
 
-        let gemini_tools = request.tools.as_deref().and_then(build_gemini_tools);
+        let gemini_tools = match request.tools.as_deref() {
+            Some(tools) => build_gemini_tools(tools)?,
+            None => None,
+        };
 
         let body = GeminiRequest {
             contents,

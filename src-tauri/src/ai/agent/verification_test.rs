@@ -90,6 +90,7 @@ mod tests {
             max_steps: Some(1),
             allowed_paths: None,
             custom_system_prompt: None,
+            streaming_enabled: Some(false),
         };
 
         // We can't easily run() without a real SkillExecutor/Router,

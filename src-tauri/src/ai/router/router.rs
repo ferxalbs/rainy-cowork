@@ -323,14 +323,23 @@ impl IntelligentRouter {
         let model = request.model.to_lowercase();
         let all_providers = self.load_balancer.providers();
 
-        // Pure-Gemini BYOK models: route to provider whose ID contains "gemini"
-        // (but not "rainy") — these use the user's own Google API key.
-        let is_pure_gemini = (model.starts_with("gemini-")
-            || model.starts_with("gemini/")
-            || model.starts_with("gemini:"))
-            && !model.contains("rainy");
+        // Explicit provider prefixes are authoritative and deterministic.
+        let is_rainy_model = model.starts_with("rainy-api/") || model.starts_with("rainy:");
+        if is_rainy_model {
+            if let Some(p) = all_providers
+                .iter()
+                .find(|p| {
+                    let id = p.provider().id().to_string().to_lowercase();
+                    id.contains("rainy")
+                })
+                .cloned()
+            {
+                return Some(p);
+            }
+        }
 
-        if is_pure_gemini {
+        let is_prefixed_gemini = model.starts_with("gemini:");
+        if is_prefixed_gemini {
             if let Some(p) = all_providers
                 .iter()
                 .find(|p| {
@@ -343,15 +352,16 @@ impl IntelligentRouter {
             }
         }
 
-        // Rainy API models: prefer the rainy_api provider.
-        let is_rainy_model = model.starts_with("rainy-api/") || model.starts_with("rainy:");
+        // Unprefixed pure-Gemini models default to BYOK when available.
+        let is_pure_gemini_unprefixed =
+            (model.starts_with("gemini-") || model.starts_with("gemini/")) && !model.contains(':');
 
-        if is_rainy_model {
+        if is_pure_gemini_unprefixed {
             if let Some(p) = all_providers
                 .iter()
                 .find(|p| {
                     let id = p.provider().id().to_string().to_lowercase();
-                    id.contains("rainy")
+                    id.contains("gemini") && !id.contains("rainy")
                 })
                 .cloned()
             {

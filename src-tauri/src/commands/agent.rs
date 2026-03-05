@@ -85,7 +85,7 @@ pub async fn run_agent_workflow(
     runtime_registry: State<'_, Arc<RuntimeRegistry>>,
 ) -> Result<String, String> {
     crate::ai::model_catalog::ensure_supported_model_slug(&model_id)?;
-    let normalized_model_id = crate::ai::model_catalog::normalize_model_slug(&model_id).to_string();
+    let selected_model_id = model_id.clone();
 
     // 0. Ensure Chat Session Exists (Persist Metadata)
     // We use workspace_id as the chat_id for this simple implementation
@@ -192,7 +192,7 @@ pub async fn run_agent_workflow(
     }
 
     let options = RuntimeOptions {
-        model: Some(normalized_model_id.clone()),
+        model: Some(selected_model_id),
         workspace_id: workspace_id.clone(),
         max_steps: None,
         allowed_paths: if derived_allowed_paths.is_empty() {
@@ -201,6 +201,7 @@ pub async fn run_agent_workflow(
             Some(derived_allowed_paths.clone())
         },
         custom_system_prompt: None,
+        streaming_enabled: Some(false),
     };
 
     // Initialize Persistent Memory

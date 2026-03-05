@@ -699,7 +699,10 @@ export function useAgentChat() {
             m.id === agentMsgId
               ? {
                   ...m,
-                  content: result,
+                  content:
+                    typeof result === "string" && result.trim().length > 0
+                      ? result
+                      : "No final text response was generated. Please try again with a more specific instruction.",
                   isLoading: false,
                   neuralState: undefined,
                   activeToolName: undefined,

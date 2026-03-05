@@ -199,16 +199,11 @@ pub async fn complete_with_routing(
     let messages: Vec<ChatMessage> = request.messages.into_iter().map(|m| m.into()).collect();
 
     // Build request
-    let requested_model = request.model.unwrap_or_else(|| "default".to_string());
-    let normalized_model = if requested_model == "default" {
-        requested_model
-    } else {
-        crate::ai::model_catalog::normalize_model_slug(&requested_model).to_string()
-    };
+    let model = request.model.unwrap_or_else(|| "default".to_string());
 
     let chat_request = ChatCompletionRequest {
         messages,
-        model: normalized_model,
+        model,
         temperature: request.temperature,
         max_tokens: request.max_tokens,
         top_p: request.top_p,
@@ -246,16 +241,11 @@ pub async fn stream_with_routing(
         .model
         .clone()
         .unwrap_or_else(|| "default".to_string());
-    let normalized_model = if model == "default" {
-        model.clone()
-    } else {
-        crate::ai::model_catalog::normalize_model_slug(&model).to_string()
-    };
 
     // Build request
     let chat_request = ChatCompletionRequest {
         messages,
-        model: normalized_model.clone(),
+        model: model.clone(),
         temperature: request.temperature,
         max_tokens: request.max_tokens,
         top_p: request.top_p,
@@ -270,7 +260,7 @@ pub async fn stream_with_routing(
 
     // Send started event (we'll get the actual provider from the router)
     let _ = on_event.send(StreamingEvent::Started {
-        model: normalized_model.clone(),
+        model: model.clone(),
         provider_id: "intelligent_router".to_string(),
     });
 

@@ -712,6 +712,7 @@ impl CommandPoller {
                             // This ensures the Cloud's "Soul" (instructions, personality) is respected
                             // even if we load a local (potentially stale) spec.
                             custom_system_prompt: agent_system_prompt.clone(),
+                            streaming_enabled: Some(false),
                         };
 
                         // Create config
