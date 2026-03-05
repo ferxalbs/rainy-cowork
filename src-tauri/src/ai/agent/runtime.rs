@@ -176,21 +176,22 @@ impl AgentRuntime {
         *hist = messages;
     }
 
-    fn generate_system_prompt(&self) -> String {
+    fn generate_system_prompt(&self, skills: &SkillExecutor) -> String {
         // If a custom system prompt is provided (e.g. from Cloud/ATM), use it directly.
         if let Some(custom) = &self.options.custom_system_prompt {
             return format!("{}{}", custom, Self::runtime_truthfulness_appendix());
         }
 
         let spec = &self.spec;
-        // ... (rest of generation logic)
         let workspace_id = &self.options.workspace_id;
         let allowed_paths = self.options.allowed_paths.clone().unwrap_or_default();
+
         let workspace_scope = if allowed_paths.is_empty() {
+            // Derive scope from workspace_id when allowed_paths is not explicitly set.
+            // This matches the derivation logic in run_agent_workflow (agent.rs).
             let ws = workspace_id.trim();
-            let is_unix_abs = ws.starts_with('/');
-            let is_windows_abs = ws.len() > 2 && ws.as_bytes()[1] == b':' && ws.as_bytes()[2] == b'\\';
-            if is_unix_abs || is_windows_abs {
+            let is_abs = ws.starts_with('/') || (ws.len() > 2 && ws.as_bytes()[1] == b':');
+            if is_abs {
                 format!("{} (derived from workspace)", ws)
             } else {
                 "(workspace root — use tools to explore)".to_string()
@@ -199,9 +200,34 @@ impl AgentRuntime {
             allowed_paths.join(", ")
         };
 
+        // Build the available tool list dynamically, applying the same two filters ThinkStep uses:
+        // 1. Filesystem guard — drop filesystem tools when no allowed_paths are configured.
+        // 2. Airlock policy — respect this agent's tool_policy (allowlist / deny entries).
+        // This guarantees the LLM sees EXACTLY the tools it will get — no over-promising, no under-promising.
+        let mut available_tools = skills.get_tool_definitions();
+        if allowed_paths.is_empty() {
+            available_tools.retain(|t| {
+                !crate::ai::agent::workflow::FILESYSTEM_TOOL_NAMES
+                    .contains(&t.function.name.as_str())
+            });
+        }
+        available_tools.retain(|t| spec.airlock.is_tool_allowed(&t.function.name));
+
         let capability_lines = if spec.skills.capabilities.is_empty() {
-            "- Native built-in tool suite (filesystem, shell, memory — use them freely)"
-                .to_string()
+            // No explicit capability spec — describe what the agent actually has access to
+            // based on the Airlock filtering above (single source of truth with ThinkStep).
+            if available_tools.is_empty() {
+                "- No tools available for this agent (filtered by Airlock policy or filesystem scope restrictions)".to_string()
+            } else {
+                let tool_names: Vec<String> = available_tools
+                    .iter()
+                    .map(|t| format!("`{}`", t.function.name))
+                    .collect();
+                format!(
+                    "- Available tools (use them for all operations — never simulate results):\n  {}",
+                    tool_names.join(", ")
+                )
+            }
         } else {
             spec.skills
                 .capabilities
@@ -291,7 +317,8 @@ Rules:
 
             let prefix = format!("[{}] ", i + 1);
             let content_budget_tokens = (remaining_chars / 4).saturating_sub(8);
-            let content = context_window.truncate_text_for_tokens(&entry.content, content_budget_tokens);
+            let content =
+                context_window.truncate_text_for_tokens(&entry.content, content_budget_tokens);
             let line = format!("{}{}\n", prefix, content);
             if line.len() > remaining_chars {
                 break;
@@ -351,7 +378,7 @@ Rules:
         // Add System Message to State
         state.messages.push(AgentMessage {
             role: "system".to_string(),
-            content: AgentContent::text(self.generate_system_prompt()),
+            content: AgentContent::text(self.generate_system_prompt(&self.skills)),
             tool_calls: None,
             tool_call_id: None,
         });
@@ -379,7 +406,7 @@ Rules:
             } else {
                 state.messages[0].content = AgentContent::text(format!(
                     "{}{}",
-                    self.generate_system_prompt(),
+                    self.generate_system_prompt(&self.skills),
                     appended_context
                 ));
             }

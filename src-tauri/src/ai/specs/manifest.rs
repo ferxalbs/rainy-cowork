@@ -95,6 +95,22 @@ impl Default for AirlockConfig {
     }
 }
 
+impl AirlockConfig {
+    /// Check whether a tool is permitted by this airlock's policy.
+    /// Used by both ThinkStep (tool advertising) and generate_system_prompt (dynamic capability display)
+    /// so the LLM _sees_ exactly the tools it will _get_.
+    pub fn is_tool_allowed(&self, tool_name: &str) -> bool {
+        let policy = &self.tool_policy;
+        if policy.deny.iter().any(|item| item == tool_name) {
+            return false;
+        }
+        if policy.mode == "allowlist" {
+            return policy.allow.iter().any(|item| item == tool_name);
+        }
+        true
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AirlockToolPolicy {
     #[serde(default = "default_policy_mode")]

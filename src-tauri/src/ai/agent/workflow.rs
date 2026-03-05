@@ -1,7 +1,7 @@
 // Workflow Engine v2 — Step-based execution model for the agent's ReAct loop.
 // Contains ThinkStep (LLM interaction) and ActStep (tool execution) with memory persistence.
-use crate::ai::agent::memory::AgentMemory;
 use crate::ai::agent::events::AgentEvent;
+use crate::ai::agent::memory::AgentMemory;
 use crate::ai::agent::runtime::{AgentContent, AgentMessage, RuntimeOptions};
 use crate::ai::router::IntelligentRouter;
 use crate::ai::specs::manifest::AgentSpec;
@@ -20,7 +20,7 @@ use tokio::sync::RwLock;
 const MAX_MODEL_MESSAGE_BYTES: usize = 95 * 1024;
 const MAX_TOOL_TEXT_BYTES: usize = 48 * 1024;
 const MAX_MEMORY_CONTEXT_BYTES: usize = 24 * 1024;
-const FILESYSTEM_TOOL_NAMES: &[&str] = &[
+pub const FILESYSTEM_TOOL_NAMES: &[&str] = &[
     "read_file",
     "read_many_files",
     "write_file",
@@ -37,14 +37,7 @@ const FILESYSTEM_TOOL_NAMES: &[&str] = &[
 ];
 
 fn is_tool_allowed_by_spec(spec: &AgentSpec, tool_name: &str) -> bool {
-    let policy = &spec.airlock.tool_policy;
-    if policy.deny.iter().any(|item| item == tool_name) {
-        return false;
-    }
-    if policy.mode == "allowlist" {
-        return policy.allow.iter().any(|item| item == tool_name);
-    }
-    true
+    spec.airlock.is_tool_allowed(tool_name)
 }
 
 fn resolve_airlock_level_for_tool(spec: &AgentSpec, tool_name: &str) -> AirlockLevel {
