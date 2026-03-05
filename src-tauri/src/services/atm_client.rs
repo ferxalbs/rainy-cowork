@@ -322,6 +322,20 @@ pub struct ToolAccessPolicyResponse {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
+pub struct FleetStatusResponse {
+    pub workspace_id: String,
+    pub nodes: Vec<serde_json::Value>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct FleetDispatchResponse {
+    pub success: bool,
+    pub dispatch: serde_json::Value,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct AdminPolicyAuditEvent {
     pub id: String,
     pub actor: String,
@@ -1223,6 +1237,131 @@ impl ATMClient {
             tool_access_policy_version: body.tool_access_policy_version,
             tool_access_policy_hash: body.tool_access_policy_hash,
         })
+    }
+
+    pub async fn get_fleet_status(&self) -> Result<FleetStatusResponse, String> {
+        self.verify_authenticated_connection().await?;
+
+        let state = self.state.lock().await;
+        let api_key = state.api_key.as_ref().ok_or("Not authenticated")?;
+        let url = format!("{}/admin/fleet/status", state.base_url);
+
+        let res = self
+            .http
+            .get(&url)
+            .header("Authorization", format!("Bearer {}", api_key))
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+
+        if !res.status().is_success() {
+            let status = res.status();
+            let err_text = res.text().await.unwrap_or_default();
+            return Err(format!("Get fleet status failed: {} - {}", status, err_text));
+        }
+
+        res.json().await.map_err(|e| e.to_string())
+    }
+
+    pub async fn push_fleet_policy(
+        &self,
+        tool_access_policy: ToolAccessPolicy,
+        platform_key: String,
+        user_api_key: String,
+    ) -> Result<serde_json::Value, String> {
+        self.verify_authenticated_connection().await?;
+
+        let state = self.state.lock().await;
+        let api_key = state.api_key.as_ref().ok_or("Not authenticated")?;
+        let url = format!("{}/admin/fleet/policy", state.base_url);
+
+        let res = self
+            .http
+            .post(&url)
+            .header("Authorization", format!("Bearer {}", api_key))
+            .header("x-platform-key", platform_key)
+            .header("x-user-api-key", user_api_key)
+            .json(&serde_json::json!({ "toolAccessPolicy": tool_access_policy }))
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+
+        if !res.status().is_success() {
+            let status = res.status();
+            let err_text = res.text().await.unwrap_or_default();
+            return Err(format!("Push fleet policy failed: {} - {}", status, err_text));
+        }
+
+        res.json().await.map_err(|e| e.to_string())
+    }
+
+    pub async fn trigger_fleet_kill_switch(
+        &self,
+        platform_key: String,
+        user_api_key: String,
+    ) -> Result<FleetDispatchResponse, String> {
+        self.verify_authenticated_connection().await?;
+
+        let state = self.state.lock().await;
+        let api_key = state.api_key.as_ref().ok_or("Not authenticated")?;
+        let url = format!("{}/admin/fleet/kill", state.base_url);
+
+        let res = self
+            .http
+            .post(&url)
+            .header("Authorization", format!("Bearer {}", api_key))
+            .header("x-platform-key", platform_key)
+            .header("x-user-api-key", user_api_key)
+            .json(&serde_json::json!({}))
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+
+        if !res.status().is_success() {
+            let status = res.status();
+            let err_text = res.text().await.unwrap_or_default();
+            return Err(format!(
+                "Fleet kill switch failed: {} - {}",
+                status, err_text
+            ));
+        }
+
+        res.json().await.map_err(|e| e.to_string())
+    }
+
+    pub async fn send_fleet_audit_events(
+        &self,
+        node_id: String,
+        events: Vec<crate::services::audit_emitter::FleetAuditEvent>,
+    ) -> Result<usize, String> {
+        self.verify_authenticated_connection().await?;
+
+        let state = self.state.lock().await;
+        let api_key = state.api_key.as_ref().ok_or("Not authenticated")?;
+        let platform_key = state.platform_key.clone().ok_or("Missing platform key")?;
+        let url = format!("{}/v1/nodes/{}/audit/events", state.base_url, node_id);
+
+        let res = self
+            .http
+            .post(&url)
+            .header("Authorization", format!("Bearer {}", platform_key))
+            .header("x-workspace-api-key", api_key)
+            .json(&serde_json::json!({ "events": events }))
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+
+        if !res.status().is_success() {
+            let status = res.status();
+            let err_text = res.text().await.unwrap_or_default();
+            return Err(format!("Fleet audit flush failed: {} - {}", status, err_text));
+        }
+
+        let value: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
+        Ok(value
+            .get("written")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0) as usize)
     }
 
     /// Deploys an AgentSpec to the Cloud.

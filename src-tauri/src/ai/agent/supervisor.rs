@@ -153,7 +153,11 @@ impl SupervisorAgent {
         }
     }
 
-    fn synthesize_final_response(plan: &SupervisorPlan, outcomes: &[SpecialistOutcome]) -> String {
+    fn synthesize_final_response(
+        plan: &SupervisorPlan,
+        outcomes: &[SpecialistOutcome],
+        failures: &[(SpecialistRole, String)],
+    ) -> String {
         let mut sections = vec![format!("Supervisor completed {} specialist lane(s).", plan.assignments.len())];
 
         for outcome in outcomes {
@@ -162,6 +166,15 @@ impl SupervisorAgent {
                 outcome.role.display_name(),
                 outcome.response.trim()
             ));
+        }
+
+        if !failures.is_empty() {
+            let failure_lines = failures
+                .iter()
+                .map(|(role, error)| format!("[{}] {}", role.display_name(), error))
+                .collect::<Vec<_>>()
+                .join("\n");
+            sections.push(format!("Failures:\n{}", failure_lines));
         }
 
         sections.join("\n\n")
@@ -296,6 +309,7 @@ impl SupervisorAgent {
         let emitter = tokio::spawn(Self::emit_messages(rx, on_event_arc, registry_for_events));
 
         let mut outcomes = Vec::new();
+        let mut failures: Vec<(SpecialistRole, String)> = Vec::new();
 
         if let Some(registry) = self.runtime_registry.as_ref() {
             registry.update_supervisor_status(&run_id, "running").await;
@@ -346,6 +360,7 @@ impl SupervisorAgent {
                     let _ = assignment;
                 }
                 Ok((assignment, Err(error), tx_for_task, run_id_for_task)) => {
+                    failures.push((assignment.role.clone(), error.clone()));
                     tx_for_task
                         .send(SupervisorMessage::SpecialistFailed {
                             run_id: run_id_for_task,
@@ -357,6 +372,7 @@ impl SupervisorAgent {
                         .ok();
                 }
                 Err(error) => {
+                    failures.push((SpecialistRole::Executor, error.to_string()));
                     on_event(AgentEvent::Error(format!(
                         "Supervisor specialist task join error: {}",
                         error
@@ -371,6 +387,14 @@ impl SupervisorAgent {
             if let Some(registry) = self.runtime_registry.as_ref() {
                 registry.update_supervisor_status(&run_id, "verifying").await;
             }
+            on_event(AgentEvent::SpecialistStatusChanged(SpecialistEventPayload {
+                run_id: run_id.clone(),
+                agent_id: "verifier-1".to_string(),
+                role: SpecialistRole::Verifier,
+                status: SpecialistStatus::Verifying,
+                detail: Some("Verifier Agent validating resulting state".to_string()),
+                active_tool: None,
+            }));
             if let Some(assignment) = plan
                 .assignments
                 .iter()
@@ -400,6 +424,7 @@ impl SupervisorAgent {
                         outcomes.push(outcome);
                     }
                     Err(error) => {
+                        failures.push((SpecialistRole::Verifier, error.clone()));
                         tx.send(SupervisorMessage::SpecialistFailed {
                             run_id: run_id.clone(),
                             agent_id: assignment.agent_id,
@@ -416,13 +441,18 @@ impl SupervisorAgent {
         drop(tx);
         let _ = emitter.await;
 
-        let summary = Self::synthesize_final_response(&plan, &outcomes);
+        let summary = Self::synthesize_final_response(&plan, &outcomes, &failures);
         on_event(AgentEvent::SupervisorSummary(SupervisorSummaryPayload {
             run_id: run_id.clone(),
             summary: summary.clone(),
         }));
         if let Some(registry) = self.runtime_registry.as_ref() {
-            registry.finish_supervisor_run(&run_id, "completed").await;
+            let final_status = if failures.is_empty() {
+                "completed"
+            } else {
+                "failed"
+            };
+            registry.finish_supervisor_run(&run_id, final_status).await;
         }
         Ok(summary)
     }

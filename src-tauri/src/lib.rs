@@ -90,6 +90,7 @@ pub fn run() {
     // Note: It starts "stopped". Setup will start it if credentials exist.
     let command_poller = Arc::new(CommandPoller::new(
         neural_service.clone(),
+        Arc::new(atm_client.clone()),
         skill_executor.clone(),
     ));
 
@@ -283,8 +284,8 @@ pub fn run() {
                 let mut rx = socket.subscribe();
                 tauri::async_runtime::spawn(async move {
                     while let Ok(msg) = rx.recv().await {
-                        if msg.event == "command_queued" {
-                            tracing::info!("Real-time trigger received: command_queued");
+                        if msg.event == "command_queued" || msg.event == "new_command" {
+                            tracing::info!("Real-time trigger received: {}", msg.event);
                             poller_for_ws.trigger();
                         }
                     }
@@ -482,6 +483,9 @@ pub fn run() {
             commands::list_atm_admin_policy_audit,
             commands::get_atm_tool_access_policy,
             commands::update_atm_tool_access_policy,
+            commands::get_atm_fleet_status,
+            commands::push_atm_fleet_policy,
+            commands::trigger_atm_fleet_kill_switch,
             commands::set_atm_credentials,
             commands::has_atm_credentials,
             commands::ensure_atm_credentials_loaded,

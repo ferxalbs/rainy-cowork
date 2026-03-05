@@ -215,6 +215,36 @@ pub async fn update_atm_tool_access_policy(
 }
 
 #[command]
+pub async fn get_atm_fleet_status(
+    client: State<'_, ATMClient>,
+) -> Result<crate::services::atm_client::FleetStatusResponse, String> {
+    client.get_fleet_status().await
+}
+
+#[command]
+pub async fn push_atm_fleet_policy(
+    client: State<'_, ATMClient>,
+    tool_access_policy: crate::services::atm_client::ToolAccessPolicy,
+    platform_key: String,
+    user_api_key: String,
+) -> Result<serde_json::Value, String> {
+    client
+        .push_fleet_policy(tool_access_policy, platform_key, user_api_key)
+        .await
+}
+
+#[command]
+pub async fn trigger_atm_fleet_kill_switch(
+    client: State<'_, ATMClient>,
+    platform_key: String,
+    user_api_key: String,
+) -> Result<crate::services::atm_client::FleetDispatchResponse, String> {
+    client
+        .trigger_fleet_kill_switch(platform_key, user_api_key)
+        .await
+}
+
+#[command]
 pub async fn generate_pairing_code(
     client: State<'_, ATMClient>,
 ) -> Result<crate::services::atm_client::PairingCodeResponse, String> {

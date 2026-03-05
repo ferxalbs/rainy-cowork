@@ -741,6 +741,49 @@ impl WorkflowStep for ActStep {
                 approved_by: None,
             };
 
+            // Enforce Airlock for local agent tool execution as well as cloud-dispatched commands.
+            if let Some(airlock) = state.airlock_service.as_ref() {
+                on_event(AgentEvent::Status(format!(
+                    "Awaiting Airlock approval for {}",
+                    function_name
+                )));
+                match airlock.check_permission(&command).await {
+                    Ok(true) => {}
+                    Ok(false) => {
+                        let blocked_msg = format!(
+                            "Tool '{}' blocked by Airlock policy or user decision",
+                            function_name
+                        );
+                        on_event(AgentEvent::ToolResult {
+                            id: call.id.clone(),
+                            result: blocked_msg.clone(),
+                        });
+                        results.push(AgentMessage {
+                            role: "tool".to_string(),
+                            content: AgentContent::text(blocked_msg),
+                            tool_calls: None,
+                            tool_call_id: Some(call.id.clone()),
+                        });
+                        continue;
+                    }
+                    Err(e) => {
+                        let blocked_msg =
+                            format!("Tool '{}' blocked by Airlock error: {}", function_name, e);
+                        on_event(AgentEvent::ToolResult {
+                            id: call.id.clone(),
+                            result: blocked_msg.clone(),
+                        });
+                        results.push(AgentMessage {
+                            role: "tool".to_string(),
+                            content: AgentContent::text(blocked_msg),
+                            tool_calls: None,
+                            tool_call_id: Some(call.id.clone()),
+                        });
+                        continue;
+                    }
+                }
+            }
+
             // Implement Auto-Retry Logic
             let mut attempts = 0;
             const MAX_RETRIES: u32 = 2;

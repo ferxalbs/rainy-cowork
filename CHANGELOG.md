@@ -5,6 +5,50 @@ All notable changes to Rainy Cowork will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.95] - 2026-03-05 - NERVE CENTER (FLEET COMMAND CENTER)
+
+### Added - STEP 6 Fleet Foundations
+
+- Added first-pass Fleet Command Center UI module in `src/components/neural/modules/FleetCommandCenter.tsx` with:
+  - node health/status cards
+  - fleet policy push action
+  - fleet kill switch dispatch action
+- Added Fleet tab wiring in neural UI:
+  - `src/components/neural/layout/NeuralSidebar.tsx`
+  - `src/components/neural/NeuralPanel.tsx`
+- Added desktop fleet API command wrappers in:
+  - `src-tauri/src/commands/atm.rs`
+  - `src/services/tauri.ts`
+  - `src-tauri/src/services/atm_client.rs`
+- Added modular fleet runtime services in desktop core:
+  - `src-tauri/src/services/fleet_control.rs`
+  - `src-tauri/src/services/agent_kill_switch.rs`
+  - `src-tauri/src/services/audit_emitter.rs`
+
+### Fixed - Step 5 Production Closure Hardening
+
+- Enforced Airlock checks for local tool execution inside agent ActStep before tool dispatch in `src-tauri/src/ai/agent/workflow.rs`.
+- Improved specialist runtime status fidelity:
+  - emits `waiting_on_airlock` when approval gates are active
+  - emits verifier `verifying` phase
+  - files: `src-tauri/src/ai/agent/specialist.rs`, `src-tauri/src/ai/agent/supervisor.rs`
+- Fixed Supervisor terminal semantics so runs with failed specialist lanes are no longer reported as completed in `src-tauri/src/ai/agent/supervisor.rs`.
+- Aligned desktop websocket wake-up handling for both `command_queued` and legacy `new_command` events in `src-tauri/src/lib.rs`.
+- Wired fleet audit queue flush on command completion in `src-tauri/src/services/command_poller.rs` via `AuditEmitter -> ATMClient`.
+
+### Changed - Versioning
+
+- `package.json` -> `0.5.95`
+- `src-tauri/Cargo.toml` -> `0.5.95`
+- `src-tauri/tauri.conf.json` -> `0.5.95`
+
+### Validation
+
+- `cd src-tauri && cargo check -q` — passes
+- `cd src-tauri && cargo test -q` — passes (116/116)
+- `pnpm exec tsc --noEmit` — passes
+- `pnpm run build` — passes
+
 ## [0.5.94] - 2026-03-04 - THE DIRECTOR
 
 ### Fixed - Step 4 Production Closure

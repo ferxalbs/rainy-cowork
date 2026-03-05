@@ -1493,6 +1493,31 @@ export interface AtmMetricsAlertCleanupResponse {
   cutoffTs: number;
 }
 
+export interface AtmFleetNodeHealth {
+  score: number;
+  heartbeatRegularity: number;
+  errorRatePenalty: number;
+  violationPenalty: number;
+  memoryPenalty: number;
+}
+
+export interface AtmFleetNodeStatus {
+  id: string;
+  hostname: string;
+  platform: string;
+  status: string;
+  lastHeartbeat: number;
+  lastSeenMsAgo: number;
+  runtimeStats: Record<string, unknown>;
+  pendingApprovals: number;
+  health: AtmFleetNodeHealth;
+}
+
+export interface AtmFleetStatusResponse {
+  workspaceId: string;
+  nodes: AtmFleetNodeStatus[];
+}
+
 export async function createAtmAgent(
   name: string,
   type: string,
@@ -1592,6 +1617,30 @@ export async function updateAtmMetricsAlertRetention(
 
 export async function cleanupAtmMetricsAlerts(): Promise<AtmMetricsAlertCleanupResponse> {
   return invoke("cleanup_atm_metrics_alerts");
+}
+
+export async function getAtmFleetStatus(): Promise<AtmFleetStatusResponse> {
+  return invoke("get_atm_fleet_status");
+}
+
+export async function pushAtmFleetPolicy(input: {
+  toolAccessPolicy: {
+    enabled: boolean;
+    mode: string;
+    allow: string[];
+    deny: string[];
+  };
+  platformKey: string;
+  userApiKey: string;
+}): Promise<any> {
+  return invoke("push_atm_fleet_policy", input);
+}
+
+export async function triggerAtmFleetKillSwitch(input: {
+  platformKey: string;
+  userApiKey: string;
+}): Promise<any> {
+  return invoke("trigger_atm_fleet_kill_switch", input);
 }
 
 // ============ ATM Bootstrap Commands ============

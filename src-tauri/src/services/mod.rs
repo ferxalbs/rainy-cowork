@@ -2,6 +2,8 @@
 // Business logic layer
 
 pub mod airlock;
+pub mod agent_kill_switch;
+pub mod audit_emitter;
 pub mod atm_client;
 pub mod browser_controller;
 pub mod cloud_bridge;
@@ -9,6 +11,7 @@ pub mod command_poller;
 pub mod document;
 pub mod embedder;
 pub mod file_manager;
+pub mod fleet_control;
 pub mod file_operations;
 pub mod folder_manager;
 pub mod image;

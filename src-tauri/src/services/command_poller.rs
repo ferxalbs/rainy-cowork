@@ -5,6 +5,10 @@ use crate::ai::agent::runtime_registry::RuntimeRegistry;
 use crate::ai::router::IntelligentRouter;
 use crate::models::neural::CommandResult;
 use crate::services::airlock::AirlockService;
+use crate::services::agent_kill_switch::AgentKillSwitch;
+use crate::services::audit_emitter::{AuditEmitter, FleetAuditEvent};
+use crate::services::atm_client::ATMClient;
+use crate::services::fleet_control::{apply_fleet_policy, FleetPolicyEnvelope};
 use crate::services::neural_service::NeuralService;
 use crate::services::settings::SettingsManager;
 use crate::services::skill_executor::SkillExecutor;
@@ -231,22 +235,32 @@ pub struct AgentRuntimeContext {
 #[derive(Clone)]
 pub struct CommandPoller {
     neural_service: NeuralService,
+    atm_client: Arc<ATMClient>,
     skill_executor: Arc<SkillExecutor>,
     agent_context: Arc<RwLock<Option<AgentRuntimeContext>>>,
     is_running: Arc<Mutex<bool>>,
     airlock_service: Arc<RwLock<Option<AirlockService>>>,
     notify: Arc<Notify>,
+    kill_switch: AgentKillSwitch,
+    audit_emitter: AuditEmitter,
 }
 
 impl CommandPoller {
-    pub fn new(neural_service: NeuralService, skill_executor: Arc<SkillExecutor>) -> Self {
+    pub fn new(
+        neural_service: NeuralService,
+        atm_client: Arc<ATMClient>,
+        skill_executor: Arc<SkillExecutor>,
+    ) -> Self {
         Self {
             neural_service,
+            atm_client,
             skill_executor,
             agent_context: Arc::new(RwLock::new(None)),
             is_running: Arc::new(Mutex::new(false)),
             airlock_service: Arc::new(RwLock::new(None)),
             notify: Arc::new(Notify::new()),
+            kill_switch: AgentKillSwitch::new(),
+            audit_emitter: AuditEmitter::new(),
         }
     }
 
@@ -477,10 +491,94 @@ impl CommandPoller {
             .await;
 
         // Execute - check if this is an agent.run command for full workflow
-        let result = if command.intent.starts_with("agent.") {
+        let result = if command.intent.starts_with("fleet.") {
+            match command.intent.as_str() {
+                "fleet.apply_policy" => {
+                    let workspace_id = command
+                        .workspace_id
+                        .clone()
+                        .unwrap_or_else(|| "default".to_string());
+                    let parsed = command
+                        .payload
+                        .params
+                        .clone()
+                        .ok_or_else(|| "Missing fleet policy params".to_string())
+                        .and_then(|value| {
+                            let envelope: FleetPolicyEnvelope = serde_json::from_value(value)
+                                .map_err(|e| format!("Invalid fleet policy payload: {}", e))?;
+                            Ok(envelope)
+                        });
+
+                    match parsed.and_then(|envelope| apply_fleet_policy(&workspace_id, &envelope))
+                    {
+                        Ok(_) => {
+                            self.kill_switch.clear();
+                            self.audit_emitter
+                                .enqueue(FleetAuditEvent {
+                                    action_type: "fleet.apply_policy".to_string(),
+                                    outcome: "success".to_string(),
+                                    agent_id: None,
+                                    tool_name: None,
+                                    airlock_level: Some(command.airlock_level as u8),
+                                    payload_json: None,
+                                })
+                                .await;
+                            CommandResult {
+                                success: true,
+                                output: Some("Fleet policy applied atomically".to_string()),
+                                error: None,
+                                exit_code: Some(0),
+                            }
+                        }
+                        Err(e) => CommandResult {
+                            success: false,
+                            output: None,
+                            error: Some(e),
+                            exit_code: Some(1),
+                        },
+                    }
+                }
+                "fleet.terminate_all_agents" => {
+                    self.kill_switch.trigger();
+                    self.audit_emitter
+                        .enqueue(FleetAuditEvent {
+                            action_type: "fleet.terminate_all_agents".to_string(),
+                            outcome: "success".to_string(),
+                            agent_id: None,
+                            tool_name: None,
+                            airlock_level: Some(command.airlock_level as u8),
+                            payload_json: command.payload.params.clone().map(|v| v.to_string()),
+                        })
+                        .await;
+                    CommandResult {
+                        success: true,
+                        output: Some("Kill switch armed; new agent runs will be blocked".to_string()),
+                        error: None,
+                        exit_code: Some(0),
+                    }
+                }
+                _ => CommandResult {
+                    success: false,
+                    output: None,
+                    error: Some(format!("Unknown fleet intent: {}", command.intent)),
+                    exit_code: Some(1),
+                },
+            }
+        } else if command.intent.starts_with("agent.") {
             // Route to AgentRuntime for full ReAct workflow
             match command.intent.as_str() {
                 "agent.run" => {
+                    if self.kill_switch.is_triggered() {
+                        CommandResult {
+                            success: false,
+                            output: None,
+                            error: Some(
+                                "Kill switch active: agent.run blocked until policy reset"
+                                    .to_string(),
+                            ),
+                            exit_code: Some(1),
+                        }
+                    } else {
                     // Extract prompt from params
                     let prompt = command
                         .payload
@@ -800,6 +898,7 @@ GUIDELINES:
                             exit_code: Some(1),
                         }
                     }
+                    }
                 }
                 _ => CommandResult {
                     success: false,
@@ -863,6 +962,15 @@ GUIDELINES:
                 "[CommandPoller] Failed to report completion for {}: {}",
                 command.id, e
             );
+        }
+
+        if let Some(node_id) = command.desktop_node_id.as_deref() {
+            if let Err(e) = self.audit_emitter.flush(&self.atm_client, node_id).await {
+                eprintln!(
+                    "[CommandPoller] Failed to flush fleet audit queue for node {}: {}",
+                    node_id, e
+                );
+            }
         }
 
         Ok(())

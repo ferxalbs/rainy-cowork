@@ -196,11 +196,16 @@ impl SpecialistAgent {
                         });
                     }
                     super::events::AgentEvent::Status(ref text) => {
+                        let status = if text.to_ascii_lowercase().contains("airlock") {
+                            SpecialistStatus::WaitingOnAirlock
+                        } else {
+                            SpecialistStatus::Running
+                        };
                         let _ = callback_tx.try_send(SupervisorMessage::SpecialistStatus {
                             run_id: callback_run_id.clone(),
                             agent_id: callback_agent_id.clone(),
                             role: callback_role.clone(),
-                            status: SpecialistStatus::Running,
+                            status,
                             detail: Some(text.clone()),
                             active_tool: None,
                         });
