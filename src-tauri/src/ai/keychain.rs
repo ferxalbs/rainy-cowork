@@ -118,10 +118,6 @@ impl KeychainManager {
         }
     }
 
-    /// Check if an API key exists for a provider
-    pub fn has_key(&self, provider: &str) -> bool {
-        self.get_key(provider).map(|k| k.is_some()).unwrap_or(false)
-    }
 }
 
 impl Default for KeychainManager {
