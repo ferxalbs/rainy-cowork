@@ -1,6 +1,7 @@
 // Rainy Cowork - macOS Keychain Integration
 // Secure storage for API keys using security-framework
 
+#[cfg(target_os = "macos")]
 use security_framework::passwords::{
     delete_generic_password, get_generic_password, set_generic_password,
 };
@@ -10,6 +11,7 @@ use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
 
 #[cfg(not(test))]
+#[allow(dead_code)]
 const SERVICE_NAME: &str = "com.enosislabs.rainycowork";
 
 #[cfg(test)]
@@ -27,6 +29,7 @@ impl KeychainManager {
     }
 
     /// Store an API key in the Keychain
+    #[allow(unused_variables)]
     pub fn store_key(&self, provider: &str, api_key: &str) -> Result<(), String> {
         let account = format!("api_key_{}", provider);
 
@@ -41,15 +44,23 @@ impl KeychainManager {
 
         #[cfg(not(test))]
         {
-            // Try to delete existing key first (in case of update)
-            let _ = delete_generic_password(SERVICE_NAME, &account);
+            #[cfg(target_os = "macos")]
+            {
+                // Try to delete existing key first (in case of update)
+                let _ = delete_generic_password(SERVICE_NAME, &account);
 
-            set_generic_password(SERVICE_NAME, &account, api_key.as_bytes())
-                .map_err(|e| format!("Failed to store API key: {}", e))
+                set_generic_password(SERVICE_NAME, &account, api_key.as_bytes())
+                    .map_err(|e| format!("Failed to store API key: {}", e))
+            }
+            #[cfg(not(target_os = "macos"))]
+            {
+                Err("Keychain integration is only supported on macOS".to_string())
+            }
         }
     }
 
     /// Retrieve an API key from the Keychain
+    #[allow(unused_variables)]
     pub fn get_key(&self, provider: &str) -> Result<Option<String>, String> {
         let account = format!("api_key_{}", provider);
 
@@ -63,29 +74,37 @@ impl KeychainManager {
 
         #[cfg(not(test))]
         {
-            match get_generic_password(SERVICE_NAME, &account) {
-                Ok(bytes) => {
-                    let key = String::from_utf8(bytes.to_vec())
-                        .map_err(|e| format!("Invalid key data: {}", e))?;
-                    Ok(Some(key))
-                }
-                Err(e) => {
-                    let err_str = e.to_string();
-                    // ItemNotFound is not an error - just means no key stored
-                    if err_str.contains("ItemNotFound")
-                        || err_str.contains("not found")
-                        || err_str.contains("could not be found")
-                    {
-                        Ok(None)
-                    } else {
-                        Err(format!("Failed to retrieve API key: {}", e))
+            #[cfg(target_os = "macos")]
+            {
+                match get_generic_password(SERVICE_NAME, &account) {
+                    Ok(bytes) => {
+                        let key = String::from_utf8(bytes.to_vec())
+                            .map_err(|e| format!("Invalid key data: {}", e))?;
+                        Ok(Some(key))
+                    }
+                    Err(e) => {
+                        let err_str = e.to_string();
+                        // ItemNotFound is not an error - just means no key stored
+                        if err_str.contains("ItemNotFound")
+                            || err_str.contains("not found")
+                            || err_str.contains("could not be found")
+                        {
+                            Ok(None)
+                        } else {
+                            Err(format!("Failed to retrieve API key: {}", e))
+                        }
                     }
                 }
+            }
+            #[cfg(not(target_os = "macos"))]
+            {
+                Err("Keychain integration is only supported on macOS".to_string())
             }
         }
     }
 
     /// Delete an API key from the Keychain
+    #[allow(unused_variables)]
     pub fn delete_key(&self, provider: &str) -> Result<(), String> {
         let account = format!("api_key_{}", provider);
 
@@ -100,24 +119,30 @@ impl KeychainManager {
 
         #[cfg(not(test))]
         {
-            match delete_generic_password(SERVICE_NAME, &account) {
-                Ok(_) => Ok(()),
-                Err(e) => {
-                    let err_str = e.to_string();
-                    // Ignore "not found" errors
-                    if err_str.contains("ItemNotFound")
-                        || err_str.contains("not found")
-                        || err_str.contains("could not be found")
-                    {
-                        Ok(())
-                    } else {
-                        Err(format!("Failed to delete API key: {}", e))
+            #[cfg(target_os = "macos")]
+            {
+                match delete_generic_password(SERVICE_NAME, &account) {
+                    Ok(_) => Ok(()),
+                    Err(e) => {
+                        let err_str = e.to_string();
+                        // Ignore "not found" errors
+                        if err_str.contains("ItemNotFound")
+                            || err_str.contains("not found")
+                            || err_str.contains("could not be found")
+                        {
+                            Ok(())
+                        } else {
+                            Err(format!("Failed to delete API key: {}", e))
+                        }
                     }
                 }
             }
+            #[cfg(not(target_os = "macos"))]
+            {
+                Err("Keychain integration is only supported on macOS".to_string())
+            }
         }
     }
-
 }
 
 impl Default for KeychainManager {
