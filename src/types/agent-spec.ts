@@ -9,6 +9,10 @@ export interface AgentSpec {
   airlock: AirlockConfig;
   memory_config: MemoryConfig;
   runtime?: RuntimeConfig;
+  model?: string;
+  temperature?: number;
+  maxTokens?: number;
+  provider?: string;
 }
 
 export interface AgentSoul {

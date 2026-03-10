@@ -9,12 +9,14 @@ import {
   Cpu,
   Rocket,
   ArrowLeft,
+  SlidersHorizontal,
 } from "lucide-react";
 import { AgentSpec } from "../../../types/agent-spec";
 import { SoulEditor } from "./SoulEditor";
 import { SkillsEditor } from "./SkillsEditor";
 import { AirlockPanel } from "./AirlockPanel";
 import { MemoryPanel } from "./MemoryPanel";
+import { RuntimePanel } from "./RuntimePanel";
 import { createDefaultAgentSpec, normalizeAgentSpec } from "./specDefaults";
 import * as tauri from "../../../services/tauri";
 import { useTheme } from "../../../hooks/useTheme";
@@ -107,6 +109,10 @@ export function AgentBuilder({ onBack, initialSpec }: AgentBuilderProps) {
   const handleDeploy = async () => {
     setIsDeploying(true);
     try {
+      if (!spec.model || !spec.model.trim()) {
+        throw new Error("Select a runtime model before deploying.");
+      }
+
       const hasCredentials = await tauri.ensureAtmCredentialsLoaded();
       if (!hasCredentials) {
         throw new Error(
@@ -180,6 +186,13 @@ export function AgentBuilder({ onBack, initialSpec }: AgentBuilderProps) {
             description="Knowledge"
             isActive={activeTab === "memory"}
             onPress={() => setActiveTab("memory")}
+          />
+          <NavItem
+            icon={SlidersHorizontal}
+            label="Runtime"
+            description="Model & output"
+            isActive={activeTab === "runtime"}
+            onPress={() => setActiveTab("runtime")}
           />
           <NavItem
             icon={Shield}
@@ -269,6 +282,32 @@ export function AgentBuilder({ onBack, initialSpec }: AgentBuilderProps) {
                 memoryConfig={spec.memory_config}
                 onChange={(memoryConfig) =>
                   updateSpec({ memory_config: memoryConfig })
+                }
+              />
+            )}
+
+            {activeTab === "runtime" && (
+              <RuntimePanel
+                model={spec.model || ""}
+                temperature={
+                  typeof spec.temperature === "number" ? spec.temperature : 0.4
+                }
+                maxTokens={
+                  typeof spec.maxTokens === "number" ? spec.maxTokens : 4096
+                }
+                onChange={(updates) =>
+                  updateSpec({
+                    model:
+                      updates.model !== undefined ? updates.model : spec.model,
+                    temperature:
+                      updates.temperature !== undefined
+                        ? updates.temperature
+                        : spec.temperature,
+                    maxTokens:
+                      updates.maxTokens !== undefined
+                        ? updates.maxTokens
+                        : spec.maxTokens,
+                  })
                 }
               />
             )}

@@ -347,7 +347,7 @@ export function NeuralPanel({ onNavigate }: NeuralPanelProps) {
                   <div className="relative">
                     <input
                       type={showUserKey ? "text" : "password"}
-                      placeholder="rny_..."
+                      placeholder="ra_..."
                       value={userApiKey}
                       onChange={(e) => setUserApiKey(e.target.value)}
                       className={`${loginInputClass} pr-10`}

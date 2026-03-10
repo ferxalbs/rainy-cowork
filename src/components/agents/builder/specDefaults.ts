@@ -4,6 +4,10 @@ export function createDefaultAgentSpec(id: string = crypto.randomUUID()): AgentS
   return {
     id,
     version: "3.0.0",
+    model: "openai/gpt-5-nano",
+    temperature: 0.4,
+    maxTokens: 4096,
+    provider: "rainy",
     soul: {
       name: "",
       description: "",
@@ -165,5 +169,21 @@ export function normalizeAgentSpec(raw: any): AgentSpec {
           : defaults.memory_config.knowledge.indexed_files,
       },
     },
+    model:
+      typeof source.model === "string" && source.model.trim().length > 0
+        ? source.model.trim()
+        : defaults.model,
+    temperature:
+      typeof source.temperature === "number"
+        ? source.temperature
+        : defaults.temperature,
+    maxTokens:
+      typeof source.maxTokens === "number"
+        ? source.maxTokens
+        : defaults.maxTokens,
+    provider:
+      typeof source.provider === "string" && source.provider.trim().length > 0
+        ? source.provider.trim()
+        : defaults.provider,
   };
 }
