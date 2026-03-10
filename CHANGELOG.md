@@ -5,19 +5,34 @@ All notable changes to Rainy Cowork will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.5.96] - 2026-03-06 - ATM MODELS UPDATE
+## [0.5.95] - 2026-03-10 - NERVE CENTER STEP 6 STABILITY PATCH
 
-### Changed
+### Fixed
 
-- Updated ATM models to exclusively use `gpt-5-nano` (basic) and `inception/mercury-2` (advanced) via OpenRouter/Rainy-SDK.
-- Restricted the ATM agent creation form (`CreateAgentForm.tsx`) to only display and use these models.
-- Documented these new backend capabilities in types configuration.
+- Fixed Tauri startup panic caused by TaskManager state type mismatch (`TaskManager` vs `Arc<TaskManager>`) by aligning managed state and command state extraction:
+  - `src-tauri/src/lib.rs`
+  - `src-tauri/src/commands/task.rs`
+- Fixed Tokio nested-runtime panic (`Cannot start a runtime from within a runtime`) by removing `tauri::async_runtime::block_on(...)` from tool-definition discovery and making tool fetch fully async:
+  - `src-tauri/src/services/skill_executor/registry.rs`
+  - `src-tauri/src/ai/agent/runtime.rs`
+  - `src-tauri/src/ai/agent/workflow.rs`
+- Fixed stale workflow test harness constructor drift after `SkillExecutor::new(...)` gained `Arc<McpService>`:
+  - `src-tauri/src/ai/agent/workflow.rs`
+- Stabilized supervisor orchestration determinism by enforcing dependency-aware specialist sequencing, dependency-context handoff, and assignment-order summary output:
+  - `src-tauri/src/ai/agent/supervisor.rs`
 
 ### Changed - Versioning
 
-- `package.json` -> `0.5.96`
-- `src-tauri/Cargo.toml` -> `0.5.96`
-- `src-tauri/tauri.conf.json` -> `0.5.96`
+- `package.json` -> `0.5.95`
+- `src-tauri/Cargo.toml` -> `0.5.95`
+- `src-tauri/tauri.conf.json` -> `0.5.95`
+
+### Validation
+
+- `cd src-tauri && cargo check -q` — passes
+- `cd src-tauri && cargo test -q workflow --lib` — passes
+- `cd src-tauri && cargo test -q agent --lib` — passes
+- `pnpm exec tsc --noEmit` — passes
 
 ## [0.5.95] - 2026-03-06 - NERVE CENTER (FLEET COMMAND CENTER)
 
@@ -43,6 +58,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - sync `fleet_dispatch_log` to observed command state.
 - Updated node command lifecycle handlers in `rainy-atm/src/routes/nodes.ts` to move `fleet_dispatch_log` through `running` and terminal statuses on `start`/`complete`.
 - Updated desktop `CommandPoller` to expose `arm_kill_switch()` and use it for both direct fleet commands and websocket-triggered kill events.
+- Updated ATM models to exclusively use `gpt-5-nano` (basic) and `inception/mercury-2` (advanced) via OpenRouter/Rainy-SDK.
+- Restricted the ATM agent creation form (`CreateAgentForm.tsx`) to only display and use these models.
+- Documented these new backend capabilities in types configuration.
 
 ### Fixed
 

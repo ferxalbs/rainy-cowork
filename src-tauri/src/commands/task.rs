@@ -3,6 +3,7 @@
 
 use crate::models::{ProviderType, Task, TaskEvent};
 use crate::services::TaskManager;
+use std::sync::Arc;
 use tauri::{ipc::Channel, State};
 
 /// Create a new task with workspace validation
@@ -12,7 +13,7 @@ pub async fn create_task(
     provider: ProviderType,
     model: String,
     workspace_path: Option<String>,
-    task_manager: State<'_, TaskManager>,
+    task_manager: State<'_, Arc<TaskManager>>,
 ) -> Result<Task, String> {
     let mut task = Task::new(description, provider, model);
     task.workspace_path = workspace_path.clone();
@@ -70,7 +71,7 @@ pub async fn create_task(
 pub async fn set_task_manager_workspace(
     workspace_id: String,
     folder_manager: State<'_, crate::services::FolderManager>,
-    task_manager: State<'_, TaskManager>,
+    task_manager: State<'_, Arc<TaskManager>>,
 ) -> Result<(), String> {
     let folder = folder_manager
         .get_folder(&workspace_id)
@@ -114,7 +115,7 @@ pub async fn set_task_manager_workspace(
 pub async fn execute_task(
     task_id: String,
     on_event: Channel<TaskEvent>,
-    task_manager: State<'_, TaskManager>,
+    task_manager: State<'_, Arc<TaskManager>>,
 ) -> Result<(), String> {
     task_manager.execute_task(&task_id, on_event).await
 }
@@ -123,7 +124,7 @@ pub async fn execute_task(
 #[tauri::command]
 pub async fn pause_task(
     task_id: String,
-    task_manager: State<'_, TaskManager>,
+    task_manager: State<'_, Arc<TaskManager>>,
 ) -> Result<(), String> {
     task_manager.pause_task(&task_id).await
 }
@@ -132,7 +133,7 @@ pub async fn pause_task(
 #[tauri::command]
 pub async fn resume_task(
     task_id: String,
-    task_manager: State<'_, TaskManager>,
+    task_manager: State<'_, Arc<TaskManager>>,
 ) -> Result<(), String> {
     task_manager.resume_task(&task_id).await
 }
@@ -141,7 +142,7 @@ pub async fn resume_task(
 #[tauri::command]
 pub async fn cancel_task(
     task_id: String,
-    task_manager: State<'_, TaskManager>,
+    task_manager: State<'_, Arc<TaskManager>>,
 ) -> Result<(), String> {
     task_manager.cancel_task(&task_id).await
 }
@@ -150,14 +151,14 @@ pub async fn cancel_task(
 #[tauri::command]
 pub async fn get_task(
     task_id: String,
-    task_manager: State<'_, TaskManager>,
+    task_manager: State<'_, Arc<TaskManager>>,
 ) -> Result<Option<Task>, String> {
     Ok(task_manager.get_task(&task_id).await)
 }
 
 /// List all tasks
 #[tauri::command]
-pub async fn list_tasks(task_manager: State<'_, TaskManager>) -> Result<Vec<Task>, String> {
+pub async fn list_tasks(task_manager: State<'_, Arc<TaskManager>>) -> Result<Vec<Task>, String> {
     Ok(task_manager.list_tasks().await)
 }
 
@@ -165,7 +166,7 @@ pub async fn list_tasks(task_manager: State<'_, TaskManager>) -> Result<Vec<Task
 #[tauri::command]
 pub async fn save_task_queue_state(
     path: String,
-    task_manager: State<'_, crate::services::TaskManager>,
+    task_manager: State<'_, Arc<crate::services::TaskManager>>,
 ) -> Result<(), String> {
     task_manager
         .save_state(&std::path::PathBuf::from(path))
@@ -177,7 +178,7 @@ pub async fn save_task_queue_state(
 #[tauri::command]
 pub async fn load_task_queue_state(
     path: String,
-    task_manager: State<'_, crate::services::TaskManager>,
+    task_manager: State<'_, Arc<crate::services::TaskManager>>,
 ) -> Result<(), String> {
     task_manager
         .load_state(&std::path::PathBuf::from(path))
@@ -188,7 +189,7 @@ pub async fn load_task_queue_state(
 /// Start background task processing
 #[tauri::command]
 pub async fn start_background_task_processing(
-    task_manager: State<'_, crate::services::TaskManager>,
+    task_manager: State<'_, Arc<crate::services::TaskManager>>,
 ) -> Result<(), String> {
     task_manager.start_background_processing().await;
     Ok(())

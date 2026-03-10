@@ -29,7 +29,7 @@ pub fn run() {
     let provider_registry = Arc::new(ProviderRegistry::new());
 
     // Initialize task manager with Arc clone (needs its own reference)
-    let task_manager = services::task_manager::TaskManager::new(ai_provider.clone());
+    let task_manager = Arc::new(services::task_manager::TaskManager::new(ai_provider.clone()));
 
     // Initialize file manager
     let file_manager = Arc::new(FileManager::new());
@@ -121,7 +121,7 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_process::init())
         // Managed state
-        .manage(task_manager)
+        .manage(task_manager.clone())
         .manage(file_manager)
         .manage(file_ops)
         .manage(managed_research) // Manage the new AI research service

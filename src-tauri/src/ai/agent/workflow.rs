@@ -468,7 +468,7 @@ impl WorkflowStep for ThinkStep {
         }
 
         // 2. Prepare tools
-        let mut tools = skills.get_tool_definitions();
+        let mut tools = skills.get_tool_definitions().await;
         if state.allowed_paths.is_empty() {
             tools.retain(|tool| !FILESYSTEM_TOOL_NAMES.contains(&tool.function.name.as_str()));
         }
@@ -1041,7 +1041,14 @@ mod tests {
                 let provider_manager = Arc::new(AIProviderManager::new());
                 let managed_research = Arc::new(ManagedResearchService::new(provider_manager));
                 let browser = Arc::new(BrowserController::new());
-                let skills = Arc::new(SkillExecutor::new(Arc::new(wm), managed_research, browser));
+                let mcp_service =
+                    Arc::new(crate::services::mcp_service::McpService::new());
+                let skills = Arc::new(SkillExecutor::new(
+                    Arc::new(wm),
+                    managed_research,
+                    browser,
+                    mcp_service,
+                ));
                 let result = workflow.execute(state, skills, |_| {}).await;
                 assert!(result.is_ok());
 

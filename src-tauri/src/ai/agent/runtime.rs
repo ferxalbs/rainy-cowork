@@ -181,7 +181,7 @@ impl AgentRuntime {
         *hist = messages;
     }
 
-    fn generate_system_prompt(&self, skills: &SkillExecutor) -> String {
+    async fn generate_system_prompt(&self, skills: &SkillExecutor) -> String {
         // If a custom system prompt is provided (e.g. from Cloud/ATM), use it directly.
         if let Some(custom) = &self.options.custom_system_prompt {
             return format!("{}{}", custom, Self::runtime_truthfulness_appendix());
@@ -209,7 +209,7 @@ impl AgentRuntime {
         // 1. Filesystem guard — drop filesystem tools when no allowed_paths are configured.
         // 2. Airlock policy — respect this agent's tool_policy (allowlist / deny entries).
         // This guarantees the LLM sees EXACTLY the tools it will get — no over-promising, no under-promising.
-        let mut available_tools = skills.get_tool_definitions();
+        let mut available_tools = skills.get_tool_definitions().await;
         if allowed_paths.is_empty() {
             available_tools.retain(|t| {
                 !crate::ai::agent::workflow::FILESYSTEM_TOOL_NAMES
@@ -385,7 +385,7 @@ Rules:
         // Add System Message to State
         state.messages.push(AgentMessage {
             role: "system".to_string(),
-            content: AgentContent::text(self.generate_system_prompt(&self.skills)),
+            content: AgentContent::text(self.generate_system_prompt(&self.skills).await),
             tool_calls: None,
             tool_call_id: None,
         });
@@ -413,7 +413,7 @@ Rules:
             } else {
                 state.messages[0].content = AgentContent::text(format!(
                     "{}{}",
-                    self.generate_system_prompt(&self.skills),
+                    self.generate_system_prompt(&self.skills).await,
                     appended_context
                 ));
             }
