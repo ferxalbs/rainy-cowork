@@ -4,6 +4,7 @@ import type {
   SkillWorkflow,
   ToolPreference,
 } from "../../../types/agent-spec";
+import { Cpu } from "lucide-react";
 
 interface SkillsEditorProps {
   skills: AgentSkills;
@@ -58,14 +59,21 @@ export function SkillsEditor({ skills, onChange }: SkillsEditorProps) {
 
   return (
     <div className="space-y-8 animate-appear">
-      <div className="flex flex-col gap-1 border-b border-border/10 pb-6">
-        <h3 className="text-2xl font-bold text-foreground tracking-tight">Skills</h3>
-        <p className="text-muted-foreground text-sm">
-          Define workflows, tool preferences, and behavior rules.
-        </p>
+      <div className="relative overflow-hidden rounded-2xl border border-border/20 bg-card/40 backdrop-blur-xl p-5">
+        <div className="absolute -top-20 right-[-60px] w-[280px] h-[280px] rounded-full bg-primary/10 blur-[85px] pointer-events-none" />
+        <div className="absolute -bottom-24 left-[-80px] w-[260px] h-[260px] rounded-full bg-foreground/[0.04] blur-[90px] pointer-events-none" />
+        <div className="relative z-10 flex flex-col gap-1">
+          <h3 className="text-2xl font-bold text-foreground tracking-tight flex items-center gap-2">
+            <Cpu className="size-5 text-primary" />
+            Skills
+          </h3>
+          <p className="text-muted-foreground text-sm">
+            Define workflows, tool preferences, and behavior rules.
+          </p>
+        </div>
       </div>
 
-      <section className="space-y-4">
+      <section className="space-y-4 rounded-2xl border border-border/20 bg-card/35 backdrop-blur-md p-5">
         <div className="flex items-center justify-between">
           <h4 className={sectionTitleClass}>Workflows</h4>
           <button
@@ -191,7 +199,7 @@ export function SkillsEditor({ skills, onChange }: SkillsEditorProps) {
         ))}
       </section>
 
-      <section className="space-y-4">
+      <section className="space-y-4 rounded-2xl border border-border/20 bg-card/35 backdrop-blur-md p-5">
         <div className="flex items-center justify-between">
           <h4 className={sectionTitleClass}>Tool Preferences</h4>
           <button
@@ -273,7 +281,7 @@ export function SkillsEditor({ skills, onChange }: SkillsEditorProps) {
         ))}
       </section>
 
-      <section className="space-y-4">
+      <section className="space-y-4 rounded-2xl border border-border/20 bg-card/35 backdrop-blur-md p-5">
         <div className="flex items-center justify-between">
           <h4 className={sectionTitleClass}>Behaviors</h4>
           <button

@@ -1,4 +1,5 @@
 import { AgentSoul } from "../../../types/agent-spec";
+import { Bot } from "lucide-react";
 
 interface SoulEditorProps {
   soul: AgentSoul;
@@ -33,17 +34,24 @@ export function SoulEditor({ soul, onChange }: SoulEditorProps) {
 
   return (
     <div className="space-y-8 animate-appear">
-      {/* Header Section */}
-      <div className="flex flex-col gap-1 border-b border-border/10 pb-6">
-        <h3 className="text-2xl font-bold text-foreground tracking-tight">
-          Identity
-        </h3>
-        <p className="text-muted-foreground text-sm">
-          Define the core persona and purpose.
-        </p>
+      <div className="relative overflow-hidden rounded-2xl border border-border/20 bg-card/40 backdrop-blur-xl p-5">
+        <div className="absolute -top-20 right-[-60px] w-[280px] h-[280px] rounded-full bg-primary/10 blur-[85px] pointer-events-none" />
+        <div className="absolute -bottom-24 left-[-80px] w-[260px] h-[260px] rounded-full bg-foreground/[0.04] blur-[90px] pointer-events-none" />
+        <div className="relative z-10 flex flex-col gap-1">
+          <h3 className="text-2xl font-bold text-foreground tracking-tight flex items-center gap-2">
+            <Bot className="size-5 text-primary" />
+            Identity
+          </h3>
+          <p className="text-muted-foreground text-sm">
+            Define the core persona and purpose.
+          </p>
+        </div>
       </div>
 
-      <div className="space-y-6">
+      <div className="rounded-2xl border border-border/20 bg-card/35 backdrop-blur-md p-6 space-y-6">
+        <p className="text-muted-foreground text-sm">
+          Build an intentional identity for how this agent responds and reasons.
+        </p>
         {/* Core Info */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div className="md:col-span-3">

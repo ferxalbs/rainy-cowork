@@ -4,6 +4,7 @@ import { KNOWN_TOOL_NAMES, getToolAirlockLevel } from "../../../constants/toolPo
 import { PolicySection } from "./airlock/PolicySection";
 import { RateLimitsSection } from "./airlock/RateLimitsSection";
 import { ScopesSection } from "./airlock/ScopesSection";
+import { Shield } from "lucide-react";
 
 interface AirlockPanelProps {
   airlock: AirlockConfig;
@@ -131,59 +132,72 @@ export function AirlockPanel({ airlock, onChange }: AirlockPanelProps) {
 
   return (
     <div className="space-y-8 animate-appear">
-      <div className="flex flex-col gap-1 border-b border-border/10 pb-6">
-        <h3 className="text-2xl font-bold text-foreground tracking-tight">Airlock</h3>
-        <p className="text-muted-foreground text-sm">
-          Define exactly which tools run, at which risk level, and how approval modals are
-          triggered.
-        </p>
+      <div className="relative overflow-hidden rounded-2xl border border-border/20 bg-card/40 backdrop-blur-xl p-5">
+        <div className="absolute -top-20 right-[-60px] w-[280px] h-[280px] rounded-full bg-primary/10 blur-[85px] pointer-events-none" />
+        <div className="absolute -bottom-24 left-[-80px] w-[260px] h-[260px] rounded-full bg-foreground/[0.04] blur-[90px] pointer-events-none" />
+        <div className="relative z-10 flex flex-col gap-1">
+          <h3 className="text-2xl font-bold text-foreground tracking-tight flex items-center gap-2">
+            <Shield className="size-5 text-primary" />
+            Airlock
+          </h3>
+          <p className="text-muted-foreground text-sm">
+            Define exactly which tools run, at which risk level, and how approval modals are
+            triggered.
+          </p>
+        </div>
       </div>
 
-      <PolicySection
-        airlock={airlock}
-        allTools={allTools}
-        activeTools={activeTools}
-        customToolInput={customToolInput}
-        getToolLevel={getToolLevel}
-        onModeChange={(mode) =>
-          onChange({
-            ...airlock,
-            tool_policy: {
-              ...airlock.tool_policy,
-              mode,
-            },
-          })
-        }
-        onAllowAllTools={() => applyAllowPreset(() => true)}
-        onAllowSafeOnly={() => applyAllowPreset((level) => level === 0)}
-        onAllowSafeSensitive={() => applyAllowPreset((level) => level <= 1)}
-        onClearAllowlist={() => applyAllowPreset(() => false)}
-        onSetToolLevel={setToolLevel}
-        onSetAllowed={setAllowed}
-        onSetDenied={setDenied}
-        onCustomToolInputChange={setCustomToolInput}
-        onAddCustomTool={addCustomTool}
-      />
+      <div className="rounded-2xl border border-border/20 bg-card/35 backdrop-blur-md p-5">
+        <PolicySection
+          airlock={airlock}
+          allTools={allTools}
+          activeTools={activeTools}
+          customToolInput={customToolInput}
+          getToolLevel={getToolLevel}
+          onModeChange={(mode) =>
+            onChange({
+              ...airlock,
+              tool_policy: {
+                ...airlock.tool_policy,
+                mode,
+              },
+            })
+          }
+          onAllowAllTools={() => applyAllowPreset(() => true)}
+          onAllowSafeOnly={() => applyAllowPreset((level) => level === 0)}
+          onAllowSafeSensitive={() => applyAllowPreset((level) => level <= 1)}
+          onClearAllowlist={() => applyAllowPreset(() => false)}
+          onSetToolLevel={setToolLevel}
+          onSetAllowed={setAllowed}
+          onSetDenied={setDenied}
+          onCustomToolInputChange={setCustomToolInput}
+          onAddCustomTool={addCustomTool}
+        />
+      </div>
 
-      <ScopesSection
-        airlock={airlock}
-        onScopesChange={(scopes) =>
-          onChange({
-            ...airlock,
-            scopes,
-          })
-        }
-      />
+      <div className="rounded-2xl border border-border/20 bg-card/35 backdrop-blur-md p-5">
+        <ScopesSection
+          airlock={airlock}
+          onScopesChange={(scopes) =>
+            onChange({
+              ...airlock,
+              scopes,
+            })
+          }
+        />
+      </div>
 
-      <RateLimitsSection
-        airlock={airlock}
-        onRateLimitsChange={(rate_limits) =>
-          onChange({
-            ...airlock,
-            rate_limits,
-          })
-        }
-      />
+      <div className="rounded-2xl border border-border/20 bg-card/35 backdrop-blur-md p-5">
+        <RateLimitsSection
+          airlock={airlock}
+          onRateLimitsChange={(rate_limits) =>
+            onChange({
+              ...airlock,
+              rate_limits,
+            })
+          }
+        />
+      </div>
     </div>
   );
 }

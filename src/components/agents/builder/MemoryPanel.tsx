@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { toast } from "sonner";
+import { Brain } from "lucide-react";
 import type { MemoryConfig, KnowledgeFile } from "../../../types/memory";
 import * as tauri from "../../../services/tauri";
 
@@ -116,14 +117,21 @@ export function MemoryPanel({ agentId, memoryConfig, onChange }: MemoryPanelProp
 
   return (
     <div className="space-y-8 animate-appear">
-      <div className="flex flex-col gap-1 border-b border-border/10 pb-6">
-        <h3 className="text-2xl font-bold text-foreground tracking-tight">Memory</h3>
-        <p className="text-muted-foreground text-sm">
-          Configure retrieval and persist indexed knowledge for cross-session use.
-        </p>
+      <div className="relative overflow-hidden rounded-2xl border border-border/20 bg-card/40 backdrop-blur-xl p-5">
+        <div className="absolute -top-20 right-[-60px] w-[280px] h-[280px] rounded-full bg-primary/10 blur-[85px] pointer-events-none" />
+        <div className="absolute -bottom-24 left-[-80px] w-[260px] h-[260px] rounded-full bg-foreground/[0.04] blur-[90px] pointer-events-none" />
+        <div className="relative z-10 flex flex-col gap-1">
+          <h3 className="text-2xl font-bold text-foreground tracking-tight flex items-center gap-2">
+            <Brain className="size-5 text-primary" />
+            Memory
+          </h3>
+          <p className="text-muted-foreground text-sm">
+            Configure retrieval and persist indexed knowledge for cross-session use.
+          </p>
+        </div>
       </div>
 
-      <section className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <section className="grid grid-cols-1 md:grid-cols-2 gap-8 rounded-2xl border border-border/20 bg-card/35 backdrop-blur-md p-5">
         <div className="space-y-3">
           <label className={sectionTitleClass}>Retrieval Strategy</label>
           <select
@@ -188,7 +196,7 @@ export function MemoryPanel({ agentId, memoryConfig, onChange }: MemoryPanelProp
         </div>
       </section>
 
-      <section className="space-y-4">
+      <section className="space-y-4 rounded-2xl border border-border/20 bg-card/35 backdrop-blur-md p-5">
         <h4 className={sectionTitleClass}>Persistence</h4>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <label className="text-sm text-foreground flex items-center gap-2">
@@ -227,7 +235,7 @@ export function MemoryPanel({ agentId, memoryConfig, onChange }: MemoryPanelProp
         </div>
       </section>
 
-      <section className="space-y-4">
+      <section className="space-y-4 rounded-2xl border border-border/20 bg-card/35 backdrop-blur-md p-5">
         <div className="flex items-center justify-between">
           <h4 className={sectionTitleClass}>Knowledge Files</h4>
           <button
@@ -282,7 +290,7 @@ export function MemoryPanel({ agentId, memoryConfig, onChange }: MemoryPanelProp
         )}
       </section>
 
-      <section className="space-y-3">
+      <section className="space-y-3 rounded-2xl border border-border/20 bg-card/35 backdrop-blur-md p-5">
         <h4 className={sectionTitleClass}>Query Preview</h4>
         <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-2">
           <input
