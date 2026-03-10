@@ -87,6 +87,14 @@ function getNeuralConnectErrorMessage(error: unknown): string {
     return "Platform Key / Creator API Key are invalid for this ATM instance.";
   }
 
+  if (
+    /platformKey format|apiKey format|Rainy API key validation failed|missing required checks/i.test(
+      text,
+    )
+  ) {
+    return text;
+  }
+
   return "Connection failed. Please check your credentials.";
 }
 
