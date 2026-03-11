@@ -597,3 +597,126 @@ rainy-atm/src/
 CHANGELOG.md                           ← READ THIS. Primary state oracle.
 ROADMAP.md                             ← What is planned but not built yet
 ```
+
+---
+
+# Changes and Versioning
+
+> **IRON LAW — read before touching any version or changelog:** Every release MUST be backward-compatible by default. Breaking changes are forbidden without an explicit written authorization from the user and a completed compatibility plan. When in doubt, ask.
+
+---
+
+## 1. Mandatory Ask-First Protocol
+
+**Before performing *any* of the following actions, you MUST stop and ask the user for explicit confirmation:**
+
+| Action | Why you must ask |
+|--------|-----------------|
+| Update `CHANGELOG.md` | User decides what gets recorded and how |
+| Bump version in `package.json`, `Cargo.toml`, or `tauri.conf.json` | User controls the release cadence |
+| Label a change as a breaking change (MAJOR bump) | Triggers the Breaking Change Plan (see §4) |
+| Deprecate any public API, command, or data format | May affect existing users or integrations |
+| Remove or rename any Tauri `invoke()` command | Always a breaking change for the UI layer |
+
+> **No exceptions.** Do not auto-commit, auto-bump, or auto-log. Present what you propose to log/bump and wait for approval.
+
+---
+
+## 2. Backward Compatibility Policy (Default: ALWAYS ON)
+
+Every release — patch, minor, or major channel — **must preserve compatibility with the previous release** unless the user has explicitly authorized a breaking change in writing.
+
+Compatibility invariants that must never be broken without authorization:
+
+- **Tauri command surface**: All existing `invoke()` command names and their parameter shapes must remain unchanged.
+- **SQLite schema**: Migrations are additive only (new columns/tables). Dropping or renaming columns requires a plan.
+- **Tool registry names**: Removing or renaming a registered tool name breaks the Airlock policy test and ATM routing.
+- **Memory vault embedding dimension**: Locked at 3072d / `gemini-embedding-001`. Never change.
+- **ATM API contracts**: Any change to REST/WebSocket message shapes requires a versioned migration.
+- **Skill manifest format** (`skill.toml`): Additive fields only. Removing fields breaks installed third-party skills.
+
+---
+
+## 3. Versioning Strategy (SemVer)
+
+We use **Semantic Versioning** (`MAJOR.MINOR.PATCH`) across three files simultaneously:
+
+| File | Field |
+|------|-------|
+| `package.json` | `version` |
+| `src-tauri/Cargo.toml` | `version` |
+| `src-tauri/tauri.conf.json` | `version` |
+
+### Bump Rules
+
+| Change type | Bump | Backward-compatible? |
+|-------------|------|----------------------|
+| Bug fix, internal refactor | `PATCH` | ✅ Always |
+| New feature, new tool, new command | `MINOR` | ✅ Additive only |
+| Removed / renamed API, schema drop, protocol change | `MAJOR` | ❌ Requires plan (§4) |
+
+> **Never bump without user approval.** Propose the bump, wait for a green light, then apply it.
+
+---
+
+## 4. Breaking Change Plan (Required for Any MAJOR Bump)
+
+If — and only if — the user explicitly authorizes a breaking change, you must produce and get approval for a **Breaking Change Plan** before writing a single line of code. The plan must cover all of the following:
+
+### 4.1 Impact Assessment
+- List every component, command, or data format that will break.
+- Identify all active users / integrations affected (ATM, desktop app, third-party skills).
+
+### 4.2 Migration Strategy
+- Provide a step-by-step migration path for each breaking point.
+- Specify whether a compatibility shim (adapter layer) can be used to support both old and new simultaneously during a transition window.
+- For SQLite: write the exact migration SQL and define rollback SQL.
+- For Tauri commands: keep old command names as deprecated wrappers calling the new implementation (at minimum one MINOR version).
+
+### 4.3 Rollback Plan
+- Define exactly how to revert if the new release causes unexpected failures in production.
+- Identify which data (if any) is irreversibly mutated and cannot be rolled back.
+
+### 4.4 Validation Gates
+All of the following must pass **before** the breaking change ships:
+
+```bash
+cd src-tauri && cargo check -q
+cd src-tauri && cargo test
+pnpm exec tsc --noEmit
+cd src-tauri && cargo test -q every_registered_tool_has_explicit_policy_entry --lib
+cd src-tauri && cargo test -q manifest_covers_every_registered_tool --lib
+```
+
+### 4.5 CHANGELOG Entry
+The CHANGELOG entry for a breaking change must include:
+
+```
+## [X.Y.Z] - YYYY-MM-DD - RELEASE-NAME
+### ⚠️ BREAKING CHANGES
+- What broke and why
+- Migration path for each breaking point
+- Files changed
+### Validation
+- Command run + result (pass/fail)
+```
+
+> **No breaking change ships without a completed plan reviewed and approved by the user.**
+
+---
+
+## 5. Changelog Format
+
+```
+## [X.Y.Z] - YYYY-MM-DD - RELEASE-NAME
+### Added / Changed / Fixed / Deprecated / Removed
+- Description with exact file paths affected
+### Validation
+- `cargo check -q` → ✅ pass
+- `pnpm exec tsc --noEmit` → ✅ pass
+- (any other test commands run)
+```
+
+---
+
+**End of AGENTS.md**
