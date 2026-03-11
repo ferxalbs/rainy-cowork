@@ -171,13 +171,14 @@ pub async fn store_memory(
 #[tauri::command]
 pub async fn search_memory(
     manager: State<'_, MemoryManagerState>,
+    workspace_id: String,
     query: String,
     limit: Option<usize>,
 ) -> Result<Vec<MemoryEntry>, String> {
     let limit = limit.unwrap_or(10);
     manager
         .0
-        .search(&query, limit)
+        .search(&workspace_id, &query, limit)
         .await
         .map_err(|e| e.to_string())
 }
@@ -574,7 +575,13 @@ mod tests {
             .await
             .unwrap();
 
-        let result = search_memory(as_state(&manager), "test".to_string(), Some(10)).await;
+        let result = search_memory(
+            as_state(&manager),
+            "global".to_string(),
+            "test".to_string(),
+            Some(10),
+        )
+        .await;
 
         assert!(result.is_ok());
         let results = result.unwrap();

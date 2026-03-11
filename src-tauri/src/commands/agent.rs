@@ -486,8 +486,9 @@ pub async fn run_agent_workflow(
         .app_data_dir()
         .map_err(|e| format!("Failed to get app data dir: {}", e))?;
 
-    let mut memory_obj = crate::ai::agent::memory::AgentMemory::new(&chat_id, app_data_dir).await;
-    memory_obj.set_manager(memory_manager.0.clone());
+    let memory_obj =
+        crate::ai::agent::memory::AgentMemory::new(&chat_id, app_data_dir, memory_manager.0.clone())
+            .await;
     let memory = Arc::new(memory_obj);
 
     let airlock_service = {

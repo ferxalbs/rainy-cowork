@@ -70,7 +70,19 @@ mod tests {
 
         // 5. Run Runtime with Loaded        // Provide an isolated temp dir for memory
         let temp_dir_mem = tempfile::TempDir::new().unwrap();
-        let memory = Arc::new(crate::ai::agent::memory::AgentMemory::new("test-persisted", temp_dir_mem.path().to_path_buf()).await);
+        let memory_manager = Arc::new(crate::services::MemoryManager::new(
+            100,
+            temp_dir_mem.path().join("memory_db"),
+        ));
+        memory_manager.init().await;
+        let memory = Arc::new(
+            crate::ai::agent::memory::AgentMemory::new(
+                "test-persisted",
+                temp_dir_mem.path().to_path_buf(),
+                memory_manager,
+            )
+            .await,
+        );
         let router = Arc::new(RwLock::new(IntelligentRouter::default()));
         // Mock skills for now or use basic one
         // We need a proper SkillExecutor construction or mock.

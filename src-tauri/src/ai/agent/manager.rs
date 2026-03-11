@@ -204,6 +204,11 @@ impl AgentManager {
             .execute(&*self.db)
             .await?;
 
+        sqlx::query("DELETE FROM memory_vault_embedding_vectors WHERE workspace_id = ?")
+            .bind(chat_id)
+            .execute(&*self.db)
+            .await?;
+
         sqlx::query("DELETE FROM agent_entities WHERE workspace_id = ?")
             .bind(chat_id)
             .execute(&*self.db)

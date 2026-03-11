@@ -1,4 +1,4 @@
-use crate::services::memory_vault::{MemorySensitivity, MemoryVaultService, StoreMemoryInput};
+use crate::services::memory_vault::MemorySensitivity;
 use chrono::{TimeZone, Utc};
 use reqwest::Client;
 use scraper::{Html, Selector};
@@ -24,27 +24,23 @@ pub struct MemoryEntry {
 pub struct AgentMemory {
     workspace_id: String,
     db: Arc<sqlx::SqlitePool>,
-    vault: Arc<MemoryVaultService>,
-    manager: Option<Arc<crate::services::MemoryManager>>,
-    embedder: Arc<crate::services::embedder::EmbedderService>,
+    manager: Arc<crate::services::MemoryManager>,
     #[allow(dead_code)]
     http_client: Client,
 }
 
 impl AgentMemory {
-    pub async fn new(workspace_id: &str, app_data_dir: PathBuf) -> Self {
+    pub async fn new(
+        workspace_id: &str,
+        app_data_dir: PathBuf,
+        manager: Arc<crate::services::MemoryManager>,
+    ) -> Self {
         let _ = std::fs::create_dir_all(&app_data_dir);
         let db_path = app_data_dir.join("rainy_cowork_v2.db");
         if !db_path.exists() {
             let _ = std::fs::File::create(&db_path);
         }
         let db_url = format!("sqlite://{}", db_path.to_string_lossy());
-
-        let vault = Arc::new(
-            MemoryVaultService::new(app_data_dir.clone())
-                .await
-                .expect("failed to initialize memory vault"),
-        );
 
         let pool = SqlitePoolOptions::new()
             .max_connections(5)
@@ -65,33 +61,10 @@ impl AgentMemory {
         .execute(&pool)
         .await;
 
-        let settings = crate::services::settings::SettingsManager::new();
-        let provider_raw = settings.get_embedder_provider().to_string();
-        let provider = match provider_raw.trim().to_lowercase().as_str() {
-            "g" | "google" | "gemini" => {
-                crate::services::memory_vault::EMBEDDING_PROVIDER.to_string()
-            }
-            _ => crate::services::memory_vault::EMBEDDING_PROVIDER.to_string(),
-        };
-        let model = crate::services::memory_vault::EMBEDDING_MODEL.to_string();
-
-        let keychain = crate::ai::keychain::KeychainManager::new();
-        let api_key = keychain
-            .get_key(&provider)
-            .or_else(|_| keychain.get_key(&provider_raw))
-            .unwrap_or_default()
-            .unwrap_or_default();
-
         let memory = Self {
             workspace_id: workspace_id.to_string(),
             db: Arc::new(pool),
-            vault,
-            manager: None, // Will be set by set_manager if provided
-            embedder: Arc::new(crate::services::embedder::EmbedderService::new(
-                provider,
-                api_key,
-                Some(model),
-            )),
+            manager,
             http_client: Client::builder()
                 .user_agent("Rainy-MaTE-Agent/1.0")
                 .build()
@@ -102,14 +75,8 @@ impl AgentMemory {
         memory
     }
 
-    pub fn manager(&self) -> Option<Arc<crate::services::MemoryManager>> {
+    pub fn manager(&self) -> Arc<crate::services::MemoryManager> {
         self.manager.clone()
-    }
-
-    // @RESERVED - will be implemented for agent runtime init cycle
-    #[allow(dead_code)]
-    pub fn set_manager(&mut self, manager: Arc<crate::services::MemoryManager>) {
-        self.manager = Some(manager);
     }
 
     pub async fn store(
@@ -134,76 +101,18 @@ impl AgentMemory {
             tags.push(format!("tool:{}", tool));
         }
 
-        let active_model = crate::services::memory_vault::profiles::ACTIVE_EMBEDDING_PROFILE.model;
-        let fallback_model =
-            crate::services::memory_vault::profiles::FALLBACK_EMBEDDING_PROFILE.model;
-        let provider = self.embedder.provider_name().to_string();
-
-        let mut embedding_model = active_model.to_string();
-        let mut embedding = None;
-        let mut additional_embeddings = Vec::new();
-
-        match self.embedder.embed_text_for_model(&content, active_model).await {
-            Ok(vec) => {
-                embedding = Some(vec);
-                if fallback_model != active_model {
-                    if let Ok(fallback_vec) = self
-                        .embedder
-                        .embed_text_for_model(&content, fallback_model)
-                        .await
-                    {
-                        additional_embeddings.push(
-                            crate::services::memory_vault::AdditionalEmbeddingInput {
-                                embedding: fallback_vec,
-                                embedding_model: fallback_model.to_string(),
-                                embedding_provider: provider.clone(),
-                                embedding_dim: crate::services::memory_vault::EMBEDDING_DIM,
-                            },
-                        );
-                    }
-                }
-            }
-            Err(active_err) => {
-                if fallback_model != active_model {
-                    match self
-                        .embedder
-                        .embed_text_for_model(&content, fallback_model)
-                        .await
-                    {
-                        Ok(vec) => {
-                            embedding_model = fallback_model.to_string();
-                            embedding = Some(vec);
-                        }
-                        Err(fallback_err) => {
-                            println!(
-                                "Failed to embed memory with active '{}' and fallback '{}': {} | {}",
-                                active_model, fallback_model, active_err, fallback_err
-                            );
-                        }
-                    }
-                } else {
-                    println!("Failed to embed memory: {}", active_err);
-                }
-            }
-        }
-
         let _ = self
-            .vault
-            .put(StoreMemoryInput {
-                id: entry_id,
-                workspace_id: self.workspace_id.clone(),
+            .manager
+            .store_workspace_memory(
+                &self.workspace_id,
+                entry_id,
                 content,
+                source.clone(),
                 tags,
-                source: source.clone(),
-                sensitivity: MemorySensitivity::Internal,
-                metadata: metadata.clone(),
-                created_at: timestamp,
-                embedding,
-                embedding_model: Some(embedding_model),
-                embedding_provider: Some(provider),
-                embedding_dim: Some(crate::services::memory_vault::EMBEDDING_DIM),
-                additional_embeddings,
-            })
+                metadata.clone(),
+                timestamp,
+                MemorySensitivity::Internal,
+            )
             .await;
 
         if let (Some(entity_key), Some(entity_value)) =
@@ -223,41 +132,23 @@ impl AgentMemory {
         }
     }
 
+    #[allow(dead_code)]
     pub async fn retrieve(&self, query: &str) -> Vec<MemoryEntry> {
-        let embed_res = self.embedder.embed_text(query).await;
-
-        let rows = if let Ok(query_embedding) = embed_res {
-            let limit = 20;
-            self.vault
-                .search_workspace_vector(&self.workspace_id, &query_embedding, limit)
-                .await
-                .unwrap_or_default()
-                .into_iter()
-                .map(|(entry, _dist)| entry)
-                .collect()
-        } else {
-            // Fallback to basic keyword search if embedding fails
-            self.vault
-                .search_workspace(&self.workspace_id, query, 20)
-                .await
-                .unwrap_or_default()
-        };
-
-        rows.into_iter()
+        self.manager
+            .search(&self.workspace_id, query, 20)
+            .await
+            .unwrap_or_default()
+            .into_iter()
             .map(|row| {
-                let importance = row
-                    .metadata
-                    .get("importance")
-                    .and_then(|v| v.parse::<f32>().ok())
-                    .unwrap_or(0.5);
+                let importance = 0.5;
                 MemoryEntry {
                     id: row.id,
                     content: row.content,
-                    source: row.source,
-                    timestamp: row.created_at,
-                    metadata: row.metadata,
+                    source: derive_source_from_tags(&row.tags),
+                    timestamp: row.timestamp.timestamp(),
+                    metadata: HashMap::new(),
                     importance,
-                    sensitivity: row.sensitivity,
+                    sensitivity: MemorySensitivity::Internal,
                 }
             })
             .collect()
@@ -318,8 +209,8 @@ impl AgentMemory {
     #[allow(dead_code)]
     pub async fn dump_context(&self) -> String {
         let rows = self
-            .vault
-            .recent_workspace(&self.workspace_id, 100)
+            .manager
+            .query_workspace_memory(&self.workspace_id, "", 100)
             .await
             .unwrap_or_default();
 
@@ -327,8 +218,8 @@ impl AgentMemory {
             .map(|entry| {
                 format!(
                     "[{}] {}: {}",
-                    entry.source,
-                    Utc.timestamp_opt(entry.created_at, 0)
+                    derive_source_from_tags(&entry.tags),
+                    Utc.timestamp_opt(entry.timestamp.timestamp(), 0)
                         .unwrap()
                         .format("%H:%M:%S"),
                     entry.content
@@ -369,30 +260,31 @@ impl AgentMemory {
             }
 
             let _ = self
-                .vault
-                .put(StoreMemoryInput {
-                    id: entry.id,
-                    workspace_id: self.workspace_id.clone(),
-                    content: entry.content,
+                .manager
+                .store_workspace_memory(
+                    &self.workspace_id,
+                    entry.id,
+                    entry.content,
+                    if entry.source.trim().is_empty() {
+                        "legacy".to_string()
+                    } else {
+                        entry.source.clone()
+                    },
                     tags,
-                    source: "legacy".to_string(),
-                    sensitivity: MemorySensitivity::Internal,
-                    metadata: entry.metadata,
-                    created_at: entry.timestamp,
-                    embedding: None,
-                    embedding_model: Some(
-                        crate::services::memory_vault::EMBEDDING_MODEL.to_string(),
-                    ),
-                    embedding_provider: Some(
-                        crate::services::memory_vault::EMBEDDING_PROVIDER.to_string(),
-                    ),
-                    embedding_dim: Some(crate::services::memory_vault::EMBEDDING_DIM),
-                    additional_embeddings: Vec::new(),
-                })
+                    entry.metadata,
+                    entry.timestamp,
+                    MemorySensitivity::Internal,
+                )
                 .await;
         }
 
         let backup_path = legacy_path.with_extension("json.migrated");
         let _ = fs::rename(&legacy_path, backup_path).await;
     }
+}
+
+fn derive_source_from_tags(tags: &[String]) -> String {
+    tags.iter()
+        .find_map(|tag| tag.strip_prefix("source:").map(|value| value.to_string()))
+        .unwrap_or_else(|| "agent_memory".to_string())
 }

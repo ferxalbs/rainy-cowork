@@ -250,7 +250,9 @@ impl SkillExecutor {
                 self.execute_browser(method, &payload.params, allowed_domains, blocked_domains)
                     .await
             }
-            "memory" => self.execute_memory(method, &payload.params).await,
+            "memory" => self
+                .execute_memory(&workspace_id, method, &payload.params)
+                .await,
             _ => self
                 .execute_third_party_skill(
                     command,
@@ -366,6 +368,7 @@ impl SkillExecutor {
 
     async fn execute_memory(
         &self,
+        workspace_id: &str,
         method: &str,
         params: &Option<serde_json::Value>,
     ) -> CommandResult {
@@ -383,7 +386,7 @@ impl SkillExecutor {
                 let query = params.get("query").and_then(|v| v.as_str()).unwrap_or("");
                 let limit = params.get("limit").and_then(|v| v.as_u64()).unwrap_or(5) as usize;
 
-                match mm.search(query, limit).await {
+                match mm.search(workspace_id, query, limit).await {
                     Ok(results) => CommandResult {
                         success: true,
                         output: Some(serde_json::to_string(&results).unwrap_or_default()),

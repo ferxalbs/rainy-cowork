@@ -13,6 +13,7 @@ use crate::services::neural_service::NeuralService;
 use crate::services::settings::SettingsManager;
 use crate::services::skill_executor::SkillExecutor;
 use crate::services::tool_manifest::build_skill_manifest_from_runtime;
+use crate::services::MemoryManager;
 use rand::Rng;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -237,6 +238,7 @@ pub struct AgentRuntimeContext {
     pub app_data_dir: PathBuf,
     pub agent_manager: Arc<AgentManager>,
     pub runtime_registry: Arc<RuntimeRegistry>,
+    pub memory_manager: Arc<MemoryManager>,
 }
 
 #[derive(Clone)]
@@ -296,6 +298,7 @@ impl CommandPoller {
         app_data_dir: PathBuf,
         agent_manager: Arc<AgentManager>,
         runtime_registry: Arc<RuntimeRegistry>,
+        memory_manager: Arc<MemoryManager>,
     ) {
         let mut lock = self.agent_context.write().await;
         *lock = Some(AgentRuntimeContext {
@@ -303,6 +306,7 @@ impl CommandPoller {
             app_data_dir,
             agent_manager,
             runtime_registry,
+            memory_manager,
         });
     }
 
@@ -726,7 +730,12 @@ impl CommandPoller {
                     if let Some(ctx) = context_lock.as_ref() {
                         // Create memory for this workspace
                         let memory = Arc::new(
-                            AgentMemory::new(&workspace_id, ctx.app_data_dir.clone()).await,
+                            AgentMemory::new(
+                                &workspace_id,
+                                ctx.app_data_dir.clone(),
+                                ctx.memory_manager.clone(),
+                            )
+                            .await,
                         );
 
                         // Try to load spec from DB if agentId is present

@@ -360,6 +360,7 @@ pub fn run() {
 
             let agent_manager_for_poller = Arc::new(agent_manager);
             let runtime_registry_for_poller = runtime_registry.clone();
+            let memory_manager_for_poller = memory_manager.clone();
 
             tauri::async_runtime::spawn(async move {
                 // Inject Airlock service
@@ -372,6 +373,7 @@ pub fn run() {
                         app_data_for_poller,
                         agent_manager_for_poller,
                         runtime_registry_for_poller,
+                        memory_manager_for_poller,
                     )
                     .await;
 

@@ -20,7 +20,6 @@ use tokio::sync::RwLock;
 
 const MAX_MODEL_MESSAGE_BYTES: usize = 95 * 1024;
 const MAX_TOOL_TEXT_BYTES: usize = 48 * 1024;
-const MAX_MEMORY_CONTEXT_BYTES: usize = 24 * 1024;
 pub const FILESYSTEM_TOOL_NAMES: &[&str] = &[
     "read_file",
     "read_many_files",
@@ -339,101 +338,7 @@ impl WorkflowStep for ThinkStep {
             })
             .collect();
 
-        // 1.5. Inject Memory Context (RAG)
-        if let Some(last_user_msg) = state.messages.iter().rfind(|m| m.role == "user") {
-            // Use as_text() to extract text for vector search
-            let mut hits = state
-                .memory
-                .retrieve(&last_user_msg.content.as_text())
-                .await;
-
-            // Airlock Gatekeeping: Filter out Confidential memories if Dangerous permission is denied
-            let has_confidential = hits.iter().any(|hit| {
-                matches!(
-                    hit.sensitivity,
-                    crate::services::memory_vault::MemorySensitivity::Confidential
-                )
-            });
-
-            if has_confidential {
-                let allowed = if let Some(airlock) = state.airlock_service.as_ref() {
-                    let cmd = crate::models::neural::QueuedCommand {
-                        id: uuid::Uuid::new_v4().to_string(),
-                        intent: "memory_vault.read_confidential".to_string(),
-                        payload: crate::models::neural::RainyPayload {
-                            skill: Some("memory_vault".to_string()),
-                            method: Some("read_confidential".to_string()),
-                            params: None,
-                            content: None,
-                            allowed_paths: state.allowed_paths.clone(),
-                            blocked_paths: state.spec.airlock.scopes.blocked_paths.clone(),
-                            allowed_domains: state.spec.airlock.scopes.allowed_domains.clone(),
-                            blocked_domains: state.spec.airlock.scopes.blocked_domains.clone(),
-                            tool_access_policy: None,
-                            tool_access_policy_version: None,
-                            tool_access_policy_hash: None,
-                        },
-                        status: crate::models::neural::CommandStatus::Pending,
-                        priority: crate::models::neural::CommandPriority::Normal,
-                        airlock_level: crate::models::neural::AirlockLevel::Dangerous,
-                        created_at: Some(chrono::Utc::now().timestamp()),
-                        started_at: None,
-                        completed_at: None,
-                        result: None,
-                        workspace_id: Some(state.workspace_id.clone()),
-                        desktop_node_id: None,
-                        approved_by: None,
-                    };
-
-                    match airlock.check_permission(&cmd).await {
-                        Ok(true) => true,
-                        Ok(false) => {
-                            on_event(AgentEvent::Error(
-                                "Reading confidential memory was blocked by Airlock".to_string(),
-                            ));
-                            false
-                        }
-                        Err(e) => {
-                            on_event(AgentEvent::Error(format!("Airlock check failed: {}", e)));
-                            false
-                        }
-                    }
-                } else {
-                    true // local bypass wrapper
-                };
-
-                if !allowed {
-                    hits.retain(|hit| {
-                        !matches!(
-                            hit.sensitivity,
-                            crate::services::memory_vault::MemorySensitivity::Confidential
-                        )
-                    });
-                }
-            }
-            if !hits.is_empty() {
-                let ctx = hits
-                    .iter()
-                    .map(|h| format!("- {}", h.content))
-                    .collect::<Vec<_>>()
-                    .join("\n");
-                let ctx = truncate_to_max_bytes(&ctx, MAX_MEMORY_CONTEXT_BYTES);
-
-                let system_ctx = format!(
-                    "Retrieved Memory Context:\n{}\n\nUse this context to answer the user's request if relevant.",
-                    ctx
-                );
-
-                // Insert at the beginning as a system message (or append if system exists)
-                // For now, simpler to just prepend
-                messages.insert(
-                    0,
-                    crate::ai::provider_types::ChatMessage::system(system_ctx),
-                );
-            }
-        }
-
-        // 1.6. Persist user input to long-term memory (non-blocking)
+        // 1.5. Persist user input to long-term memory
         if let Some(last_user_msg) = state.messages.iter().rfind(|m| m.role == "user") {
             let user_text = last_user_msg.content.as_text();
             if !user_text.is_empty() && user_text.len() > 10 {
@@ -1029,7 +934,14 @@ mod tests {
         // Note: This relies on being able to create WorkspaceManager in test env.
         // We need an isolated temp dir for memory
         let temp_dir = tempfile::TempDir::new().unwrap();
-        let memory = Arc::new(AgentMemory::new("test-ws", temp_dir.path().to_path_buf()).await);
+        let memory_manager = Arc::new(crate::services::MemoryManager::new(
+            100,
+            temp_dir.path().join("memory_db"),
+        ));
+        memory_manager.init().await;
+        let memory = Arc::new(
+            AgentMemory::new("test-ws", temp_dir.path().to_path_buf(), memory_manager).await,
+        );
 
         let state = AgentState::new(
             "test-ws".to_string(),

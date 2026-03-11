@@ -399,21 +399,20 @@ Rules:
         // We'll add the semantic results as an invisible "system" state message or inject into the system prompt.
         let mut appended_context = String::new();
         let mut retrieval_mode = "unavailable".to_string();
-        if let Some(mm) = self.memory.manager() {
-            if let Ok(result) = mm
-                .search_semantic_detailed(&self.options.workspace_id, input, 5)
-                .await
-            {
-                retrieval_mode = match result.mode {
-                    crate::services::memory::SemanticRetrievalMode::Ann => "ann",
-                    crate::services::memory::SemanticRetrievalMode::Exact => "exact",
-                    crate::services::memory::SemanticRetrievalMode::LexicalFallback => {
-                        "lexical_fallback"
-                    }
+        let mm = self.memory.manager();
+        if let Ok(result) = mm
+            .search_semantic_detailed(&self.options.workspace_id, input, 5)
+            .await
+        {
+            retrieval_mode = match result.mode {
+                crate::services::memory::SemanticRetrievalMode::Ann => "ann",
+                crate::services::memory::SemanticRetrievalMode::Exact => "exact",
+                crate::services::memory::SemanticRetrievalMode::LexicalFallback => {
+                    "lexical_fallback"
                 }
-                .to_string();
-                appended_context = self.build_semantic_context_block(&context_window, &result);
             }
+            .to_string();
+            appended_context = self.build_semantic_context_block(&context_window, &result);
         }
         on_event(AgentEvent::Status(format!(
             "RAG_TELEMETRY:{}",

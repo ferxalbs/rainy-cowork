@@ -50,6 +50,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `src-tauri/src/ai/agent/manager.rs`
     - `src-tauri/src/lib.rs`
     - `src/services/tauri.ts`
+- Added hybrid memory retrieval reranking that merges semantic and lexical candidates and scores by semantic distance, lexical overlap, recency, and access frequency:
+  - `src-tauri/src/services/memory/memory_manager.rs`
+- Added Gemini batch embedding path (`batchEmbedContents`) for high-throughput document ingestion and memory backfill:
+  - `src-tauri/src/services/embedder.rs`
+  - `src-tauri/src/services/memory/memory_manager.rs`
+  - `src-tauri/src/services/memory_vault/service.rs`
+- Added optional Turso remote-replica mode for memory vault (local-first default remains unchanged):
+  - env support: `RAINY_MEMORY_TURSO_URL`, `RAINY_MEMORY_TURSO_AUTH_TOKEN`, `RAINY_MEMORY_TURSO_SYNC_SECS`
+  - file:
+    - `src-tauri/src/services/memory_vault/repository.rs`
 
 ### Changed
 
@@ -78,6 +88,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - idle loop: `10s`
   - files:
     - `src-tauri/src/services/command_poller.rs`
+- Updated memory runtime wiring to use one canonical `MemoryManager` path across local and polled agent execution, eliminating split retrieval/store behavior:
+  - `src-tauri/src/ai/agent/memory.rs`
+  - `src-tauri/src/ai/agent/runtime.rs`
+  - `src-tauri/src/ai/agent/workflow.rs`
+  - `src-tauri/src/commands/agent.rs`
+  - `src-tauri/src/services/command_poller.rs`
+  - `src-tauri/src/lib.rs`
+  - `src-tauri/src/services/skill_executor.rs`
+- Updated memory write flow to transactional atomic upsert for encrypted entries + vector rows:
+  - `src-tauri/src/services/memory_vault/repository.rs`
+  - `src-tauri/src/services/memory_vault/service.rs`
+- Updated memory command search API to enforce workspace-scoped retrieval:
+  - `src-tauri/src/commands/memory.rs`
 
 ### Fixed
 
@@ -100,6 +123,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `src-tauri/src/commands/agent.rs`
   - `src/hooks/useAgentChat.ts`
   - `src/components/agent-chat/AgentChatPanel.tsx`
+- Fixed memory DB directory drift so vault initialization respects `memory_db` path instead of writing to app-data parent.
+  - `src-tauri/src/services/memory/memory_manager.rs`
+- Fixed global search leakage by removing implicit `"global"` query fallback and requiring workspace-scoped memory search.
+  - `src-tauri/src/services/memory/memory_manager.rs`
+  - `src-tauri/src/services/skill_executor.rs`
+  - `src-tauri/src/commands/memory.rs`
+- Fixed partial consistency risk where encrypted memory rows could succeed while vector rows failed silently by enforcing transactional atomicity.
+  - `src-tauri/src/services/memory_vault/repository.rs`
+  - `src-tauri/src/services/memory_vault/service.rs`
+- Fixed incomplete context reset so `memory_vault_embedding_vectors` is also cleared with workspace history reset.
+  - `src-tauri/src/ai/agent/manager.rs`
+- Fixed dead-code/warning regressions introduced by memory refactor by removing unused methods/constants and cfg-sensitive unused imports.
+  - `src-tauri/src/services/embedder.rs`
+  - `src-tauri/src/ai/agent/workflow.rs`
+  - `src-tauri/src/services/memory_vault/repository.rs`
 
 ### Validation
 
@@ -108,6 +146,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `cd src-tauri && cargo test -q workflow --lib` — passes
 - `cd src-tauri && cargo test -q agent --lib` — passes
 - `cd src-tauri && cargo test -q memory_vault --lib` — passes
+- `cd src-tauri && cargo test -q agent --lib` — passes (post hybrid/batch/Turso memory updates)
+- `cd src-tauri && cargo test -q memory_vault --lib` — passes (post hybrid/batch/Turso memory updates)
 
 ## [0.5.95] - 2026-03-10 - NERVE CENTER STEP 6 STABILITY PATCH
 

@@ -40,17 +40,51 @@ impl MemoryVaultRepository {
             let _ = std::fs::remove_file(&db_path);
         }
 
-        if !db_path.exists() {
-            let _ = std::fs::File::create(&db_path)
-                .map_err(|e| format!("Failed to create db file: {}", e));
-        }
-
         #[cfg(test)]
         let db_url = ":memory:".to_string();
         
         #[cfg(not(test))]
-        let db_url = db_path.to_string_lossy().to_string();
-        
+        let db = {
+            let turso_url = std::env::var("RAINY_MEMORY_TURSO_URL")
+                .ok()
+                .map(|v| v.trim().to_string())
+                .filter(|v| !v.is_empty());
+            let turso_token = std::env::var("RAINY_MEMORY_TURSO_AUTH_TOKEN")
+                .ok()
+                .map(|v| v.trim().to_string())
+                .filter(|v| !v.is_empty());
+
+            if let (Some(url), Some(token)) = (turso_url, turso_token) {
+                let sync_secs = std::env::var("RAINY_MEMORY_TURSO_SYNC_SECS")
+                    .ok()
+                    .and_then(|v| v.parse::<u64>().ok())
+                    .filter(|v| *v > 0);
+
+                let mut builder = Builder::new_remote_replica(&db_path, url, token)
+                    .read_your_writes(true);
+                if let Some(seconds) = sync_secs {
+                    builder = builder.sync_interval(std::time::Duration::from_secs(seconds));
+                }
+
+                builder
+                    .build()
+                    .await
+                    .map_err(|e| format!("Failed to open libsql remote replica: {}", e))?
+            } else {
+                if !db_path.exists() {
+                    let _ = std::fs::File::create(&db_path)
+                        .map_err(|e| format!("Failed to create db file: {}", e));
+                }
+
+                let db_url = db_path.to_string_lossy().to_string();
+                Builder::new_local(db_url)
+                    .build()
+                    .await
+                    .map_err(|e| format!("Failed to open libsql builder: {}", e))?
+            }
+        };
+
+        #[cfg(test)]
         let db = Builder::new_local(db_url)
             .build()
             .await
@@ -157,7 +191,11 @@ impl MemoryVaultRepository {
         &self.conn
     }
 
-    pub async fn upsert_encrypted(&self, row: &VaultRow, key_version: i64) -> Result<(), String> {
+    async fn upsert_encrypted_row(
+        &self,
+        row: &VaultRow,
+        key_version: i64,
+    ) -> Result<(), String> {
         self.conn.execute(
             "INSERT INTO memory_vault_entries
              (id, workspace_id, source, sensitivity, created_at, last_accessed, access_count,
@@ -206,6 +244,88 @@ impl MemoryVaultRepository {
         .map_err(|e| format!("Failed to upsert vault entry: {}", e))?;
 
         Ok(())
+    }
+
+    async fn upsert_embedding_vector_row(
+        &self,
+        entry_id: &str,
+        workspace_id: &str,
+        embedding_model: &str,
+        embedding_provider: &str,
+        embedding_dim: usize,
+        embedding_bytes: Vec<u8>,
+        created_at: i64,
+    ) -> Result<(), String> {
+        self.conn
+            .execute(
+                "INSERT INTO memory_vault_embedding_vectors
+                 (entry_id, workspace_id, embedding_model, embedding_provider, embedding_dim, embedding, created_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+                 ON CONFLICT(entry_id, embedding_model) DO UPDATE SET
+                    workspace_id = excluded.workspace_id,
+                    embedding_provider = excluded.embedding_provider,
+                    embedding_dim = excluded.embedding_dim,
+                    embedding = excluded.embedding,
+                    created_at = excluded.created_at",
+                params![
+                    entry_id.to_string(),
+                    workspace_id.to_string(),
+                    embedding_model.to_string(),
+                    embedding_provider.to_string(),
+                    embedding_dim as i64,
+                    embedding_bytes,
+                    created_at
+                ],
+            )
+            .await
+            .map_err(|e| format!("Failed to upsert embedding vector: {}", e))?;
+        Ok(())
+    }
+
+    pub async fn upsert_encrypted_atomic(
+        &self,
+        row: &VaultRow,
+        key_version: i64,
+        embedding_rows: Vec<(String, String, usize, Vec<u8>)>,
+    ) -> Result<(), String> {
+        self.conn
+            .execute("BEGIN IMMEDIATE TRANSACTION", ())
+            .await
+            .map_err(|e| format!("Failed to begin memory transaction: {}", e))?;
+
+        let result = async {
+            self.upsert_encrypted_row(row, key_version).await?;
+
+            for (model, provider, dim, bytes) in embedding_rows {
+                self.upsert_embedding_vector_row(
+                    &row.id,
+                    &row.workspace_id,
+                    &model,
+                    &provider,
+                    dim,
+                    bytes,
+                    row.created_at,
+                )
+                .await?;
+            }
+
+            Ok::<(), String>(())
+        }
+        .await;
+
+        match result {
+            Ok(()) => {
+                self.conn
+                    .execute("COMMIT", ())
+                    .await
+                    .map_err(|e| format!("Failed to commit memory transaction: {}", e))?;
+                Ok(())
+            }
+            Err(err) => {
+                let _ = self.conn.execute("ROLLBACK", ()).await;
+                Err(err)
+            }
+        }
     }
 
     pub async fn list_workspace_rows(
@@ -265,42 +385,6 @@ impl MemoryVaultRepository {
                 params![id.to_string()],
             )
             .await;
-        Ok(())
-    }
-
-    pub async fn upsert_embedding_vector(
-        &self,
-        entry_id: &str,
-        workspace_id: &str,
-        embedding_model: &str,
-        embedding_provider: &str,
-        embedding_dim: usize,
-        embedding_bytes: Vec<u8>,
-        created_at: i64,
-    ) -> Result<(), String> {
-        self.conn
-            .execute(
-                "INSERT INTO memory_vault_embedding_vectors
-                 (entry_id, workspace_id, embedding_model, embedding_provider, embedding_dim, embedding, created_at)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
-                 ON CONFLICT(entry_id, embedding_model) DO UPDATE SET
-                    workspace_id = excluded.workspace_id,
-                    embedding_provider = excluded.embedding_provider,
-                    embedding_dim = excluded.embedding_dim,
-                    embedding = excluded.embedding,
-                    created_at = excluded.created_at",
-                params![
-                    entry_id.to_string(),
-                    workspace_id.to_string(),
-                    embedding_model.to_string(),
-                    embedding_provider.to_string(),
-                    embedding_dim as i64,
-                    embedding_bytes,
-                    created_at
-                ],
-            )
-            .await
-            .map_err(|e| format!("Failed to upsert embedding vector: {}", e))?;
         Ok(())
     }
 
@@ -524,7 +608,7 @@ mod tests {
         };
 
         // Test insertion
-        repo.upsert_encrypted(&row, 1)
+        repo.upsert_encrypted_atomic(&row, 1, Vec::new())
             .await
             .expect("Failed to upsert row");
 

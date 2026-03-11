@@ -2,6 +2,7 @@ use super::crypto::{decrypt_bytes, encrypt_bytes};
 use super::key_provider::{MacOSKeychainVaultKeyProvider, VaultKeyProvider};
 use super::repository::{MemoryVaultRepository, VaultRow};
 use super::types::{DecryptedMemoryEntry, MemorySensitivity, MemoryVaultStats, StoreMemoryInput};
+use crate::services::embedder::EmbeddingTaskType;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -41,7 +42,6 @@ impl MemoryVaultService {
         };
         if !cfg!(test) {
             service.run_plaintext_migration().await?;
-            service.run_reembed_backfill().await?;
         }
         Ok(service)
     }
@@ -125,27 +125,23 @@ impl MemoryVaultService {
             embedding_dim: Some(embedding_dim),
         };
 
-        self.repository.upsert_encrypted(&row, 1).await?;
+        let mut vector_rows = Vec::new();
 
         if let Some(primary_emb) = valid_embedding {
             let mut bytes = Vec::with_capacity(primary_emb.len() * 4);
             for f in primary_emb {
                 bytes.extend_from_slice(&f.to_le_bytes());
             }
-            let _ = self
-                .repository
-                .upsert_embedding_vector(
-                    &row.id,
-                    &row.workspace_id,
-                    row.embedding_model.as_deref().unwrap_or(super::types::EMBEDDING_MODEL),
-                    row.embedding_provider
-                        .as_deref()
-                        .unwrap_or(super::types::EMBEDDING_PROVIDER),
-                    row.embedding_dim.unwrap_or(super::types::EMBEDDING_DIM),
-                    bytes,
-                    row.created_at,
-                )
-                .await;
+            vector_rows.push((
+                row.embedding_model
+                    .clone()
+                    .unwrap_or_else(|| super::types::EMBEDDING_MODEL.to_string()),
+                row.embedding_provider
+                    .clone()
+                    .unwrap_or_else(|| super::types::EMBEDDING_PROVIDER.to_string()),
+                row.embedding_dim.unwrap_or(super::types::EMBEDDING_DIM),
+                bytes,
+            ));
         }
 
         for extra in input.additional_embeddings {
@@ -156,21 +152,28 @@ impl MemoryVaultService {
             for f in extra.embedding {
                 bytes.extend_from_slice(&f.to_le_bytes());
             }
-            let _ = self
-                .repository
-                .upsert_embedding_vector(
-                    &row.id,
-                    &row.workspace_id,
-                    &extra.embedding_model,
-                    &extra.embedding_provider,
-                    extra.embedding_dim,
-                    bytes,
-                    row.created_at,
-                )
-                .await;
+            vector_rows.push((
+                extra.embedding_model,
+                extra.embedding_provider,
+                extra.embedding_dim,
+                bytes,
+            ));
         }
 
+        self.repository
+            .upsert_encrypted_atomic(&row, 1, vector_rows)
+            .await?;
+
         Ok(())
+    }
+
+    pub fn spawn_reembed_backfill(&self) {
+        let service = self.clone();
+        tokio::spawn(async move {
+            if let Err(err) = service.run_reembed_backfill().await {
+                tracing::warn!("Memory re-embedding backfill failed: {}", err);
+            }
+        });
     }
 
     pub async fn search_workspace(
@@ -207,6 +210,7 @@ impl MemoryVaultService {
         Ok(results)
     }
 
+    #[allow(dead_code)]
     pub async fn search_workspace_vector(
         &self,
         workspace_id: &str,
@@ -302,6 +306,7 @@ impl MemoryVaultService {
         Ok((results, mode))
     }
 
+    #[allow(dead_code)]
     pub async fn recent_workspace(
         &self,
         workspace_id: &str,
@@ -466,6 +471,7 @@ impl MemoryVaultService {
     }
 
     async fn run_reembed_backfill(&self) -> Result<(), String> {
+        const BACKFILL_BATCH_SIZE: usize = 16;
         let migration_key = "migrate_memory_reembed_active_profile_v2";
         if self.repository.migration_completed(migration_key).await? {
             return Ok(());
@@ -551,41 +557,83 @@ impl MemoryVaultService {
             return Ok(());
         }
 
-        for id in ids_to_reembed {
-            if let Ok(Some(entry)) = self.get_by_id(&id).await {
-                // If the entry already has the right dimensions (e.g. was processed in another thread/session), skip.
-                if entry.embedding_dim == Some(super::types::EMBEDDING_DIM)
-                    && entry.embedding_model.as_deref() == Some(super::types::EMBEDDING_MODEL)
-                {
-                    continue;
-                }
-                match embedder.embed_text(&entry.content).await {
-                    Ok(new_embedding) => {
-                        let _ = self
-                            .put(StoreMemoryInput {
-                                id: entry.id,
-                                workspace_id: entry.workspace_id,
-                                content: entry.content,
-                                tags: entry.tags,
-                                source: entry.source,
-                                sensitivity: entry.sensitivity,
-                                metadata: entry.metadata,
-                                created_at: entry.created_at,
-                                embedding: Some(new_embedding),
-                                embedding_model: Some(super::types::EMBEDDING_MODEL.to_string()),
-                                embedding_provider: Some(super::types::EMBEDDING_PROVIDER.to_string()),
-                                embedding_dim: Some(super::types::EMBEDDING_DIM),
-                                additional_embeddings: Vec::new(),
-                            })
-                            .await;
+        for id_batch in ids_to_reembed.chunks(BACKFILL_BATCH_SIZE) {
+            let mut entries = Vec::new();
+            for id in id_batch {
+                if let Ok(Some(entry)) = self.get_by_id(id).await {
+                    if entry.embedding_dim == Some(super::types::EMBEDDING_DIM)
+                        && entry.embedding_model.as_deref() == Some(super::types::EMBEDDING_MODEL)
+                    {
+                        continue;
                     }
-                    Err(e) => {
-                        println!("Failed to re-embed memory {}: {}", id, e);
-                    }
+                    entries.push(entry);
                 }
+            }
 
-                // Sleep slightly to avoid blasting embedding API quota concurrently
-                tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+            if entries.is_empty() {
+                continue;
+            }
+
+            let texts = entries
+                .iter()
+                .map(|entry| entry.content.clone())
+                .collect::<Vec<_>>();
+
+            let embeddings = match embedder
+                .embed_texts_for_model_with_task(
+                    &texts,
+                    super::types::EMBEDDING_MODEL,
+                    EmbeddingTaskType::RetrievalDocument,
+                )
+                .await
+            {
+                Ok(v) if v.len() == entries.len() => Some(v),
+                Ok(_) => {
+                    println!(
+                        "Batch re-embed size mismatch for {} entries; falling back to per-entry path",
+                        entries.len()
+                    );
+                    None
+                }
+                Err(err) => {
+                    println!(
+                        "Batch re-embed failed for {} entries: {}. Falling back to per-entry path",
+                        entries.len(),
+                        err
+                    );
+                    None
+                }
+            };
+
+            for (idx, entry) in entries.into_iter().enumerate() {
+                let new_embedding = if let Some(ref batched) = embeddings {
+                    batched.get(idx).cloned()
+                } else {
+                    embedder
+                        .embed_text_with_task(&entry.content, EmbeddingTaskType::RetrievalDocument)
+                        .await
+                        .ok()
+                };
+
+                if let Some(vec) = new_embedding {
+                    let _ = self
+                        .put(StoreMemoryInput {
+                            id: entry.id,
+                            workspace_id: entry.workspace_id,
+                            content: entry.content,
+                            tags: entry.tags,
+                            source: entry.source,
+                            sensitivity: entry.sensitivity,
+                            metadata: entry.metadata,
+                            created_at: entry.created_at,
+                            embedding: Some(vec),
+                            embedding_model: Some(super::types::EMBEDDING_MODEL.to_string()),
+                            embedding_provider: Some(super::types::EMBEDDING_PROVIDER.to_string()),
+                            embedding_dim: Some(super::types::EMBEDDING_DIM),
+                            additional_embeddings: Vec::new(),
+                        })
+                        .await;
+                }
             }
         }
 

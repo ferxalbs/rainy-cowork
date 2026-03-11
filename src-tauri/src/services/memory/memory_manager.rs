@@ -2,6 +2,7 @@ use crate::services::memory::{
     IngestionResult, MemoryEntry, MemoryError, MemoryStats, SemanticRetrievalMode,
     SemanticSearchResult,
 };
+use crate::services::embedder::EmbeddingTaskType;
 use crate::services::memory_vault::{MemorySensitivity, MemoryVaultService, StoreMemoryInput};
 use crate::services::memory_vault::{EMBEDDING_MODEL, EMBEDDING_PROVIDER};
 use std::collections::{HashMap, VecDeque};
@@ -13,7 +14,7 @@ use tokio::sync::RwLock;
 pub struct MemoryManager {
     short_term: Arc<RwLock<VecDeque<MemoryEntry>>>,
     short_term_capacity: usize,
-    app_data_dir: PathBuf,
+    vault_dir: PathBuf,
     vault: Arc<RwLock<Option<Arc<MemoryVaultService>>>>,
 }
 
@@ -21,21 +22,19 @@ impl MemoryManager {
     const MAX_INGEST_CHUNKS: usize = 2048;
     const DEFAULT_CHUNK_CHARS: usize = 1500;
 
-    pub fn new(short_term_size: usize, long_term_path: PathBuf) -> Self {
-        let app_data_dir = long_term_path
-            .parent()
-            .map(|p| p.to_path_buf())
-            .unwrap_or(long_term_path);
+    pub fn new(short_term_size: usize, vault_dir: PathBuf) -> Self {
         Self {
             short_term: Arc::new(RwLock::new(VecDeque::with_capacity(short_term_size))),
             short_term_capacity: short_term_size.max(1),
-            app_data_dir,
+            vault_dir,
             vault: Arc::new(RwLock::new(None)),
         }
     }
 
     pub async fn init(&self) {
-        let _ = self.ensure_vault().await;
+        if let Ok(vault) = self.ensure_vault().await {
+            vault.spawn_reembed_backfill();
+        }
     }
 
     async fn ensure_vault(&self) -> Result<Arc<MemoryVaultService>, MemoryError> {
@@ -52,7 +51,7 @@ impl MemoryManager {
         }
 
         let created = Arc::new(
-            MemoryVaultService::new(self.app_data_dir.clone())
+            MemoryVaultService::new(self.vault_dir.clone())
                 .await
                 .map_err(MemoryError::Other)?,
         );
@@ -61,30 +60,59 @@ impl MemoryManager {
     }
 
     pub async fn store(&self, entry: MemoryEntry) -> Result<(), MemoryError> {
+        let workspace_id = derive_workspace_id(&entry.tags);
+        let source = derive_source(&entry.tags);
+        self.store_workspace_memory(
+            &workspace_id,
+            entry.id,
+            entry.content,
+            source,
+            entry.tags,
+            HashMap::new(),
+            entry.timestamp.timestamp(),
+            MemorySensitivity::Internal,
+        )
+        .await
+    }
+
+    pub async fn store_workspace_memory(
+        &self,
+        workspace_id: &str,
+        id: String,
+        content: String,
+        source: String,
+        tags: Vec<String>,
+        metadata: HashMap<String, String>,
+        created_at: i64,
+        sensitivity: MemorySensitivity,
+    ) -> Result<(), MemoryError> {
         {
             let mut stm = self.short_term.write().await;
-            stm.push_back(entry.clone());
+            stm.push_back(MemoryEntry {
+                id: id.clone(),
+                content: content.clone(),
+                embedding: None,
+                timestamp: chrono::DateTime::from_timestamp(created_at, 0)
+                    .unwrap_or_else(chrono::Utc::now),
+                tags: tags.clone(),
+            });
             while stm.len() > self.short_term_capacity {
                 let _ = stm.pop_front();
             }
         }
 
         let vault = self.ensure_vault().await?;
-        let now = entry.timestamp.timestamp();
-        let workspace_id = derive_workspace_id(&entry.tags);
-        let metadata = HashMap::new();
-        let source = derive_source(&entry.tags);
 
         vault
             .put(StoreMemoryInput {
-                id: entry.id,
-                workspace_id,
-                content: entry.content,
-                tags: entry.tags,
+                id,
+                workspace_id: workspace_id.to_string(),
+                content,
+                tags,
                 source,
-                sensitivity: MemorySensitivity::Internal,
+                sensitivity,
                 metadata,
-                created_at: now,
+                created_at,
                 embedding: None,
                 embedding_model: Some(EMBEDDING_MODEL.to_string()),
                 embedding_provider: Some(EMBEDDING_PROVIDER.to_string()),
@@ -97,25 +125,16 @@ impl MemoryManager {
         Ok(())
     }
 
-    pub async fn search(&self, query: &str, limit: usize) -> Result<Vec<MemoryEntry>, MemoryError> {
-        let workspace_id = derive_workspace_id_from_query(query);
-        let vault = self.ensure_vault().await?;
-        let results = vault
-            .search_workspace(&workspace_id, query, limit.max(1))
-            .await
-            .map_err(MemoryError::Other)?;
-
-        Ok(results
-            .into_iter()
-            .map(|entry| MemoryEntry {
-                id: entry.id,
-                content: entry.content,
-                embedding: None,
-                timestamp: chrono::DateTime::from_timestamp(entry.created_at, 0)
-                    .unwrap_or_else(chrono::Utc::now),
-                tags: entry.tags,
-            })
-            .collect())
+    pub async fn search(
+        &self,
+        workspace_id: &str,
+        query: &str,
+        limit: usize,
+    ) -> Result<Vec<MemoryEntry>, MemoryError> {
+        let result = self
+            .search_semantic_detailed(workspace_id, query, limit)
+            .await?;
+        Ok(result.entries)
     }
 
     pub async fn get_recent(&self, count: usize) -> Vec<MemoryEntry> {
@@ -225,7 +244,10 @@ impl MemoryManager {
             }
         };
 
-        let query_embedding = match embedder.embed_text(query).await {
+        let query_embedding = match embedder
+            .embed_text_with_task(query, EmbeddingTaskType::RetrievalQuery)
+            .await
+        {
             Ok(v) => v,
             Err(e) => {
                 let entries = self
@@ -245,6 +267,11 @@ impl MemoryManager {
             .await
             .map_err(MemoryError::Other)?;
 
+        let lexical_rows = vault
+            .search_workspace(workspace_id, query, limit.saturating_mul(3).max(20))
+            .await
+            .map_err(MemoryError::Other)?;
+
         let mode = match mode {
             crate::services::memory_vault::service::VectorSearchMode::Ann => {
                 SemanticRetrievalMode::Ann
@@ -254,10 +281,42 @@ impl MemoryManager {
             }
         };
 
+        let query_tokens = normalize_query_tokens(query);
+        let now = chrono::Utc::now().timestamp();
+        let mut merged: HashMap<
+            String,
+            (f64, crate::services::memory_vault::types::DecryptedMemoryEntry),
+        > = HashMap::new();
+
+        for (entry, distance) in rows {
+            let lexical = lexical_overlap_score(&query_tokens, &entry.content);
+            let recency = recency_score(entry.created_at, now);
+            let access = access_score(entry.access_count);
+            let semantic = semantic_score(distance);
+            let score = 0.65 * semantic + 0.15 * lexical + 0.15 * recency + 0.05 * access;
+            upsert_ranked_entry(&mut merged, entry, score);
+        }
+
+        for entry in lexical_rows {
+            let lexical = lexical_overlap_score(&query_tokens, &entry.content);
+            let recency = recency_score(entry.created_at, now);
+            let access = access_score(entry.access_count);
+            let score = 0.70 * lexical + 0.20 * recency + 0.10 * access;
+            upsert_ranked_entry(&mut merged, entry, score);
+        }
+
+        let mut ranked = merged.into_values().collect::<Vec<_>>();
+        ranked.sort_by(|(a_score, _), (b_score, _)| {
+            b_score
+                .partial_cmp(a_score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+
         Ok(SemanticSearchResult {
-            entries: rows
+            entries: ranked
                 .into_iter()
-                .map(|(entry, _distance)| MemoryEntry {
+                .take(limit.max(1))
+                .map(|(_score, entry)| MemoryEntry {
                     id: entry.id,
                     content: entry.content,
                     embedding: None,
@@ -319,42 +378,107 @@ impl MemoryManager {
         }
 
         let chunk_count = chunks.len();
-        for (idx, chunk) in chunks.iter().enumerate() {
-            let mut embedding = None;
-            let mut embedding_model = EMBEDDING_MODEL.to_string();
-            let mut additional_embeddings = Vec::new();
-            if let Some(ref e) = embedder {
-                let active_model = crate::services::memory_vault::profiles::ACTIVE_EMBEDDING_PROFILE.model;
-                let fallback_model =
-                    crate::services::memory_vault::profiles::FALLBACK_EMBEDDING_PROFILE.model;
-                match e.embed_text_for_model(chunk, active_model).await {
-                    Ok(vec) => {
-                        embedding = Some(vec);
-                        if fallback_model != active_model {
-                            if let Ok(fallback_vec) =
-                                e.embed_text_for_model(chunk, fallback_model).await
-                            {
-                                additional_embeddings.push(
-                                    crate::services::memory_vault::AdditionalEmbeddingInput {
-                                        embedding: fallback_vec,
-                                        embedding_model: fallback_model.to_string(),
-                                        embedding_provider: EMBEDDING_PROVIDER.to_string(),
-                                        embedding_dim: crate::services::memory_vault::EMBEDDING_DIM,
-                                    },
-                                );
-                            }
-                        }
+        let active_model = crate::services::memory_vault::profiles::ACTIVE_EMBEDDING_PROFILE.model;
+        let fallback_model = crate::services::memory_vault::profiles::FALLBACK_EMBEDDING_PROFILE.model;
+        let mut primary_embeddings: Vec<Option<Vec<f32>>> = vec![None; chunk_count];
+        let mut primary_models: Vec<String> = vec![active_model.to_string(); chunk_count];
+        let mut fallback_embeddings: Vec<Option<Vec<f32>>> = vec![None; chunk_count];
+
+        if let Some(ref e) = embedder {
+            match e
+                .embed_texts_for_model_with_task(
+                    &chunks,
+                    active_model,
+                    EmbeddingTaskType::RetrievalDocument,
+                )
+                .await
+            {
+                Ok(vecs) if vecs.len() == chunk_count => {
+                    for (idx, v) in vecs.into_iter().enumerate() {
+                        primary_embeddings[idx] = Some(v);
                     }
-                    Err(_) => {
-                        if fallback_model != active_model {
-                            if let Ok(vec) = e.embed_text_for_model(chunk, fallback_model).await {
-                                embedding = Some(vec);
-                                embedding_model = fallback_model.to_string();
+                    if fallback_model != active_model {
+                        match e
+                            .embed_texts_for_model_with_task(
+                                &chunks,
+                                fallback_model,
+                                EmbeddingTaskType::RetrievalDocument,
+                            )
+                            .await
+                        {
+                            Ok(extra_vecs) if extra_vecs.len() == chunk_count => {
+                                for (idx, v) in extra_vecs.into_iter().enumerate() {
+                                    fallback_embeddings[idx] = Some(v);
+                                }
                             }
+                            Ok(_) => warnings.push(
+                                "Fallback batch embeddings size mismatch during ingestion"
+                                    .to_string(),
+                            ),
+                            Err(err) => warnings.push(format!(
+                                "Fallback batch embeddings failed during ingestion: {}",
+                                err
+                            )),
                         }
                     }
                 }
+                Ok(_) => warnings.push(
+                    "Primary batch embeddings size mismatch during ingestion; using fallback path"
+                        .to_string(),
+                ),
+                Err(err) => {
+                    if fallback_model != active_model {
+                        match e
+                            .embed_texts_for_model_with_task(
+                                &chunks,
+                                fallback_model,
+                                EmbeddingTaskType::RetrievalDocument,
+                            )
+                            .await
+                        {
+                            Ok(vecs) if vecs.len() == chunk_count => {
+                                for (idx, v) in vecs.into_iter().enumerate() {
+                                    primary_embeddings[idx] = Some(v);
+                                    primary_models[idx] = fallback_model.to_string();
+                                }
+                                warnings.push(format!(
+                                    "Primary batch embedding failed; used fallback model '{}': {}",
+                                    fallback_model, err
+                                ));
+                            }
+                            Ok(_) => warnings.push(
+                                "Fallback batch embeddings size mismatch during ingestion"
+                                    .to_string(),
+                            ),
+                            Err(fallback_err) => warnings.push(format!(
+                                "Batch embeddings unavailable; storing without embeddings: {} | {}",
+                                err, fallback_err
+                            )),
+                        }
+                    } else {
+                        warnings.push(format!(
+                            "Batch embeddings unavailable; storing without embeddings: {}",
+                            err
+                        ));
+                    }
+                }
             }
+        }
+
+        for (idx, chunk) in chunks.iter().enumerate() {
+            let embedding = primary_embeddings[idx].clone();
+            let embedding_model = primary_models[idx].clone();
+            let mut additional_embeddings = Vec::new();
+
+            if let Some(extra) = fallback_embeddings[idx].clone() {
+                additional_embeddings.push(crate::services::memory_vault::AdditionalEmbeddingInput {
+                    embedding: extra,
+                    embedding_model: fallback_model.to_string(),
+                    embedding_provider: EMBEDDING_PROVIDER.to_string(),
+                    embedding_dim: crate::services::memory_vault::EMBEDDING_DIM,
+                });
+            }
+
             if embedding.is_some() {
                 embedded_count += 1;
             }
@@ -453,6 +577,56 @@ fn derive_source(tags: &[String]) -> String {
         .unwrap_or_else(|| "memory_manager".to_string())
 }
 
-fn derive_workspace_id_from_query(_query: &str) -> String {
-    "global".to_string()
+fn normalize_query_tokens(query: &str) -> Vec<String> {
+    query
+        .to_lowercase()
+        .split_whitespace()
+        .map(|s| s.trim_matches(|c: char| !c.is_alphanumeric()).to_string())
+        .filter(|s| !s.is_empty())
+        .collect()
+}
+
+fn lexical_overlap_score(tokens: &[String], content: &str) -> f64 {
+    if tokens.is_empty() {
+        return 0.0;
+    }
+    let haystack = content.to_lowercase();
+    let mut hits = 0usize;
+    for token in tokens {
+        if haystack.contains(token) {
+            hits += 1;
+        }
+    }
+    hits as f64 / tokens.len() as f64
+}
+
+fn recency_score(created_at: i64, now: i64) -> f64 {
+    let age_seconds = now.saturating_sub(created_at).max(0);
+    let age_hours = age_seconds as f64 / 3600.0;
+    (-age_hours / 168.0).exp().clamp(0.0, 1.0)
+}
+
+fn access_score(access_count: i64) -> f64 {
+    let v = (access_count.max(0) as f64 + 1.0).ln();
+    let norm = (64.0_f64 + 1.0).ln();
+    (v / norm).clamp(0.0, 1.0)
+}
+
+fn semantic_score(distance: f32) -> f64 {
+    let d = distance.max(0.0) as f64;
+    (1.0 / (1.0 + d)).clamp(0.0, 1.0)
+}
+
+fn upsert_ranked_entry(
+    merged: &mut HashMap<String, (f64, crate::services::memory_vault::types::DecryptedMemoryEntry)>,
+    entry: crate::services::memory_vault::types::DecryptedMemoryEntry,
+    score: f64,
+) {
+    let id = entry.id.clone();
+    match merged.get(&id) {
+        Some((existing_score, _)) if *existing_score >= score => {}
+        _ => {
+            merged.insert(id, (score, entry));
+        }
+    }
 }
