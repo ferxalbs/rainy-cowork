@@ -70,6 +70,26 @@ struct ManifestState {
 }
 
 impl NeuralService {
+    fn summarize_http_error_body(raw: &str) -> String {
+        let compact = raw
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ")
+            .trim()
+            .to_string();
+        if compact.is_empty() {
+            return "empty error body".to_string();
+        }
+        if compact.contains("<html") || compact.contains("<!doctype") {
+            return "temporary upstream HTML error response".to_string();
+        }
+        const MAX_LEN: usize = 220;
+        if compact.len() > MAX_LEN {
+            return format!("{}...", &compact[..MAX_LEN]);
+        }
+        compact
+    }
+
     async fn clear_node_id(&self) {
         let mut metadata = self.metadata.lock().await;
         metadata.node_id = None;
@@ -473,7 +493,8 @@ impl NeuralService {
             let status = res.status();
             self.reset_node_on_status(status).await;
             let err_text = res.text().await.unwrap_or_default();
-            return Err(format!("Heartbeat failed: {} - {}", status, err_text));
+            let summary = Self::summarize_http_error_body(&err_text);
+            return Err(format!("Heartbeat failed: {} - {}", status, summary));
         }
 
         if include_manifest {

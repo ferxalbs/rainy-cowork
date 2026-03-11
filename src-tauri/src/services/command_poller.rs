@@ -53,6 +53,12 @@ fn progress_preview(value: &str) -> String {
     format!("{}...", preview)
 }
 
+fn is_transient_upstream_error(text: &str) -> bool {
+    text.contains("Heartbeat failed: 502")
+        || text.contains("Heartbeat failed: 503")
+        || text.contains("Heartbeat failed: 504")
+}
+
 fn map_agent_event(event: &AgentEvent) -> (String, serde_json::Value) {
     match event {
         AgentEvent::Status(text) => (
@@ -330,6 +336,7 @@ impl CommandPoller {
                         POLL_INTERVAL
                     }
                     Err(e) => {
+                        let error_text = e.to_string();
                         backoff_failures += 1;
                         let backoff_secs = std::cmp::min(
                             POLL_INTERVAL.as_secs() * (2u64.pow(backoff_failures.min(6) as u32)),
@@ -337,12 +344,21 @@ impl CommandPoller {
                         );
                         let sleep_with_jitter = with_jitter(Duration::from_secs(backoff_secs));
 
-                        eprintln!(
-                            "[CommandPoller] Error: {}. Retrying in {}ms (base={}s)...",
-                            e,
-                            sleep_with_jitter.as_millis(),
-                            backoff_secs
-                        );
+                        if is_transient_upstream_error(&error_text) {
+                            println!(
+                                "[CommandPoller] Temporary upstream issue: {}. Retrying in {}ms (base={}s)...",
+                                error_text,
+                                sleep_with_jitter.as_millis(),
+                                backoff_secs
+                            );
+                        } else {
+                            eprintln!(
+                                "[CommandPoller] Error: {}. Retrying in {}ms (base={}s)...",
+                                error_text,
+                                sleep_with_jitter.as_millis(),
+                                backoff_secs
+                            );
+                        }
                         sleep_with_jitter
                     }
                 };

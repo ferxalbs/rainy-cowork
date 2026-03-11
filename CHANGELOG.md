@@ -18,6 +18,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `src-tauri/src/lib.rs`
     - `src/services/tauri.ts`
     - `src/components/neural/modules/NeuralMcp.tsx`
+- Added persistent long-chat history scope and hydration path for Agent Chat so local runs continue in one durable conversation:
+  - `get_default_chat_scope`
+  - `get_chat_history_window`
+  - files:
+    - `src-tauri/src/ai/agent/manager.rs`
+    - `src-tauri/src/lib.rs`
+    - `src-tauri/src/commands/agent.rs`
+    - `src/services/tauri.ts`
+    - `src/hooks/useAgentChat.ts`
+    - `src/components/agent-chat/AgentChatPanel.tsx`
+- Added dual-vector storage foundation for embedding profile migration with dedicated per-model vector rows:
+  - `memory_vault_embedding_vectors` table + ANN index
+  - files:
+    - `src-tauri/src/services/memory_vault/repository.rs`
+    - `src-tauri/src/services/memory_vault/service.rs`
+    - `src-tauri/src/services/memory_vault/types.rs`
+    - `src-tauri/src/services/memory_vault/profiles.rs`
+- Added RAG telemetry chips wiring in Agent Chat message metadata:
+  - `history`, `retrieval`, `embedding`
+  - files:
+    - `src/types/agent.ts`
+    - `src/hooks/useAgentChat.ts`
+    - `src/components/agent-chat/AgentChatPanel.tsx`
+    - `src-tauri/src/ai/agent/runtime.rs`
 
 ### Changed
 
@@ -25,6 +49,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `src-tauri/src/services/mcp_service.rs`
 - Reworked MCP Neural panel to JSON-first management (visual JSON editor + validate/save/run), removing manual server-creation dependence:
   - `src/components/neural/modules/NeuralMcp.tsx`
+- Updated local agent workflow wiring so `run_agent_workflow` accepts optional `chat_scope_id` and defaults to the persistent global scope:
+  - `src-tauri/src/commands/agent.rs`
+  - `src/services/tauri.ts`
+  - `src/hooks/useAgentChat.ts`
+- Updated memory retrieval/embedding flow to prioritize `gemini-embedding-2-preview` with safe fallback behavior and model-aware vector selection:
+  - `src-tauri/src/services/embedder.rs`
+  - `src-tauri/src/services/memory/memory_manager.rs`
+  - `src-tauri/src/ai/agent/memory.rs`
+  - `src-tauri/src/services/settings.rs`
 
 ### Fixed
 
@@ -32,12 +65,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed MCP disconnection/removal lifecycle to explicitly terminate spawned stdio subprocesses (including replacement on reconnect with same key), preventing orphan process leaks and hidden active tools.
   - file:
     - `src-tauri/src/services/mcp_service.rs`
+- Fixed noisy heartbeat failure reporting for temporary upstream gateway errors by sanitizing HTML response bodies and classifying 502/503/504 retries as transient:
+  - `src-tauri/src/services/neural_service.rs`
+  - `src-tauri/src/services/command_poller.rs`
 
 ### Validation
 
 - `cd src-tauri && cargo check -q` — passes
 - `pnpm exec tsc --noEmit` — passes
 - `cd src-tauri && cargo test -q workflow --lib` — passes
+- `cd src-tauri && cargo test -q agent --lib` — passes
+- `cd src-tauri && cargo test -q memory_vault --lib` — passes
 
 ## [0.5.95] - 2026-03-10 - NERVE CENTER STEP 6 STABILITY PATCH
 
