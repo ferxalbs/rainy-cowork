@@ -1,32 +1,28 @@
 import { useEffect, useMemo, useState } from "react";
-import { Button, Card, Input, Switch } from "@heroui/react";
+import { Button, Card, Switch } from "@heroui/react";
 import { toast } from "sonner";
 import {
   connectMcpSavedServer,
   disconnectMcpServer,
+  getOrCreateDefaultMcpJsonConfig,
   getMcpPermissionMode,
   getMcpRuntimeStatus,
   getPendingMcpApprovals,
+  importMcpServersFromDefaultJson,
   listMcpRuntimeServers,
   listMcpServers,
   refreshMcpServerTools,
   removeMcpServer,
   respondToMcpApproval,
+  saveDefaultMcpJsonConfig,
   setMcpPermissionMode,
-  upsertMcpServer,
   type McpApprovalRequest,
   type McpPermissionMode,
   type McpRuntimeServerStatus,
   type McpRuntimeStatus,
+  type McpJsonConfigFile,
   type PersistedMcpServerConfig,
 } from "../../../services/tauri";
-
-const defaultServer: PersistedMcpServerConfig = {
-  name: "",
-  transport: { type: "stdio", command: "", args: [] },
-  timeoutSecs: 30,
-  enabled: true,
-};
 
 export function NeuralMcp() {
   const [servers, setServers] = useState<PersistedMcpServerConfig[]>([]);
@@ -34,9 +30,11 @@ export function NeuralMcp() {
   const [runtime, setRuntime] = useState<McpRuntimeStatus | null>(null);
   const [pendingApprovals, setPendingApprovals] = useState<McpApprovalRequest[]>([]);
   const [permissionMode, setPermissionModeState] = useState<McpPermissionMode>("ask");
-  const [form, setForm] = useState<PersistedMcpServerConfig>(defaultServer);
-  const [sessionEnv, setSessionEnv] = useState("");
   const [loading, setLoading] = useState(false);
+  const [jsonFile, setJsonFile] = useState<McpJsonConfigFile | null>(null);
+  const [jsonDraft, setJsonDraft] = useState("");
+  const [jsonAutoConnect, setJsonAutoConnect] = useState(true);
+  const [jsonError, setJsonError] = useState<string | null>(null);
 
   const connectedMap = useMemo(
     () => new Map(runtimeServers.map((server) => [server.name, server.connected])),
@@ -53,11 +51,15 @@ export function NeuralMcp() {
         getMcpPermissionMode(),
         getPendingMcpApprovals(),
       ]);
+      const config = await getOrCreateDefaultMcpJsonConfig();
       setServers(saved);
       setRuntimeServers(runtimeList);
       setRuntime(status);
       setPermissionModeState(mode);
       setPendingApprovals(approvals);
+      setJsonFile(config);
+      setJsonDraft(config.content);
+      setJsonError(null);
     } catch (error) {
       console.error(error);
       toast.error("Failed to load MCP state");
@@ -70,62 +72,91 @@ export function NeuralMcp() {
     load();
   }, []);
 
-  const parseEnv = (): Record<string, string> => {
-    const map: Record<string, string> = {};
-    const lines = sessionEnv
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean);
-    for (const line of lines) {
-      const idx = line.indexOf("=");
-      if (idx <= 0) continue;
-      map[line.slice(0, idx).trim()] = line.slice(idx + 1).trim();
-    }
-    return map;
-  };
-
-  const handleSaveServer = async () => {
-    if (!form.name.trim()) {
-      toast.error("Server name is required");
-      return;
-    }
-    if (form.transport.type === "stdio" && !form.transport.command.trim()) {
-      toast.error("Command is required for stdio transport");
-      return;
-    }
-
-    try {
-      await upsertMcpServer({
-        ...form,
-        name: form.name.trim(),
-        transport:
-          form.transport.type === "stdio"
-            ? {
-                type: "stdio",
-                command: form.transport.command.trim(),
-                args: form.transport.args,
-              }
-            : form.transport,
-      });
-      toast.success("MCP server saved");
-      setForm(defaultServer);
-      await load();
-    } catch (error: any) {
-      toast.error(error?.message || "Failed to save MCP server");
-    }
-  };
-
   const handleConnect = async (server: PersistedMcpServerConfig) => {
     try {
-      const env = parseEnv();
-      await connectMcpSavedServer(
-        server.name,
-        Object.keys(env).length > 0 ? env : undefined,
-      );
+      await connectMcpSavedServer(server.name);
       toast.success(`Connected ${server.name}`);
       await load();
     } catch (error: any) {
       toast.error(error?.message || "Failed to connect MCP server");
+    }
+  };
+
+  const handleValidateJson = () => {
+    try {
+      const parsed = JSON.parse(jsonDraft);
+      const pretty = JSON.stringify(parsed, null, 2);
+      setJsonDraft(pretty);
+      setJsonError(null);
+      toast.success("JSON validated");
+    } catch (error: any) {
+      const msg = error?.message || "Invalid JSON";
+      setJsonError(msg);
+      toast.error(msg);
+    }
+  };
+
+  const handleSaveJson = async () => {
+    try {
+      const saved = await saveDefaultMcpJsonConfig(jsonDraft);
+      setJsonFile(saved);
+      setJsonDraft(saved.content);
+      setJsonError(null);
+      toast.success("MCP JSON saved");
+    } catch (error: any) {
+      const msg = error?.message || "Failed to save MCP JSON";
+      setJsonError(msg);
+      toast.error(msg);
+    }
+  };
+
+  const handleSaveAndRunJson = async () => {
+    try {
+      const saved = await saveDefaultMcpJsonConfig(jsonDraft);
+      setJsonFile(saved);
+      setJsonDraft(saved.content);
+      setJsonError(null);
+      const result = await importMcpServersFromDefaultJson(jsonAutoConnect);
+      const failed = result.failed.length;
+      if (failed > 0) {
+        toast.warning(
+          `Imported ${result.imported}, connected ${result.connected}, failed ${failed}`,
+        );
+        console.warn("MCP JSON import failures:", result.failed);
+      } else {
+        toast.success(
+          `Imported ${result.imported} server(s), connected ${result.connected}`,
+        );
+      }
+      await load();
+    } catch (error: any) {
+      const msg = error?.message || "Failed to save/run MCP JSON";
+      setJsonError(msg);
+      toast.error(msg);
+    }
+  };
+
+  const handleRunJson = async () => {
+    if (!jsonFile?.path) {
+      toast.error("Default MCP JSON path is not ready");
+      return;
+    }
+    try {
+      const result = await importMcpServersFromDefaultJson(jsonAutoConnect);
+      const failed = result.failed.length;
+      if (failed > 0) {
+        toast.warning(
+          `Imported ${result.imported}, connected ${result.connected}, failed ${failed}`,
+        );
+        console.warn("MCP JSON import failures:", result.failed);
+      } else {
+        toast.success(
+          `Imported ${result.imported} server(s), connected ${result.connected}`,
+        );
+      }
+      await load();
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to run MCP JSON");
     }
   };
 
@@ -214,84 +245,49 @@ export function NeuralMcp() {
       </Card>
 
       <Card className="p-4 border border-border/20 bg-card/30 space-y-3">
-        <p className="text-sm font-semibold text-foreground">Add MCP Server</p>
-        <div className="space-y-1">
-          <p className="text-xs text-muted-foreground">Name</p>
-          <Input
-            value={form.name}
-            onChange={(event) =>
-              setForm((prev) => ({ ...prev, name: event.target.value }))
-            }
-            placeholder="filesystem"
-          />
-        </div>
-        <div className="space-y-1">
-          <p className="text-xs text-muted-foreground">Command (stdio)</p>
-          <Input
-            value={form.transport.type === "stdio" ? form.transport.command : ""}
-            onChange={(event) =>
-              setForm((prev) => ({
-                ...prev,
-                transport: { type: "stdio", command: event.target.value, args: [] },
-              }))
-            }
-            placeholder="npx"
-          />
-        </div>
-        <div className="space-y-1">
-          <p className="text-xs text-muted-foreground">Args (space separated)</p>
-          <Input
-            value={
-              form.transport.type === "stdio"
-                ? form.transport.args.join(" ")
-                : ""
-            }
-            onChange={(event) =>
-              setForm((prev) => ({
-                ...prev,
-                transport: {
-                  type: "stdio",
-                  command:
-                    prev.transport.type === "stdio"
-                      ? prev.transport.command
-                      : "",
-                  args: event.target.value
-                    .split(" ")
-                    .map((item) => item.trim())
-                    .filter(Boolean),
-                },
-              }))
-            }
-            placeholder="-y @modelcontextprotocol/server-filesystem /Users/fer/Projects"
-          />
-        </div>
-        <div className="space-y-1">
-          <p className="text-xs text-muted-foreground">Timeout (seconds)</p>
-          <Input
-            type="number"
-            value={String(form.timeoutSecs)}
-            onChange={(event) =>
-              setForm((prev) => ({
-                ...prev,
-                timeoutSecs: Math.max(1, Number(event.target.value || "30")),
-              }))
-            }
-          />
-        </div>
-        <div className="space-y-1">
-          <p className="text-xs text-muted-foreground">
-            Session ENV (KEY=VALUE per line, optional)
+        <p className="text-sm font-semibold text-foreground">
+          Default MCP JSON
+        </p>
+        <div className="rounded-xl border border-border/40 bg-background/30 px-3 py-2">
+          <p className="text-[11px] text-muted-foreground mb-1">Config file path</p>
+          <p className="text-xs font-mono text-foreground/90 break-all">
+            {jsonFile?.path || "Loading..."}
           </p>
-          <textarea
-            value={sessionEnv}
-            onChange={(event) => setSessionEnv(event.target.value)}
-            placeholder={"API_KEY=...\nTOKEN=..."}
-            className="w-full min-h-[88px] rounded-xl border border-border/50 bg-background/40 px-3 py-2 text-sm text-foreground outline-none focus:border-primary/40"
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Edit JSON here. This file is created automatically for users and is the
+          primary way to manage MCP servers.
+        </p>
+        <textarea
+          value={jsonDraft}
+          onChange={(event) => {
+            setJsonDraft(event.target.value);
+            setJsonError(null);
+          }}
+          className="w-full min-h-[260px] rounded-xl border border-border/50 bg-background/40 px-3 py-2 text-xs font-mono text-foreground outline-none focus:border-primary/40"
+        />
+        {jsonError && (
+          <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+            {jsonError}
+          </div>
+        )}
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-muted-foreground">Auto connect imported servers</p>
+          <Switch
+            isSelected={jsonAutoConnect}
+            onChange={(enabled) => setJsonAutoConnect(enabled)}
           />
         </div>
-        <div className="flex justify-end">
-          <Button onPress={handleSaveServer} className="bg-primary text-primary-foreground">
-            Save MCP Server
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" onPress={handleValidateJson}>
+            Validate / Format
+          </Button>
+          <Button variant="secondary" onPress={handleSaveJson}>
+            Save JSON
+          </Button>
+          <Button onPress={handleRunJson}>Run JSON</Button>
+          <Button className="bg-primary text-primary-foreground" onPress={handleSaveAndRunJson}>
+            Save + Run
           </Button>
         </div>
       </Card>

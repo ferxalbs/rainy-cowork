@@ -1328,7 +1328,7 @@ export type McpPermissionMode = "ask" | "no_ask";
 
 export type PersistedMcpTransportConfig =
   | { type: "stdio"; command: string; args: string[] }
-  | { type: "sse"; url: string };
+  | { type: "http"; url: string };
 
 export interface PersistedMcpServerConfig {
   name: string;
@@ -1364,9 +1364,10 @@ export interface McpServerConfig {
   name: string;
   transport:
     | { type: "stdio"; command: string; args: string[] }
-    | { type: "sse"; url: string };
+    | { type: "http"; url: string };
   timeoutSecs: number;
   env?: Record<string, string> | null;
+  headers?: Record<string, string> | null;
 }
 
 export async function listMcpServers(): Promise<PersistedMcpServerConfig[]> {
@@ -1386,8 +1387,9 @@ export async function removeMcpServer(name: string): Promise<void> {
 export async function connectMcpSavedServer(
   name: string,
   env?: Record<string, string>,
+  headers?: Record<string, string>,
 ): Promise<void> {
-  return invoke("connect_mcp_saved_server", { name, env });
+  return invoke("connect_mcp_saved_server", { name, env, headers });
 }
 
 export async function connectMcpServer(config: McpServerConfig): Promise<void> {
@@ -1427,6 +1429,40 @@ export async function respondToMcpApproval(
   approved: boolean,
 ): Promise<void> {
   return invoke("respond_to_mcp_approval", { approvalId, approved });
+}
+
+export interface McpJsonImportResult {
+  imported: number;
+  connected: number;
+  failed: string[];
+}
+
+export async function importMcpServersFromJson(
+  jsonPath: string,
+  autoConnect = true,
+): Promise<McpJsonImportResult> {
+  return invoke("import_mcp_servers_from_json", { jsonPath, autoConnect });
+}
+
+export interface McpJsonConfigFile {
+  path: string;
+  content: string;
+}
+
+export async function getOrCreateDefaultMcpJsonConfig(): Promise<McpJsonConfigFile> {
+  return invoke("get_or_create_default_mcp_json_config");
+}
+
+export async function saveDefaultMcpJsonConfig(
+  content: string,
+): Promise<McpJsonConfigFile> {
+  return invoke("save_default_mcp_json_config", { content });
+}
+
+export async function importMcpServersFromDefaultJson(
+  autoConnect = true,
+): Promise<McpJsonImportResult> {
+  return invoke("import_mcp_servers_from_default_json", { autoConnect });
 }
 
 // ============ Neural Credentials Commands ============

@@ -39,7 +39,8 @@ pub struct PersistedMcpServerConfig {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum PersistedMcpTransportConfig {
     Stdio { command: String, args: Vec<String> },
-    Sse { url: String },
+    #[serde(alias = "sse")]
+    Http { url: String },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -50,13 +51,15 @@ pub struct McpServerConfig {
     #[serde(default = "default_timeout_secs")]
     pub timeout_secs: u64,
     pub env: Option<HashMap<String, String>>,
+    pub headers: Option<HashMap<String, String>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum McpTransportConfig {
     Stdio { command: String, args: Vec<String> },
-    Sse { url: String },
+    #[serde(alias = "sse")]
+    Http { url: String },
 }
 
 impl McpServerConfig {
@@ -77,7 +80,11 @@ impl McpServerConfig {
 }
 
 impl PersistedMcpServerConfig {
-    pub fn to_runtime(&self, env: Option<HashMap<String, String>>) -> McpServerConfig {
+    pub fn to_runtime(
+        &self,
+        env: Option<HashMap<String, String>>,
+        headers: Option<HashMap<String, String>>,
+    ) -> McpServerConfig {
         McpServerConfig {
             name: self.name.clone(),
             transport: match &self.transport {
@@ -85,12 +92,13 @@ impl PersistedMcpServerConfig {
                     command: command.clone(),
                     args: args.clone(),
                 },
-                PersistedMcpTransportConfig::Sse { url } => McpTransportConfig::Sse {
+                PersistedMcpTransportConfig::Http { url } => McpTransportConfig::Http {
                     url: url.clone(),
                 },
             },
             timeout_secs: self.timeout_secs,
             env,
+            headers,
         }
     }
 }
@@ -148,6 +156,14 @@ pub struct McpRuntimeStatus {
     pub pending_approvals: usize,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct McpJsonImportResult {
+    pub imported: usize,
+    pub connected: usize,
+    pub failed: Vec<String>,
+}
+
 struct PendingMcpApproval {
     request: McpApprovalRequest,
     responder: oneshot::Sender<bool>,
@@ -193,11 +209,40 @@ impl StdioConnection {
         });
         write_raw_frame(&self.stdin, &notif).await
     }
+
+    async fn shutdown(&self) -> Result<(), String> {
+        let mut child = self._child.lock().await;
+        if child.id().is_none() {
+            return Ok(());
+        }
+        match child.kill().await {
+            Ok(_) => {
+                let _ = child.wait().await;
+                Ok(())
+            }
+            Err(error) => {
+                // If the process already exited, wait will usually fail with ESRCH.
+                let _ = child.wait().await;
+                if matches!(
+                    error.kind(),
+                    std::io::ErrorKind::InvalidInput | std::io::ErrorKind::NotFound
+                ) {
+                    Ok(())
+                } else {
+                    Err(format!("Failed to terminate MCP stdio process: {}", error))
+                }
+            }
+        }
+    }
 }
 
 enum McpTransportHandle {
     Stdio(Arc<StdioConnection>),
-    Sse { _client: Client, _url: String },
+    Http {
+        client: Client,
+        url: String,
+        headers: HashMap<String, String>,
+    },
 }
 
 struct McpConnection {
@@ -226,9 +271,10 @@ impl McpConnection {
                     .map_err(|e| format!("Failed to spawn MCP stdio transport: {}", e))?;
                 McpTransportHandle::Stdio(Arc::new(StdioConnection::new(child)?))
             }
-            McpTransportConfig::Sse { url } => McpTransportHandle::Sse {
-                _client: Client::new(),
-                _url: url.clone(),
+            McpTransportConfig::Http { url } => McpTransportHandle::Http {
+                client: Client::new(),
+                url: url.clone(),
+                headers: config.headers.clone().unwrap_or_default(),
             },
         };
 
@@ -267,36 +313,29 @@ impl McpConnection {
     }
 
     async fn initialize(&mut self) -> Result<(), String> {
-        match &self.handle {
-            McpTransportHandle::Sse { .. } => Err(
-                "SSE MCP transport is not supported in this version. Use stdio transport.".to_string(),
-            ),
-            McpTransportHandle::Stdio(transport) => {
-                let req = JsonRpcRequest {
-                    jsonrpc: "2.0".to_string(),
-                    id: self.next_id(),
-                    method: "initialize".to_string(),
-                    params: Some(serde_json::json!({
-                        "protocolVersion": "2024-11-05",
-                        "capabilities": {},
-                        "clientInfo": {
-                            "name": "Rainy MaTE",
-                            "version": env!("CARGO_PKG_VERSION")
-                        }
-                    })),
-                };
-                let response = transport
-                    .send_request(&req, self.config.timeout_secs)
-                    .await?;
-                if let Some(error) = response.error {
-                    return Err(format!("MCP initialize failed: {}", error));
+        let req = JsonRpcRequest {
+            jsonrpc: "2.0".to_string(),
+            id: self.next_id(),
+            method: "initialize".to_string(),
+            params: Some(serde_json::json!({
+                "protocolVersion": "2024-11-05",
+                "capabilities": {},
+                "clientInfo": {
+                    "name": "Rainy MaTE",
+                    "version": env!("CARGO_PKG_VERSION")
                 }
-                let _ = transport
-                    .send_notification("notifications/initialized", Some(serde_json::json!({})))
-                    .await;
-                Ok(())
-            }
+            })),
+        };
+        let response = self.send_jsonrpc(&req).await?;
+        if let Some(error) = response.error {
+            return Err(format!("MCP initialize failed: {}", error));
         }
+        if let McpTransportHandle::Stdio(transport) = &self.handle {
+            let _ = transport
+                .send_notification("notifications/initialized", Some(serde_json::json!({})))
+                .await;
+        }
+        Ok(())
     }
 
     async fn discover_tools(&mut self) -> Result<(), String> {
@@ -384,12 +423,21 @@ impl McpConnection {
 
     async fn send_jsonrpc(&self, req: &JsonRpcRequest) -> Result<JsonRpcResponse, String> {
         match &self.handle {
-            McpTransportHandle::Sse { .. } => Err(
-                "SSE MCP transport is not supported in this version. Use stdio transport.".to_string(),
-            ),
             McpTransportHandle::Stdio(transport) => {
                 transport.send_request(req, self.config.timeout_secs).await
             }
+            McpTransportHandle::Http {
+                client,
+                url,
+                headers,
+            } => send_http_jsonrpc(client, url, headers, req, self.config.timeout_secs).await,
+        }
+    }
+
+    async fn shutdown(&self) -> Result<(), String> {
+        match &self.handle {
+            McpTransportHandle::Stdio(transport) => transport.shutdown().await,
+            McpTransportHandle::Http { .. } => Ok(()),
         }
     }
 }
@@ -419,17 +467,16 @@ async fn write_raw_frame(
     payload: &serde_json::Value,
 ) -> Result<(), String> {
     let bytes = serde_json::to_vec(payload).map_err(|e| format!("Failed to serialize JSON: {}", e))?;
-    let frame = format!("Content-Length: {}\r\n\r\n", bytes.len());
     let mut lock = stdin.lock().await;
-    lock.write_all(frame.as_bytes())
-        .await
-        .map_err(|e| format!("Failed to write frame header: {}", e))?;
     lock.write_all(&bytes)
         .await
-        .map_err(|e| format!("Failed to write frame body: {}", e))?;
+        .map_err(|e| format!("Failed to write MCP payload: {}", e))?;
+    lock.write_all(b"\n")
+        .await
+        .map_err(|e| format!("Failed to write MCP delimiter: {}", e))?;
     lock.flush()
         .await
-        .map_err(|e| format!("Failed to flush frame: {}", e))?;
+        .map_err(|e| format!("Failed to flush MCP payload: {}", e))?;
     Ok(())
 }
 
@@ -461,41 +508,115 @@ async fn read_response_with_timeout(
 
 async fn read_frame(stdout: &Mutex<BufReader<ChildStdout>>) -> Result<serde_json::Value, String> {
     let mut reader = stdout.lock().await;
-    let mut content_length: usize = 0;
-
-    loop {
-        let mut line = String::new();
-        let read = reader
-            .read_line(&mut line)
-            .await
-            .map_err(|e| format!("Failed to read MCP header line: {}", e))?;
-        if read == 0 {
-            return Err("MCP stream closed".to_string());
-        }
-        let trimmed = line.trim_end_matches(['\r', '\n']);
-        if trimmed.is_empty() {
-            break;
-        }
-        if let Some(value) = trimmed.strip_prefix("Content-Length:") {
-            content_length = value
-                .trim()
-                .parse::<usize>()
-                .map_err(|e| format!("Invalid Content-Length header: {}", e))?;
-        }
-    }
-
-    if content_length == 0 {
-        return Err("MCP frame missing Content-Length".to_string());
-    }
-
-    let mut payload = vec![0u8; content_length];
-    reader
-        .read_exact(&mut payload)
+    let mut first_line = String::new();
+    let read = reader
+        .read_line(&mut first_line)
         .await
-        .map_err(|e| format!("Failed to read MCP frame body: {}", e))?;
+        .map_err(|e| format!("Failed to read MCP line: {}", e))?;
+    if read == 0 {
+        return Err("MCP stream closed".to_string());
+    }
+    let trimmed = first_line.trim_end_matches(['\r', '\n']);
+    if trimmed.starts_with("Content-Length:") {
+        let mut content_length = trimmed
+            .strip_prefix("Content-Length:")
+            .ok_or_else(|| "Invalid MCP Content-Length header".to_string())?
+            .trim()
+            .parse::<usize>()
+            .map_err(|e| format!("Invalid Content-Length header: {}", e))?;
+        loop {
+            let mut header_line = String::new();
+            let read = reader
+                .read_line(&mut header_line)
+                .await
+                .map_err(|e| format!("Failed to read MCP header line: {}", e))?;
+            if read == 0 {
+                return Err("MCP stream closed while reading headers".to_string());
+            }
+            let header_trimmed = header_line.trim_end_matches(['\r', '\n']);
+            if header_trimmed.is_empty() {
+                break;
+            }
+            if let Some(value) = header_trimmed.strip_prefix("Content-Length:") {
+                content_length = value
+                    .trim()
+                    .parse::<usize>()
+                    .map_err(|e| format!("Invalid Content-Length header: {}", e))?;
+            }
+        }
+        let mut payload = vec![0u8; content_length];
+        reader
+            .read_exact(&mut payload)
+            .await
+            .map_err(|e| format!("Failed to read MCP frame body: {}", e))?;
+        serde_json::from_slice::<serde_json::Value>(&payload)
+            .map_err(|e| format!("Failed to parse MCP frame JSON: {}", e))
+    } else {
+        serde_json::from_str::<serde_json::Value>(trimmed)
+            .map_err(|e| format!("Failed to parse MCP JSON line: {}", e))
+    }
+}
 
-    serde_json::from_slice::<serde_json::Value>(&payload)
-        .map_err(|e| format!("Failed to parse MCP frame JSON: {}", e))
+async fn send_http_jsonrpc(
+    client: &Client,
+    url: &str,
+    headers: &HashMap<String, String>,
+    req: &JsonRpcRequest,
+    timeout_secs: u64,
+) -> Result<JsonRpcResponse, String> {
+    let mut request_builder = client
+        .post(url)
+        .header("Accept", "application/json, text/event-stream")
+        .header("Content-Type", "application/json")
+        .json(req)
+        .timeout(std::time::Duration::from_secs(timeout_secs.max(1)));
+    for (key, value) in headers {
+        request_builder = request_builder.header(key, value);
+    }
+    let response = request_builder
+        .send()
+        .await
+        .map_err(|e| format!("MCP HTTP request failed: {}", e))?;
+    let status = response.status();
+    let content_type = response
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .to_string();
+    let body = response
+        .text()
+        .await
+        .map_err(|e| format!("Failed to read MCP HTTP response: {}", e))?;
+    if !status.is_success() {
+        return Err(format!("MCP HTTP error {}: {}", status, body));
+    }
+    if content_type.contains("text/event-stream") {
+        return parse_sse_jsonrpc_response(&body, req.id);
+    }
+    serde_json::from_str::<JsonRpcResponse>(&body)
+        .map_err(|e| format!("Invalid MCP HTTP JSON-RPC response: {}", e))
+}
+
+fn parse_sse_jsonrpc_response(body: &str, expected_id: u64) -> Result<JsonRpcResponse, String> {
+    for line in body.lines() {
+        let trimmed = line.trim();
+        if !trimmed.starts_with("data:") {
+            continue;
+        }
+        let data = trimmed.trim_start_matches("data:").trim();
+        if data.is_empty() {
+            continue;
+        }
+        if let Ok(value) = serde_json::from_str::<serde_json::Value>(data) {
+            let maybe_id = value.get("id").and_then(|v| v.as_u64());
+            if maybe_id == Some(expected_id) {
+                return serde_json::from_value::<JsonRpcResponse>(value)
+                    .map_err(|e| format!("Invalid JSON-RPC in SSE event: {}", e));
+            }
+        }
+    }
+    Err("No matching JSON-RPC response found in MCP SSE stream".to_string())
 }
 
 pub struct McpService {
@@ -557,14 +678,24 @@ impl McpService {
     pub async fn remove_server(&self, name: &str) -> Result<(), String> {
         let mut settings = SettingsManager::new();
         settings.remove_mcp_server(name)?;
-        self.connections.lock().await.remove(name);
+        let removed = self
+            .connections
+            .lock()
+            .await
+            .remove(&McpServerConfig::sanitize_name(name));
+        if let Some(conn) = removed {
+            let _ = conn.shutdown().await;
+        }
         Ok(())
     }
 
     pub async fn connect_server(&self, config: McpServerConfig) -> Result<(), String> {
         let conn = McpConnection::connect(config.clone()).await?;
         let key = McpServerConfig::sanitize_name(&config.name);
-        self.connections.lock().await.insert(key, conn);
+        let previous = self.connections.lock().await.insert(key, conn);
+        if let Some(prev_conn) = previous {
+            let _ = prev_conn.shutdown().await;
+        }
         Ok(())
     }
 
@@ -572,13 +703,122 @@ impl McpService {
         &self,
         name: &str,
         env: Option<HashMap<String, String>>,
+        headers: Option<HashMap<String, String>>,
     ) -> Result<(), String> {
         let saved = self.list_servers().await;
         let found = saved
             .into_iter()
             .find(|s| McpServerConfig::sanitize_name(&s.name) == McpServerConfig::sanitize_name(name))
             .ok_or_else(|| format!("MCP server '{}' not found", name))?;
-        self.connect_server(found.to_runtime(env)).await
+        self.connect_server(found.to_runtime(env, headers)).await
+    }
+
+    pub async fn import_servers_from_json(
+        &self,
+        json_path: &str,
+        auto_connect: bool,
+    ) -> Result<McpJsonImportResult, String> {
+        let contents = std::fs::read_to_string(json_path)
+            .map_err(|e| format!("Failed to read MCP JSON file: {}", e))?;
+        let json: serde_json::Value = serde_json::from_str(&contents)
+            .map_err(|e| format!("Invalid MCP JSON file: {}", e))?;
+
+        let mcp_servers = json
+            .get("mcpServers")
+            .and_then(|v| v.as_object())
+            .or_else(|| json.as_object())
+            .ok_or_else(|| "MCP JSON must be an object or include mcpServers object".to_string())?;
+
+        let mut imported = 0usize;
+        let mut connected = 0usize;
+        let mut failed = Vec::new();
+
+        for (name, config_value) in mcp_servers {
+            let config_obj = match config_value.as_object() {
+                Some(obj) => obj,
+                None => {
+                    failed.push(format!("{}: config must be an object", name));
+                    continue;
+                }
+            };
+
+            let timeout_secs = config_obj
+                .get("timeoutSecs")
+                .or_else(|| config_obj.get("timeout"))
+                .and_then(|v| v.as_u64())
+                .unwrap_or(default_timeout_secs());
+            let enabled = !config_obj
+                .get("disabled")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+
+            let transport = if let Some(url) = config_obj.get("url").and_then(|v| v.as_str()) {
+                PersistedMcpTransportConfig::Http {
+                    url: url.to_string(),
+                }
+            } else if let Some(command) = config_obj.get("command").and_then(|v| v.as_str()) {
+                let args = config_obj
+                    .get("args")
+                    .and_then(|v| v.as_array())
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|item| item.as_str().map(|s| s.to_string()))
+                            .collect::<Vec<String>>()
+                    })
+                    .unwrap_or_default();
+                PersistedMcpTransportConfig::Stdio {
+                    command: command.to_string(),
+                    args,
+                }
+            } else {
+                failed.push(format!("{}: missing command/args or url", name));
+                continue;
+            };
+
+            let persisted = PersistedMcpServerConfig {
+                name: name.to_string(),
+                transport,
+                timeout_secs,
+                enabled,
+            };
+            if let Err(error) = self.upsert_server(persisted.clone()).await {
+                failed.push(format!("{}: {}", name, error));
+                continue;
+            }
+            imported += 1;
+
+            if auto_connect && enabled {
+                let env = config_obj
+                    .get("env")
+                    .and_then(|v| v.as_object())
+                    .map(|obj| {
+                        obj.iter()
+                            .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+                            .collect::<HashMap<String, String>>()
+                    });
+                let headers = config_obj
+                    .get("headers")
+                    .or_else(|| config_obj.get("httpHeaders"))
+                    .and_then(|v| v.as_object())
+                    .map(|obj| {
+                        obj.iter()
+                            .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+                            .collect::<HashMap<String, String>>()
+                    });
+
+                if let Err(error) = self.connect_server(persisted.to_runtime(env, headers)).await {
+                    failed.push(format!("{}: {}", name, error));
+                } else {
+                    connected += 1;
+                }
+            }
+        }
+
+        Ok(McpJsonImportResult {
+            imported,
+            connected,
+            failed,
+        })
     }
 
     pub async fn disconnect_server(&self, name: &str) -> Result<(), String> {
@@ -587,7 +827,8 @@ impl McpService {
             .lock()
             .await
             .remove(&McpServerConfig::sanitize_name(name));
-        if removed.is_some() {
+        if let Some(conn) = removed {
+            let _ = conn.shutdown().await;
             Ok(())
         } else {
             Err(format!("MCP server '{}' is not connected", name))
@@ -748,6 +989,6 @@ impl McpService {
 fn transport_label(transport: &PersistedMcpTransportConfig) -> String {
     match transport {
         PersistedMcpTransportConfig::Stdio { .. } => "stdio".to_string(),
-        PersistedMcpTransportConfig::Sse { .. } => "sse".to_string(),
+        PersistedMcpTransportConfig::Http { .. } => "http".to_string(),
     }
 }
