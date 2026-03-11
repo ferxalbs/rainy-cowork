@@ -88,6 +88,15 @@ impl AirlockService {
             .filter(|s| !s.is_empty())
     }
 
+    fn is_mcp_tool(command: &QueuedCommand) -> bool {
+        command
+            .payload
+            .method
+            .as_ref()
+            .map(|method| crate::services::mcp_service::McpService::is_mcp_tool(method))
+            .unwrap_or(false)
+    }
+
     fn effective_airlock_level(command: &QueuedCommand) -> AirlockLevel {
         if Self::is_agent_run_bootstrap(command) {
             return AirlockLevel::Safe;
@@ -159,6 +168,13 @@ impl AirlockService {
                 "Airlock: Auto-approved agent.run bootstrap command {}",
                 command.id
             );
+            return Ok(true);
+        }
+
+        // MCP tools use a dedicated global ask/no-ask gate in McpService.
+        // They intentionally bypass 3-level Airlock classification.
+        if Self::is_mcp_tool(command) {
+            tracing::debug!("Airlock: Bypassing MCP tool {}; delegated to MCP gate", command.id);
             return Ok(true);
         }
 

@@ -116,11 +116,18 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
 
 /** Resolves a function name to a human-readable display name */
 export const getToolDisplayName = (functionName: string): string => {
+  if (functionName.startsWith("mcp_")) {
+    const parts = functionName.replace(/^mcp_/, "").split("_");
+    const server = parts.shift() || "server";
+    const tool = parts.join("_") || "tool";
+    return `MCP ${server}: ${tool.replace(/_/g, " ")}`;
+  }
   return TOOL_DISPLAY_NAMES[functionName] || functionName.replace(/_/g, " ");
 };
 
 /** Resolves a function name to the corresponding NeuralState */
 export const resolveNeuralState = (functionName: string): NeuralState => {
+  if (functionName.startsWith("mcp_")) return "communicating";
   return TOOL_STATE_MAP[functionName] || "executing";
 };
 

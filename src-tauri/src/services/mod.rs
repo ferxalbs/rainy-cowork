@@ -1,4 +1,4 @@
-// Rainy Cowork - Services Module
+// Rainy MaTE - Services Module
 // Business logic layer
 
 pub mod agent_kill_switch;
@@ -48,6 +48,7 @@ pub use file_operations::FileOperationEngine;
 pub use folder_manager::FolderManager;
 pub use image::ImageService;
 pub use managed_research::ManagedResearchService;
+pub use mcp_service::McpService;
 pub use memory::MemoryManager;
 pub use neural_service::NeuralService;
 pub use security::NodeAuthenticator;

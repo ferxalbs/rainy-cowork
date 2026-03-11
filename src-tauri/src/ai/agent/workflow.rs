@@ -49,6 +49,9 @@ fn resolve_airlock_level_for_tool(spec: &AgentSpec, tool_name: &str) -> AirlockL
             _ => AirlockLevel::Dangerous,
         };
     }
+    if crate::services::mcp_service::McpService::is_mcp_tool(tool_name) {
+        return AirlockLevel::Safe;
+    }
     get_tool_policy(tool_name)
         .map(|policy| policy.airlock_level)
         .unwrap_or(AirlockLevel::Dangerous)
@@ -680,9 +683,10 @@ impl WorkflowStep for ActStep {
             // First try the static built-in policy map; if not found, look in the
             // third-party Wasm skill registry. This makes Wasm skills fully first-class
             // citizens in the agent chat loop.
-            let (skill, method_str, airlock_level) = if let Some(policy) =
-                get_tool_policy(&function_name)
-            {
+            let (skill, method_str, airlock_level) = if crate::services::mcp_service::McpService::is_mcp_tool(&function_name) {
+                let level = resolve_airlock_level_for_tool(state.spec.as_ref(), &function_name);
+                ("mcp".to_string(), function_name.clone(), level)
+            } else if let Some(policy) = get_tool_policy(&function_name) {
                 let level = resolve_airlock_level_for_tool(state.spec.as_ref(), &function_name);
                 (
                     policy.skill.as_str().to_string(),

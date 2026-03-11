@@ -1322,6 +1322,113 @@ export async function setHeadlessMode(enabled: boolean): Promise<void> {
   return invoke("set_headless_mode", { enabled });
 }
 
+// ============ MCP Commands ============
+
+export type McpPermissionMode = "ask" | "no_ask";
+
+export type PersistedMcpTransportConfig =
+  | { type: "stdio"; command: string; args: string[] }
+  | { type: "sse"; url: string };
+
+export interface PersistedMcpServerConfig {
+  name: string;
+  transport: PersistedMcpTransportConfig;
+  timeoutSecs: number;
+  enabled: boolean;
+}
+
+export interface McpRuntimeServerStatus {
+  name: string;
+  connected: boolean;
+  toolCount: number;
+  transport: string;
+  lastError?: string | null;
+}
+
+export interface McpRuntimeStatus {
+  permissionMode: McpPermissionMode;
+  connectedServers: number;
+  totalTools: number;
+  pendingApprovals: number;
+}
+
+export interface McpApprovalRequest {
+  approvalId: string;
+  serverName: string;
+  toolName: string;
+  argumentsSummary: string;
+  timestamp: number;
+}
+
+export interface McpServerConfig {
+  name: string;
+  transport:
+    | { type: "stdio"; command: string; args: string[] }
+    | { type: "sse"; url: string };
+  timeoutSecs: number;
+  env?: Record<string, string> | null;
+}
+
+export async function listMcpServers(): Promise<PersistedMcpServerConfig[]> {
+  return invoke("list_mcp_servers");
+}
+
+export async function upsertMcpServer(
+  config: PersistedMcpServerConfig,
+): Promise<void> {
+  return invoke("upsert_mcp_server", { config });
+}
+
+export async function removeMcpServer(name: string): Promise<void> {
+  return invoke("remove_mcp_server", { name });
+}
+
+export async function connectMcpSavedServer(
+  name: string,
+  env?: Record<string, string>,
+): Promise<void> {
+  return invoke("connect_mcp_saved_server", { name, env });
+}
+
+export async function connectMcpServer(config: McpServerConfig): Promise<void> {
+  return invoke("connect_mcp_server", { config });
+}
+
+export async function disconnectMcpServer(name: string): Promise<void> {
+  return invoke("disconnect_mcp_server", { name });
+}
+
+export async function refreshMcpServerTools(name: string): Promise<void> {
+  return invoke("refresh_mcp_server_tools", { name });
+}
+
+export async function listMcpRuntimeServers(): Promise<McpRuntimeServerStatus[]> {
+  return invoke("list_mcp_runtime_servers");
+}
+
+export async function getMcpRuntimeStatus(): Promise<McpRuntimeStatus> {
+  return invoke("get_mcp_runtime_status");
+}
+
+export async function getMcpPermissionMode(): Promise<McpPermissionMode> {
+  return invoke("get_mcp_permission_mode");
+}
+
+export async function setMcpPermissionMode(mode: McpPermissionMode): Promise<void> {
+  return invoke("set_mcp_permission_mode", { mode });
+}
+
+export async function getPendingMcpApprovals(): Promise<McpApprovalRequest[]> {
+  return invoke("get_pending_mcp_approvals");
+}
+
+export async function respondToMcpApproval(
+  approvalId: string,
+  approved: boolean,
+): Promise<void> {
+  return invoke("respond_to_mcp_approval", { approvalId, approved });
+}
+
 // ============ Neural Credentials Commands ============
 
 export async function setNeuralCredentials(

@@ -674,10 +674,16 @@ export function useAgentChat() {
                   };
                 }
                 case "status": {
+                  const statusText = String(payload.data || "");
+                  const waitingOnMcpApproval =
+                    statusText.toLowerCase().includes("approval") &&
+                    statusText.toLowerCase().includes("mcp");
                   return {
                     ...m,
-                    neuralState: "planning",
-                    activeToolName: undefined,
+                    neuralState: waitingOnMcpApproval ? "communicating" : "planning",
+                    activeToolName: waitingOnMcpApproval
+                      ? "Awaiting MCP approval"
+                      : undefined,
                   };
                 }
                 default:

@@ -16,24 +16,48 @@ impl McpHttpProxy {
                 // Parse tool parameters and dispatch to either SkillExecutor or McpService
                 let params = request.params.unwrap_or(serde_json::json!({}));
                 let name = params.get("name").and_then(|v| v.as_str()).unwrap_or("");
-                let _args = params
+                let args = params
                     .get("arguments")
                     .cloned()
                     .unwrap_or(serde_json::json!({}));
 
                 if McpService::is_mcp_tool(name) {
-                    // Route to external MCP connection
-                    // Note: Here we'd actually look up the McpConnection and call it.
-                    // For now, this is a skeleton.
-                    JsonRpcResponse {
-                        jsonrpc: "2.0".to_string(),
-                        id: request.id,
-                        result: Some(serde_json::json!({
-                            "content": [
-                                { "type": "text", "text": format!("Dispatched {} via MCP proxy", name) }
-                            ]
-                        })),
-                        error: None,
+                    if let Some(server_name) = McpService::extract_mcp_server(name) {
+                        match self
+                            .mcp_service
+                            .call_mcp_tool(&server_name, name, args)
+                            .await
+                        {
+                            Ok(output) => JsonRpcResponse {
+                                jsonrpc: "2.0".to_string(),
+                                id: request.id,
+                                result: Some(serde_json::json!({
+                                    "content": [
+                                        { "type": "text", "text": output }
+                                    ]
+                                })),
+                                error: None,
+                            },
+                            Err(error) => JsonRpcResponse {
+                                jsonrpc: "2.0".to_string(),
+                                id: request.id,
+                                result: None,
+                                error: Some(serde_json::json!({
+                                    "code": -32000,
+                                    "message": error
+                                })),
+                            },
+                        }
+                    } else {
+                        JsonRpcResponse {
+                            jsonrpc: "2.0".to_string(),
+                            id: request.id,
+                            result: None,
+                            error: Some(serde_json::json!({
+                                "code": -32602,
+                                "message": "Invalid MCP tool name"
+                            })),
+                        }
                     }
                 } else {
                     // Option 2: Route to built-in SkillExecutor (or error if unsupported)

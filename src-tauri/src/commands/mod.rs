@@ -15,6 +15,7 @@ pub mod file_ops;
 pub mod folder;
 pub mod image;
 pub mod memory;
+pub mod mcp;
 pub mod neural;
 
 pub mod research;
@@ -38,6 +39,7 @@ pub use file_ops::*;
 pub use folder::*;
 pub use image::*;
 pub use memory::*;
+pub use mcp::*;
 pub use neural::*;
 
 pub use router::*;

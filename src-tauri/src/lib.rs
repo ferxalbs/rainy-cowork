@@ -141,8 +141,8 @@ pub fn run() {
         .manage(browser_controller) // Arc<BrowserController>
         .manage(command_poller) // Arc<CommandPoller>
         .manage(skill_executor) // Arc<SkillExecutor>
-        .manage(mcp_service) // Arc<McpService>
-        .manage(mcp_http_proxy) // Arc<McpHttpProxy>
+        .manage(mcp_service.clone()) // Arc<McpService>
+        .manage(mcp_http_proxy.clone()) // Arc<McpHttpProxy>
         .manage(runtime_registry.clone()) // Arc<RuntimeRegistry>
         .manage(socket_client) // SocketClient
         .manage(llm_client) // Arc<Mutex<LLMClient>>
@@ -170,6 +170,10 @@ pub fn run() {
                 .path()
                 .app_data_dir()
                 .expect("Failed to get app data dir");
+
+            tauri::async_runtime::block_on(async {
+                mcp_service.set_app_handle(app.handle().clone()).await;
+            });
             let folder_manager = FolderManager::new(app_data_dir);
 
             // Manage the folder manager state
@@ -646,8 +650,20 @@ pub fn run() {
             manager::get_chat_history,
             manager::clear_chat_history,
             manager::compact_session_cmd,
-            crate::services::mcp_service::connect_mcp_server,
             crate::services::mcp_http::handle_mcp_request,
+            commands::list_mcp_servers,
+            commands::upsert_mcp_server,
+            commands::remove_mcp_server,
+            commands::connect_mcp_saved_server,
+            commands::connect_mcp_server,
+            commands::disconnect_mcp_server,
+            commands::refresh_mcp_server_tools,
+            commands::list_mcp_runtime_servers,
+            commands::get_mcp_runtime_status,
+            commands::get_mcp_permission_mode,
+            commands::set_mcp_permission_mode,
+            commands::get_pending_mcp_approvals,
+            commands::respond_to_mcp_approval,
             crate::services::persistent_scheduler::add_scheduled_job,
             crate::services::persistent_scheduler::list_scheduled_jobs,
             crate::services::persistent_scheduler::remove_scheduled_job,

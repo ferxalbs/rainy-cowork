@@ -5,6 +5,7 @@ use crate::ai::model_catalog::{
     ensure_supported_model_slug, find_catalog_model, ModelProvider,
 };
 use crate::ai::provider::AIProviderManager;
+use crate::services::mcp_service::{McpPermissionMode, PersistedMcpServerConfig};
 use rainy_sdk::models::{CapabilityFlag, ModelCatalogItem};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -37,6 +38,10 @@ pub struct UserSettings {
     pub tool_policy_version_floor: HashMap<String, u64>,
     pub embedder_provider: String,
     pub embedder_model: String,
+    #[serde(default)]
+    pub mcp_permission_mode: McpPermissionMode,
+    #[serde(default)]
+    pub mcp_servers: Vec<PersistedMcpServerConfig>,
 }
 
 /// User profile metadata for desktop personalization and cloud identity sync
@@ -61,6 +66,8 @@ impl Default for UserSettings {
             tool_policy_version_floor: HashMap::new(),
             embedder_provider: "gemini".to_string(),
             embedder_model: "gemini-embedding-001".to_string(),
+            mcp_permission_mode: McpPermissionMode::Ask,
+            mcp_servers: Vec::new(),
         }
     }
 }
@@ -218,6 +225,44 @@ impl SettingsManager {
         self.settings
             .tool_policy_version_floor
             .insert(workspace_id.to_string(), version);
+        self.save_to_disk()
+    }
+
+    pub fn get_mcp_permission_mode(&self) -> McpPermissionMode {
+        self.settings.mcp_permission_mode.clone()
+    }
+
+    pub fn set_mcp_permission_mode(&mut self, mode: McpPermissionMode) -> Result<(), String> {
+        self.settings.mcp_permission_mode = mode;
+        self.save_to_disk()
+    }
+
+    pub fn get_mcp_servers(&mut self) -> Vec<PersistedMcpServerConfig> {
+        self.settings.mcp_servers.clone()
+    }
+
+    pub fn upsert_mcp_server(&mut self, config: PersistedMcpServerConfig) -> Result<(), String> {
+        if let Some(existing) = self
+            .settings
+            .mcp_servers
+            .iter_mut()
+            .find(|s| s.name.eq_ignore_ascii_case(&config.name))
+        {
+            *existing = config;
+        } else {
+            self.settings.mcp_servers.push(config);
+        }
+        self.save_to_disk()
+    }
+
+    pub fn remove_mcp_server(&mut self, name: &str) -> Result<(), String> {
+        let before = self.settings.mcp_servers.len();
+        self.settings
+            .mcp_servers
+            .retain(|s| !s.name.eq_ignore_ascii_case(name));
+        if self.settings.mcp_servers.len() == before {
+            return Err(format!("MCP server '{}' not found", name));
+        }
         self.save_to_disk()
     }
 

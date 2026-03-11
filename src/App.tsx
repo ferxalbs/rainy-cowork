@@ -3,7 +3,7 @@ import { UpdateChecker } from "./components/updater/UpdateChecker";
 import { TahoeLayout, AIDocumentPanel, AIResearchPanel } from "./components";
 import { SettingsPage } from "./components/settings";
 import { AgentChatPanel } from "./components/agent-chat/AgentChatPanel";
-import { NeuralPanel, AirlockEvents } from "./components/neural";
+import { NeuralPanel, AirlockEvents, McpApprovalEvents } from "./components/neural";
 import { AgentBuilder } from "./components/agents/builder/AgentBuilder";
 import { AgentStorePage } from "./components/agents/store/AgentStorePage";
 import { WasmSkillsPage } from "./components/wasm-skills/WasmSkillsPage";
@@ -229,6 +229,7 @@ function App() {
       {/* Toast Container for notifications */}
       <Toaster richColors position="bottom-right" theme="system" />
       <AirlockEvents />
+      <McpApprovalEvents />
     </>
   );
 }

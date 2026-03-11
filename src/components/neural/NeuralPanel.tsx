@@ -20,6 +20,7 @@ import { NeuralActivity } from "./modules/NeuralActivity";
 import { NeuralAgents } from "./modules/NeuralAgents";
 import { NeuralDashboard } from "./modules/NeuralDashboard";
 import { FleetCommandCenter } from "./modules/FleetCommandCenter";
+import { NeuralMcp } from "./modules/NeuralMcp";
 
 type NeuralState = "idle" | "restored" | "connected" | "connecting";
 
@@ -439,6 +440,7 @@ export function NeuralPanel({ onNavigate }: NeuralPanelProps) {
       {activeTab === "fleet" && (
         <FleetCommandCenter platformKey={platformKey} userApiKey={userApiKey} />
       )}
+      {activeTab === "mcp" && <NeuralMcp />}
     </NeuralLayout>
   );
 }
