@@ -5,6 +5,40 @@ All notable changes to Rainy Cowork will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - 2026-03-11 - END OF LOCAL MCP ERA (FOUNDATION FOR 0.5.96)
+
+### Added
+
+- Added default user-editable MCP JSON lifecycle commands and runtime import flow:
+  - `get_or_create_default_mcp_json_config`
+  - `save_default_mcp_json_config`
+  - `import_mcp_servers_from_default_json`
+  - files:
+    - `src-tauri/src/commands/mcp.rs`
+    - `src-tauri/src/lib.rs`
+    - `src/services/tauri.ts`
+    - `src/components/neural/modules/NeuralMcp.tsx`
+
+### Changed
+
+- Switched MCP transport support to `stdio + http` and retained compatibility for legacy persisted `"sse"` tags via serde alias mapping:
+  - `src-tauri/src/services/mcp_service.rs`
+- Reworked MCP Neural panel to JSON-first management (visual JSON editor + validate/save/run), removing manual server-creation dependence:
+  - `src/components/neural/modules/NeuralMcp.tsx`
+
+### Fixed
+
+- Fixed MCP runtime removal lifecycle to consistently detach live connections using sanitized server keys.
+- Fixed MCP disconnection/removal lifecycle to explicitly terminate spawned stdio subprocesses (including replacement on reconnect with same key), preventing orphan process leaks and hidden active tools.
+  - file:
+    - `src-tauri/src/services/mcp_service.rs`
+
+### Validation
+
+- `cd src-tauri && cargo check -q` — passes
+- `pnpm exec tsc --noEmit` — passes
+- `cd src-tauri && cargo test -q workflow --lib` — passes
+
 ## [0.5.95] - 2026-03-10 - NERVE CENTER STEP 6 STABILITY PATCH
 
 ### Fixed
