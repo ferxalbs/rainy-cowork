@@ -41,7 +41,10 @@ interface MessageBubbleProps {
   workspaceId?: string;
 }
 
-export function MessageBubble({
+// ⚡ Bolt: Wrapped MessageBubble in React.memo to prevent unnecessary re-renders of the entire chat history
+// when parent components update (e.g. during active chat streaming).
+// Impact: Reduces CPU usage and improves frame rates during long streaming responses.
+export const MessageBubble = React.memo(function MessageBubble({
   message,
   onExecute,
   onExecuteToolCalls,
@@ -221,7 +224,7 @@ export function MessageBubble({
       </div>
     </div>
   );
-}
+});
 
 function SupervisorRail({
   summary,
