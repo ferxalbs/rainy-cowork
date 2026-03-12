@@ -658,6 +658,7 @@ pub fn run() {
             commands::get_workflow_recording,
             commands::get_active_workflow_recording,
             commands::generate_agent_spec_from_recording,
+            commands::validate_generated_agent,
             commands::save_generated_agent,
             commands::list_generated_agents,
             commands::load_generated_agent,

@@ -1916,7 +1916,29 @@ export interface RecordedWorkflow {
 
 export interface ForgeGenerateResponse {
   recording: RecordedWorkflow;
+  recordingMetrics: ForgeRecordingMetrics;
   generatedSpec: any;
+}
+
+export interface ForgeRecordingMetrics {
+  totalSteps: number;
+  usefulSteps: number;
+  toolCallsCount: number;
+  decisionPointsCount: number;
+  errorsCount: number;
+  retriesCount: number;
+  readyToGenerate: boolean;
+  missingRequirements: string[];
+}
+
+export interface ForgeValidationResult {
+  passed: boolean;
+  coverageScore: number;
+  determinismScore: number;
+  safetyScore: number;
+  totalScore: number;
+  reasons: string[];
+  checkedAtMs: number;
 }
 
 export interface AgentLibraryEntry {
@@ -1959,6 +1981,16 @@ export async function generateAgentSpecFromRecording(input: {
   agentName?: string;
 }): Promise<ForgeGenerateResponse> {
   return invoke("generate_agent_spec_from_recording", { input });
+}
+
+export async function validateGeneratedAgent(input: {
+  spec: any;
+  recordingId?: string;
+}): Promise<ForgeValidationResult> {
+  return invoke("validate_generated_agent", {
+    spec: input.spec,
+    recordingId: input.recordingId ?? null,
+  });
 }
 
 export async function saveGeneratedAgent(spec: any): Promise<AgentLibraryEntry> {

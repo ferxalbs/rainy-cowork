@@ -27,6 +27,11 @@ import { UnifiedModelSelector } from "../ai/UnifiedModelSelector";
 import { AgentSelector } from "./AgentSelector";
 import { MessageBubble } from "./MessageBubble";
 import { AgentSpec } from "../../types/agent-spec";
+import type {
+  ForgeRecordingMetrics,
+  ForgeValidationResult,
+  RecordedWorkflow,
+} from "../../services/tauri";
 
 interface AgentChatPanelProps {
   workspacePath: string;
@@ -48,15 +53,79 @@ export function AgentChatPanel({
   const [forgeRecordingId, setForgeRecordingId] = useState<string | null>(null);
   const [isForgeRecording, setIsForgeRecording] = useState(false);
   const [isForgeBusy, setIsForgeBusy] = useState(false);
+  const [isForgeValidating, setIsForgeValidating] = useState(false);
   const [pendingForgeSpec, setPendingForgeSpec] = useState<any | null>(null);
+  const [pendingForgeRecordingId, setPendingForgeRecordingId] =
+    useState<string | null>(null);
+  const [stoppedForgeRecordingId, setStoppedForgeRecordingId] = useState<
+    string | null
+  >(null);
+  const [forgeMetrics, setForgeMetrics] = useState<ForgeRecordingMetrics | null>(
+    null,
+  );
+  const [forgeValidation, setForgeValidation] =
+    useState<ForgeValidationResult | null>(null);
   const [forgeStatusText, setForgeStatusText] = useState<string>("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const computeForgeMetrics = (
+    recording: RecordedWorkflow,
+  ): ForgeRecordingMetrics => {
+    const usefulKinds = new Set([
+      "user_instruction",
+      "agent_run",
+      "agent_run_requested",
+      "tool_call",
+      "tool_result",
+      "decision",
+      "error",
+      "retry",
+    ]);
+    const totalSteps = recording.steps.length;
+    const usefulSteps = recording.steps.filter((step) =>
+      usefulKinds.has(step.kind),
+    ).length;
+    const toolCallsCount = recording.steps.filter(
+      (step) => step.kind === "tool_call",
+    ).length;
+    const decisionPointsCount = recording.steps.filter(
+      (step) => step.kind === "decision",
+    ).length;
+    const errorsCount = recording.steps.filter(
+      (step) => step.kind === "error",
+    ).length;
+    const retriesCount = recording.steps.filter(
+      (step) => step.kind === "retry",
+    ).length;
+
+    const missingRequirements: string[] = [];
+    if (usefulSteps < 3) {
+      missingRequirements.push(
+        `Need at least 3 useful steps (currently ${usefulSteps})`,
+      );
+    }
+    if (toolCallsCount < 1) {
+      missingRequirements.push(
+        `Need at least 1 tool call (currently ${toolCallsCount})`,
+      );
+    }
+
+    return {
+      totalSteps,
+      usefulSteps,
+      toolCallsCount,
+      decisionPointsCount,
+      errorsCount,
+      retriesCount,
+      readyToGenerate: missingRequirements.length === 0,
+      missingRequirements,
+    };
+  };
 
   // Initialize with default model if none selected
   useEffect(() => {
     const initModel = async () => {
       try {
-        // Reuse existing command or use new one
         const model = await tauri.getSelectedModel();
         if (model) setCurrentModelId(model);
       } catch (e) {
@@ -89,6 +158,7 @@ export function AgentChatPanel({
         if (active) {
           setForgeRecordingId(active.id);
           setIsForgeRecording(true);
+          setForgeMetrics(computeForgeMetrics(active));
         }
       } catch (e) {
         console.error("Failed to hydrate forge recording state", e);
@@ -96,6 +166,22 @@ export function AgentChatPanel({
     };
     hydrateForgeState();
   }, []);
+
+  useEffect(() => {
+    if (!isForgeRecording) return;
+    const timer = setInterval(async () => {
+      try {
+        const active = await tauri.getActiveWorkflowRecording();
+        if (active?.id) {
+          setForgeMetrics(computeForgeMetrics(active));
+        }
+      } catch {
+        // ignore transient polling errors
+      }
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [isForgeRecording]);
 
   const handleModelSelect = async (modelId: string) => {
     setCurrentModelId(modelId);
@@ -157,7 +243,6 @@ export function AgentChatPanel({
       }
     }
 
-    // Always use Native Agent
     await runNativeAgent(
       instruction,
       currentModelId,
@@ -189,7 +274,10 @@ export function AgentChatPanel({
         title: `Forge Session ${new Date().toLocaleString()}`,
       });
       setForgeRecordingId(rec.id);
+      setStoppedForgeRecordingId(null);
       setIsForgeRecording(true);
+      setForgeMetrics(computeForgeMetrics(rec));
+      setForgeValidation(null);
       setForgeStatusText("Recording in progress.");
       toast.success("Workflow recording started");
     } catch (e: any) {
@@ -200,39 +288,107 @@ export function AgentChatPanel({
     }
   };
 
-  const handleStopAndGenerateForgeAgent = async () => {
+  const handleStopForgeRecording = async () => {
     if (isForgeBusy || !isForgeRecording || !forgeRecordingId) return;
     setIsForgeBusy(true);
     try {
       const recording = await tauri.stopWorkflowRecording();
+      setForgeRecordingId(null);
+      setStoppedForgeRecordingId(recording.id);
+      setIsForgeRecording(false);
+      const metrics = computeForgeMetrics(recording);
+      setForgeMetrics(metrics);
+      if (metrics.readyToGenerate) {
+        setForgeStatusText(
+          `Recording stopped (${recording.stepCount} steps). Ready to generate specialist draft.`,
+        );
+      } else {
+        setForgeStatusText(
+          `Recording stopped (${recording.stepCount} steps). ${metrics.missingRequirements.join(" · ")}`,
+        );
+      }
+      toast.success("Workflow recording stopped");
+    } catch (e: any) {
+      console.error("Failed to stop workflow recording", e);
+      toast.error(e?.message ?? "Failed to stop workflow recording");
+    } finally {
+      setIsForgeBusy(false);
+    }
+  };
+
+  const handleGenerateForgeAgent = async () => {
+    if (isForgeBusy) return;
+    if (isForgeRecording) {
+      toast.error("Stop recording before generating the specialist draft.");
+      return;
+    }
+    if (!stoppedForgeRecordingId) {
+      toast.error("No stopped recording available to generate from.");
+      return;
+    }
+    if (forgeMetrics && !forgeMetrics.readyToGenerate) {
+      toast.error(forgeMetrics.missingRequirements.join(" · "));
+      return;
+    }
+    setIsForgeBusy(true);
+    try {
       const generated = await tauri.generateAgentSpecFromRecording({
-        recordingId: recording.id,
+        recordingId: stoppedForgeRecordingId,
         agentName: `Forge Agent ${new Date().toLocaleTimeString()}`,
       });
-      setForgeRecordingId(null);
-      setIsForgeRecording(false);
       setPendingForgeSpec(generated.generatedSpec);
+      setPendingForgeRecordingId(generated.recording.id);
+      setForgeMetrics(generated.recordingMetrics);
+      setForgeValidation(null);
       setForgeStatusText(
-        `Generated draft from recording (${recording.stepCount} steps). Review before saving.`,
+        `Generated specialist draft from recording (${generated.recording.stepCount} steps). Run Test Draft before Save & Activate.`,
       );
       toast.success("Forge draft generated");
     } catch (e: any) {
-      console.error("Failed to stop/generate forge agent", e);
+      console.error("Failed to generate forge agent", e);
       toast.error(e?.message ?? "Failed to generate Forge agent");
     } finally {
       setIsForgeBusy(false);
     }
   };
 
+  const handleValidateForgeDraft = async () => {
+    if (!pendingForgeSpec || isForgeValidating) return;
+    setIsForgeValidating(true);
+    try {
+      const result = await tauri.validateGeneratedAgent({
+        spec: pendingForgeSpec,
+        recordingId: pendingForgeRecordingId || undefined,
+      });
+      setForgeValidation(result);
+      if (result.passed) {
+        toast.success(`Validation passed (score ${result.totalScore})`);
+      } else {
+        toast.error(`Validation failed (score ${result.totalScore})`);
+      }
+    } catch (e: any) {
+      console.error("Failed to validate Forge draft", e);
+      toast.error(e?.message ?? "Failed to validate Forge draft");
+    } finally {
+      setIsForgeValidating(false);
+    }
+  };
+
   const handleSaveForgeDraft = async () => {
     if (!pendingForgeSpec || isForgeBusy) return;
+    if (!forgeValidation?.passed) {
+      toast.error("Run Test Draft and pass validation before Save & Activate.");
+      return;
+    }
     setIsForgeBusy(true);
     try {
       const saved = await tauri.saveGeneratedAgent(pendingForgeSpec);
       await tauri.saveAgentSpec(pendingForgeSpec);
       setSelectedAgentId(pendingForgeSpec.id);
       setPendingForgeSpec(null);
-      setForgeStatusText(`Generated agent "${saved.name}" saved and activated.`);
+      setPendingForgeRecordingId(null);
+      setForgeValidation(null);
+      setForgeStatusText(`Generated specialist "${saved.name}" saved and activated.`);
       toast.success(`Generated "${saved.name}"`);
       await loadSpecs();
     } catch (e: any) {
@@ -245,6 +401,8 @@ export function AgentChatPanel({
 
   const handleDiscardForgeDraft = () => {
     setPendingForgeSpec(null);
+    setPendingForgeRecordingId(null);
+    setForgeValidation(null);
     setForgeStatusText("Forge draft discarded.");
   };
 
@@ -278,7 +436,6 @@ export function AgentChatPanel({
           disabled={isProcessing}
         />
 
-        {/* Input Footer Controls */}
         <div className="flex items-center justify-between px-3 pb-3 mt-2">
           <div className="flex items-center gap-2">
             <Tooltip delay={0}>
@@ -304,7 +461,7 @@ export function AgentChatPanel({
                   size="sm"
                   variant="ghost"
                   isIconOnly
-                  onPress={handleStopAndGenerateForgeAgent}
+                  onPress={handleStopForgeRecording}
                   isDisabled={isForgeBusy || !isForgeRecording}
                   className="rounded-full w-8 h-8 text-muted-foreground hover:text-emerald-400 hover:bg-emerald-400/10"
                 >
@@ -316,7 +473,29 @@ export function AgentChatPanel({
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                <span className="text-xs">Stop & generate Forge agent</span>
+                <span className="text-xs">Stop Forge recording</span>
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip delay={0}>
+              <TooltipTrigger>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  isIconOnly
+                  onPress={handleGenerateForgeAgent}
+                  isDisabled={
+                    isForgeBusy ||
+                    isForgeRecording ||
+                    !stoppedForgeRecordingId ||
+                    (forgeMetrics ? !forgeMetrics.readyToGenerate : true)
+                  }
+                  className="rounded-full w-8 h-8 text-muted-foreground hover:text-cyan-400 hover:bg-cyan-400/10"
+                >
+                  <Sparkles className="size-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <span className="text-xs">Generate Forge specialist</span>
               </TooltipContent>
             </Tooltip>
             <Tooltip delay={0}>
@@ -359,12 +538,9 @@ export function AgentChatPanel({
 
   return (
     <div className="h-full w-full relative bg-transparent overflow-hidden text-foreground">
-      {/* Background Ambience / Base Layer */}
       <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-background/50 to-background/80 pointer-events-none z-0" />
 
-      {/* Top Bar - Absolute & Layered - Z-50 */}
       <div className="absolute top-0 left-0 right-0 z-50 flex justify-center pt-6 pointer-events-none">
-        {/* Drag Region */}
         <div
           data-tauri-drag-region
           className="absolute inset-x-0 top-0 h-20 pointer-events-auto z-0"
@@ -451,11 +627,14 @@ export function AgentChatPanel({
       {pendingForgeSpec && (
         <div className="absolute left-1/2 -translate-x-1/2 top-24 z-40 w-[min(960px,92vw)] rounded-2xl border border-border/20 bg-background/85 backdrop-blur-xl p-4 shadow-xl">
           <div className="flex items-center justify-between mb-3">
-            <h4 className="text-sm font-semibold">Forge Draft Review</h4>
-            <span className="text-xs text-muted-foreground">
-              {pendingForgeSpec.id}
-            </span>
+            <h4 className="text-sm font-semibold">Forge Specialist Draft Review</h4>
+            <span className="text-xs text-muted-foreground">{pendingForgeSpec.id}</span>
           </div>
+
+          <div className="mb-3 text-xs text-muted-foreground">
+            This is a task specialist generated by Forge. It complements your base agent.
+          </div>
+
           <div className="grid gap-3 md:grid-cols-2">
             <input
               value={pendingForgeSpec?.soul?.name ?? ""}
@@ -480,6 +659,7 @@ export function AgentChatPanel({
               placeholder="Agent description"
             />
           </div>
+
           <TextArea
             value={pendingForgeSpec?.soul?.soul_content ?? ""}
             onChange={(event) =>
@@ -492,11 +672,20 @@ export function AgentChatPanel({
             className="mt-3"
             placeholder="System prompt"
           />
+
           <div className="mt-3 flex items-center gap-2">
             <Button
               size="sm"
+              variant="ghost"
+              onPress={handleValidateForgeDraft}
+              isDisabled={isForgeValidating || isForgeBusy}
+            >
+              {isForgeValidating ? "Testing..." : "Test Draft"}
+            </Button>
+            <Button
+              size="sm"
               onPress={handleSaveForgeDraft}
-              isDisabled={isForgeBusy}
+              isDisabled={isForgeBusy || !forgeValidation?.passed}
               className="bg-emerald-600 text-white"
             >
               Save & Activate
@@ -510,12 +699,26 @@ export function AgentChatPanel({
               Discard
             </Button>
           </div>
+
+          {forgeValidation && (
+            <div className="mt-3 rounded-lg border border-border/40 bg-muted/20 p-3 text-xs space-y-1">
+              <div className="font-medium">
+                Validation: {forgeValidation.passed ? "PASS" : "FAIL"} · Score{" "}
+                {forgeValidation.totalScore}
+              </div>
+              <div>
+                Coverage {forgeValidation.coverageScore} · Determinism{" "}
+                {forgeValidation.determinismScore} · Safety {forgeValidation.safetyScore}
+              </div>
+              <div className="text-muted-foreground">
+                {forgeValidation.reasons.join(" · ")}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Scrollable Content Area - Absolute Inset - Z-10 */}
       <div className="absolute inset-0 overflow-y-auto w-full h-full scrollbar-none z-10">
-        {/* Padding to clear top bar and bottom input */}
         <div
           className={`flex flex-col px-4 md:px-8 w-full md:max-w-3xl lg:max-w-4xl mx-auto transition-all duration-300 ${
             messages.length === 0
@@ -527,6 +730,33 @@ export function AgentChatPanel({
             <div className="mb-4 text-xs text-muted-foreground text-center">
               {forgeStatusText}
             </div>
+          )}
+
+          {isForgeRecording && forgeMetrics && (
+            <>
+              <div className="mb-3 flex flex-wrap items-center justify-center gap-2 text-[11px]">
+                <span className="px-2 py-1 rounded-full border border-border/40 bg-muted/30">
+                  Steps: {forgeMetrics.totalSteps}
+                </span>
+                <span className="px-2 py-1 rounded-full border border-border/40 bg-muted/30">
+                  Useful: {forgeMetrics.usefulSteps}
+                </span>
+                <span className="px-2 py-1 rounded-full border border-border/40 bg-muted/30">
+                  Tools: {forgeMetrics.toolCallsCount}
+                </span>
+                <span className="px-2 py-1 rounded-full border border-border/40 bg-muted/30">
+                  Decisions: {forgeMetrics.decisionPointsCount}
+                </span>
+                <span className="px-2 py-1 rounded-full border border-border/40 bg-muted/30">
+                  Errors: {forgeMetrics.errorsCount}
+                </span>
+              </div>
+              {!forgeMetrics.readyToGenerate && (
+                <div className="mb-4 text-xs text-amber-400 text-center">
+                  {forgeMetrics.missingRequirements.join(" · ")}
+                </div>
+              )}
+            </>
           )}
 
           {messages.length === 0 ? (
@@ -546,10 +776,6 @@ export function AgentChatPanel({
               </p>
 
               {renderInputArea(true)}
-
-              {/* Suggestions */}
-              {/* <div className="mt-12 grid grid-cols-2 gap-4 max-w-lg w-full px-4 mb-20">
-              </div> */}
             </div>
           ) : (
             <div className="space-y-8">
@@ -565,8 +791,7 @@ export function AgentChatPanel({
                 </span>
                 {latestTelemetry?.compressionApplied && (
                   <span className="px-2.5 py-1 rounded-full text-[10px] uppercase tracking-wide bg-muted/40 border border-border/40 text-muted-foreground">
-                    Compression: auto @
-                    {latestTelemetry.compressionTriggerTokens || 80000} (best-practice)
+                    Compression: auto @{latestTelemetry.compressionTriggerTokens || 80000} (best-practice)
                   </span>
                 )}
               </div>
@@ -600,7 +825,6 @@ export function AgentChatPanel({
         </div>
       </div>
 
-      {/* Floating Input Area - Absolute Bottom - ONLY SHOW WHEN MESSAGES EXIST */}
       {messages.length > 0 && (
         <div className="absolute bottom-6 left-0 right-0 z-40 px-4 pointer-events-none flex justify-center">
           <div className="w-full max-w-2xl lg:max-w-3xl pointer-events-auto">

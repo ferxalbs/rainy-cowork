@@ -735,6 +735,15 @@ export function useAgentChat() {
 
               switch (payload.type) {
                 case "supervisor_plan_created": {
+                  void captureForgeStep(
+                    "decision",
+                    payload.data?.summary || "supervisor_plan_created",
+                    {
+                      steps: Array.isArray(payload.data?.steps)
+                        ? payload.data.steps.length
+                        : 0,
+                    },
+                  );
                   return {
                     ...m,
                     neuralState: "planning",
@@ -783,6 +792,14 @@ export function useAgentChat() {
                   };
                 }
                 case "specialist_failed": {
+                  void captureForgeStep(
+                    "error",
+                    payload.data?.error || "specialist_failed",
+                    {
+                      agentId: payload.data?.agentId ?? null,
+                      role: payload.data?.role ?? null,
+                    },
+                  );
                   return {
                     ...m,
                     neuralState: "thinking",
@@ -841,6 +858,16 @@ export function useAgentChat() {
                 }
                 case "status": {
                   const statusText = String(payload.data || "");
+                  const lower = statusText.toLowerCase();
+                  if (lower.includes("retry")) {
+                    void captureForgeStep("retry", statusText, {});
+                  } else if (
+                    lower.includes("error") ||
+                    lower.includes("failed") ||
+                    lower.includes("exception")
+                  ) {
+                    void captureForgeStep("error", statusText, {});
+                  }
                   if (statusText.startsWith("RAG_TELEMETRY:")) {
                     try {
                       const raw = statusText.slice("RAG_TELEMETRY:".length);

@@ -29,6 +29,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added Forge synthesis and persistence regression tests for deterministic allowlist derivation, summary truncation, and local agent-library roundtrip:
   - `src-tauri/src/commands/workflow_factory.rs`
   - `src-tauri/src/services/agent_library.rs`
+- Added Forge quality gate + validation command surface to prevent low-value specialist generation:
+  - strict generation gate: minimum useful steps + tool-call presence
+  - `validate_generated_agent` command for mandatory draft test scoring (`coverage`, `determinism`, `safety`)
+  - files:
+    - `src-tauri/src/commands/workflow_factory.rs`
+    - `src-tauri/src/lib.rs`
+    - `src/services/tauri.ts`
 - Added Forge auto-capture integration for native runtime tool events during active recording sessions:
   - `src/hooks/useAgentChat.ts`
 - Added desktop ATM workspace-sharing command surface for private agent import loops:
@@ -118,6 +125,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `src/services/tauri.ts`
 - Changed Forge generation flow to draft-review-before-save with inline editable fields (`name`, `description`, `soul_content`) and explicit save/discard actions:
   - `src/components/agent-chat/AgentChatPanel.tsx`
+- Changed Forge synthesis from generic prompt output to structured specialist playbook generation (`goal`, `ordered steps`, `decision rules`, `fallbacks`, `success criteria`) with deterministic allowlist mode:
+  - `src-tauri/src/commands/workflow_factory.rs`
+- Changed Forge Draft Review UX to enforce `Test Draft` pass before `Save & Activate`, and to show real-time recording quality counters (steps/useful/tools/decisions/errors):
+  - `src/components/agent-chat/AgentChatPanel.tsx`
+- Changed Forge runtime capture telemetry to include `decision`, `error`, and `retry` signals from native agent events:
+  - `src/hooks/useAgentChat.ts`
+  - `src-tauri/src/services/workflow_recorder.rs`
+- Changed Forge tool-allowlist derivation to sanitize tool labels into a safe canonical subset before embedding in generated specs:
+  - `src-tauri/src/commands/workflow_factory.rs`
 - Changed Rainy ATM route wiring to mount private workspace-agent sharing APIs:
   - `rainy-atm/src/index.ts`
   - `rainy-atm/src/routes/workspace-agents.ts`
@@ -126,8 +142,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `rainy-atm/src/routes/marketplace.ts`
 - Changed Rainy ATM bridge integration surface with modular AgentBridge dispatch primitives for external channel adapters:
   - `rainy-atm/src/integrations/agent-bridge.ts`
-- Changed release readiness posture for YC W26 / Standard Capital cycle with production gate verification completed before application window close (application deadline from invite: March 12, 2026 at 9:00 PM PT):
-  - `CHANGELOG.md` (release status + validation record)
 - Changed versioning for THE FORGE release:
   - `package.json` -> `0.5.96`
   - `src-tauri/Cargo.toml` -> `0.5.96`
@@ -228,6 +242,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `src-tauri/src/services/memory_vault/repository.rs`
 - Fixed Forge agent-library path traversal risk by enforcing strict slug validation for `AgentSpec.id` before save/load path joins (blocks `../` and any non `[a-zA-Z0-9_-]` filename components):
   - `src-tauri/src/services/agent_library.rs`
+- Fixed Forge draft-save crash vectors by requiring save-ready specialist fields (`id`, `soul.name`, `soul_content`, allowlist mode, non-empty allowed tools) at command boundary:
+  - `src-tauri/src/commands/workflow_factory.rs`
+- Fixed Forge recording UX deadlock by decoupling stop and generate actions so active recordings can always be stopped/canceled even when quality gate is not yet satisfied:
+  - `src/components/agent-chat/AgentChatPanel.tsx`
 
 ### Validation
 
@@ -274,6 +292,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `cd rainy-atm && bun run build` — passes (release readiness revalidation)
 - `pnpm run build` — passes (release readiness revalidation; non-blocking bundle-size warning from Vite reporter)
 - `cd src-tauri && cargo test -q agent_library --lib` — passes (4/4) (release readiness revalidation)
+- `cd src-tauri && cargo test -q workflow_factory --lib` — passes (5/5) (post Forge value-upgrade gates + validation)
+- `cd src-tauri && cargo check -q` — passes (post Forge value-upgrade gates + validation)
+- `pnpm exec tsc --noEmit` — passes (post Forge value-upgrade UX + command wrappers)
+- `pnpm run build` — passes (post Forge value-upgrade UX + command wrappers; non-blocking bundle-size warning)
+- `cd src-tauri && cargo test -q workflow_recorder --lib` — passes (2/2) (post Forge signal capture expansion)
+- `cd src-tauri && cargo test -q agent_library --lib` — passes (4/4) (post Forge polish regression revalidation)
+- `pnpm exec tsc --noEmit` — passes (post Forge stop/generate UX decoupling fix)
+- `cd src-tauri && cargo check -q` — passes (post Forge stop/generate UX decoupling fix)
+- `pnpm run build` — passes (post Forge stop/generate UX decoupling fix; non-blocking bundle-size warning)
 
 ## [0.5.95] - 2026-03-10 - NERVE CENTER STEP 6 STABILITY PATCH
 
