@@ -2,6 +2,7 @@
 // Business logic layer
 
 pub mod agent_kill_switch;
+pub mod agent_run_control;
 pub mod airlock;
 pub mod agent_library;
 pub mod atm_auth;
@@ -41,6 +42,7 @@ pub mod workspace;
 pub mod workflow_recorder;
 
 pub use airlock::AirlockService;
+pub use agent_run_control::AgentRunControl;
 pub use agent_library::AgentLibraryService;
 pub use atm_client::ATMClient;
 pub use browser_controller::BrowserController;

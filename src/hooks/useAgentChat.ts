@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from "react";
 import { useStreaming } from "./useStreaming";
 import { useTauriTask } from "./useTauriTask";
 import type {
+  AgentTraceEntry,
   AgentMessage,
   SpecialistRunState,
   TaskPlan,
@@ -34,6 +35,24 @@ export function useAgentChat() {
     retrievalMode: "unavailable",
     embeddingProfile: "gemini-embedding-2-preview",
   } as const;
+
+  const createTraceEntry = useCallback(
+    (
+      phase: AgentTraceEntry["phase"],
+      label: string,
+      extras?: Partial<Pick<AgentTraceEntry, "attempt" | "toolName" | "preview">>,
+      timestampMs?: number,
+    ): AgentTraceEntry => ({
+      id: crypto.randomUUID(),
+      phase,
+      label,
+      timestamp: new Date(timestampMs || Date.now()),
+      attempt: extras?.attempt,
+      toolName: extras?.toolName,
+      preview: extras?.preview,
+    }),
+    [],
+  );
 
   const captureForgeStep = useCallback(
     async (kind: string, label: string, payload?: Record<string, unknown>) => {
@@ -665,6 +684,7 @@ export function useAgentChat() {
         console.error("Failed to resolve chat scope, using fallback:", error);
         return "global:long_chat:v1";
       });
+      const clientRunId = crypto.randomUUID();
       const userMsg: AgentMessage = {
         id: crypto.randomUUID(),
         type: "user",
@@ -682,6 +702,19 @@ export function useAgentChat() {
         timestamp: new Date(),
         modelUsed: { name: modelId, thinkingEnabled: true },
         neuralState: "thinking",
+        runState: "running",
+        requestContext: {
+          runId: clientRunId,
+          prompt: instruction,
+          modelId,
+          workspaceId,
+          agentSpecId,
+          chatScopeId: resolvedChatScopeId,
+          startedAtMs: Date.now(),
+        },
+        trace: [
+          createTraceEntry("think", "Task received. Starting agent workflow."),
+        ],
         ragTelemetry: {
           historySource: "persisted_long_chat",
           retrievalMode: "unavailable",
@@ -702,10 +735,13 @@ export function useAgentChat() {
         });
         const { listen } = await import("@tauri-apps/api/event");
         unlisten = await listen<{
+          runId?: string;
+          timestampMs?: number;
           type: string;
           data: any;
         }>("agent://event", (event) => {
           const payload = event.payload;
+          if (payload?.runId && payload.runId !== clientRunId) return;
 
           const upsertSpecialist = (
             specialists: SpecialistRunState[] | undefined,
@@ -747,6 +783,15 @@ export function useAgentChat() {
                   return {
                     ...m,
                     neuralState: "planning",
+                    trace: [
+                      ...(m.trace || []),
+                      createTraceEntry(
+                        "act",
+                        payload.data?.summary || "Supervisor plan created",
+                        undefined,
+                        payload.timestampMs,
+                      ),
+                    ],
                     supervisorPlan: {
                       summary: payload.data?.summary || "Supervisor plan ready",
                       steps: Array.isArray(payload.data?.steps)
@@ -765,6 +810,15 @@ export function useAgentChat() {
                     neuralState: activeTool
                       ? resolveNeuralState(activeTool)
                       : "planning",
+                    trace: [
+                      ...(m.trace || []),
+                      createTraceEntry(
+                        "act",
+                        `${payload.data?.role || "specialist"}: ${payload.data?.status || "running"}`,
+                        { toolName: activeTool || undefined },
+                        payload.timestampMs,
+                      ),
+                    ],
                     activeToolName: activeTool
                       ? getToolDisplayName(activeTool)
                       : undefined,
@@ -781,6 +835,17 @@ export function useAgentChat() {
                   return {
                     ...m,
                     neuralState: "thinking",
+                    trace: [
+                      ...(m.trace || []),
+                      createTraceEntry(
+                        "act",
+                        `${payload.data?.role || "specialist"} completed`,
+                        {
+                          preview: payload.data?.summary || payload.data?.responsePreview,
+                        },
+                        payload.timestampMs,
+                      ),
+                    ],
                     activeToolName: undefined,
                     specialists: upsertSpecialist(m.specialists, {
                       agentId: payload.data?.agentId,
@@ -803,6 +868,15 @@ export function useAgentChat() {
                   return {
                     ...m,
                     neuralState: "thinking",
+                    trace: [
+                      ...(m.trace || []),
+                      createTraceEntry(
+                        "error",
+                        `${payload.data?.role || "specialist"} failed`,
+                        { preview: payload.data?.error },
+                        payload.timestampMs,
+                      ),
+                    ],
                     activeToolName: undefined,
                     specialists: upsertSpecialist(m.specialists, {
                       agentId: payload.data?.agentId,
@@ -822,22 +896,45 @@ export function useAgentChat() {
                   return {
                     ...m,
                     neuralState: resolveNeuralState(functionName),
+                    trace: [
+                      ...(m.trace || []),
+                      createTraceEntry(
+                        "tool",
+                        `Tool call: ${getToolDisplayName(functionName)}`,
+                        { toolName: functionName },
+                        payload.timestampMs,
+                      ),
+                    ],
                     activeToolName: getToolDisplayName(functionName),
                   };
                 }
                 case "tool_result": {
                   void captureForgeStep(
                     "tool_result",
-                    payload.data?.toolCallId || "tool_result",
+                    payload.data?.id || "tool_result",
                     {
-                      toolCallId: payload.data?.toolCallId ?? null,
-                      resultPreview: payload.data?.resultPreview ?? null,
+                      toolCallId: payload.data?.id ?? null,
+                      resultPreview: payload.data?.result ?? null,
                     },
                   );
                   // Tool finished, back to thinking for next iteration
                   return {
                     ...m,
                     neuralState: "thinking",
+                    trace: [
+                      ...(m.trace || []),
+                      createTraceEntry(
+                        "tool",
+                        `Tool result: ${payload.data?.id || "completed"}`,
+                        {
+                          preview:
+                            typeof payload.data?.result === "string"
+                              ? payload.data.result.slice(0, 180)
+                              : undefined,
+                        },
+                        payload.timestampMs,
+                      ),
+                    ],
                     activeToolName: undefined,
                   };
                 }
@@ -936,9 +1033,33 @@ export function useAgentChat() {
                   const waitingOnMcpApproval =
                     statusText.toLowerCase().includes("approval") &&
                     statusText.toLowerCase().includes("mcp");
+                  const statusLower = statusText.toLowerCase();
+                  const isRetry = statusLower.includes("retry");
+                  const isError =
+                    statusLower.includes("error") ||
+                    statusLower.includes("failed") ||
+                    statusLower.includes("exception");
+                  const isCancelled =
+                    statusLower.includes("terminated by fleet kill switch") ||
+                    statusLower.includes("terminated by user") ||
+                    statusLower.includes("cancelled by user");
+                  const tracePhase: AgentTraceEntry["phase"] = waitingOnMcpApproval
+                    ? "approval"
+                    : isRetry
+                      ? "retry"
+                      : isError
+                        ? "error"
+                        : isCancelled
+                          ? "cancelled"
+                          : "think";
                   return {
                     ...m,
                     neuralState: waitingOnMcpApproval ? "communicating" : "planning",
+                    runState: isCancelled ? "cancelled" : m.runState,
+                    trace: [
+                      ...(m.trace || []),
+                      createTraceEntry(tracePhase, statusText, undefined, payload.timestampMs),
+                    ],
                     activeToolName: waitingOnMcpApproval
                       ? "Awaiting MCP approval"
                       : undefined,
@@ -957,6 +1078,7 @@ export function useAgentChat() {
           workspaceId,
           agentSpecId,
           resolvedChatScopeId,
+          clientRunId,
         );
 
         setMessages((prev) =>
@@ -965,10 +1087,26 @@ export function useAgentChat() {
               ? {
                   ...m,
                   content:
-                    typeof result === "string" && result.trim().length > 0
-                      ? result
+                    typeof result.response === "string" &&
+                    result.response.trim().length > 0
+                      ? result.response
                       : "No final text response was generated. Please try again with a more specific instruction.",
                   isLoading: false,
+                  runState: m.runState === "cancelled" ? "cancelled" : "completed",
+                  requestContext: {
+                    ...m.requestContext,
+                    runId: result.runId || clientRunId,
+                    completedAtMs: Date.now(),
+                  },
+                  trace: [
+                    ...(m.trace || []),
+                    createTraceEntry(
+                      m.runState === "cancelled" ? "cancelled" : "done",
+                      m.runState === "cancelled"
+                        ? "Run cancelled."
+                        : "Run completed.",
+                    ),
+                  ],
                   neuralState: undefined,
                   activeToolName: undefined,
                   specialists: m.specialists,
@@ -986,6 +1124,19 @@ export function useAgentChat() {
                   ...m,
                   content: `❌ Agent Runtime Error: ${err.message || err}`,
                   isLoading: false,
+                  runState: "failed",
+                  requestContext: {
+                    ...m.requestContext,
+                    completedAtMs: Date.now(),
+                  },
+                  trace: [
+                    ...(m.trace || []),
+                    createTraceEntry(
+                      "error",
+                      "Agent runtime failed.",
+                      { preview: String(err?.message || err) },
+                    ),
+                  ],
                   neuralState: undefined,
                   activeToolName: undefined,
                   specialists: m.specialists,
@@ -1000,8 +1151,51 @@ export function useAgentChat() {
         if (unlisten) unlisten();
       }
     },
-    [captureForgeStep, ensureChatScope],
+    [captureForgeStep, createTraceEntry, ensureChatScope],
   );
+
+  const stopAgentRun = useCallback(async (messageId: string) => {
+    const target = messages.find((m) => m.id === messageId);
+    const runId = target?.requestContext?.runId;
+    if (!runId) return;
+    try {
+      const res = await tauri.cancelAgentRun(runId);
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === messageId
+            ? {
+                ...m,
+                isLoading: res.status === "cancelled" ? false : m.isLoading,
+                neuralState: res.status === "cancelled" ? undefined : m.neuralState,
+                runState: res.status === "cancelled" ? "cancelled" : m.runState,
+                trace: [
+                  ...(m.trace || []),
+                  createTraceEntry(
+                    res.status === "cancelled" ? "cancelled" : "error",
+                    res.status === "cancelled"
+                      ? "Cancellation requested by user."
+                      : "Run already finished.",
+                  ),
+                ],
+              }
+            : m,
+        ),
+      );
+    } catch (error) {
+      console.error("Failed to cancel run", error);
+    }
+  }, [createTraceEntry, messages]);
+
+  const retryAgentRun = useCallback(async (messageId: string) => {
+    const target = messages.find((m) => m.id === messageId);
+    if (!target?.requestContext?.prompt) return;
+    await runNativeAgent(
+      target.requestContext.prompt,
+      target.requestContext.modelId || "rainy:gpt-5",
+      target.requestContext.workspaceId || ".",
+      target.requestContext.agentSpecId,
+    );
+  }, [messages, runNativeAgent]);
 
   return {
     messages,
@@ -1018,6 +1212,8 @@ export function useAgentChat() {
     clearMessages,
     clearMessagesAndContext,
     runNativeAgent,
+    stopAgentRun,
+    retryAgentRun,
     hydrateLongChatHistory,
     loadOlderHistory,
     hasMoreHistory,

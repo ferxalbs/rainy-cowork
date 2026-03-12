@@ -1,5 +1,15 @@
 import React, { useMemo } from "react";
-import { Play, Ban, FileCode, FolderOpen, ArrowRight } from "lucide-react";
+import {
+  Play,
+  Ban,
+  FileCode,
+  FolderOpen,
+  ArrowRight,
+  Copy,
+  RotateCcw,
+  Square,
+  ChevronDown,
+} from "lucide-react";
 import { Button, Card } from "@heroui/react";
 import { motion } from "framer-motion";
 import type { AgentMessage, TaskPlan } from "../../types/agent";
@@ -38,6 +48,8 @@ interface MessageBubbleProps {
     toolCalls: any[],
     workspaceId: string,
   ) => void;
+  onStopRun?: (messageId: string) => void;
+  onRetryRun?: (messageId: string) => void;
   workspaceId?: string;
 }
 
@@ -45,6 +57,8 @@ export function MessageBubble({
   message,
   onExecute,
   onExecuteToolCalls,
+  onStopRun,
+  onRetryRun,
   isExecuting,
   workspaceId,
 }: MessageBubbleProps) {
@@ -56,6 +70,26 @@ export function MessageBubble({
       onExecuteToolCalls(message.id, message.toolCalls, workspaceId);
     }
   };
+
+  const handleCopy = async () => {
+    if (!message.content) return;
+    try {
+      await navigator.clipboard.writeText(message.content);
+    } catch (error) {
+      console.error("Failed to copy message", error);
+    }
+  };
+
+  const traceStats = useMemo(() => {
+    const trace = message.trace || [];
+    return {
+      total: trace.length,
+      toolCalls: trace.filter((item) => item.phase === "tool").length,
+      retries: trace.filter((item) => item.phase === "retry").length,
+      errors: trace.filter((item) => item.phase === "error").length,
+      approvals: trace.filter((item) => item.phase === "approval").length,
+    };
+  }, [message.trace]);
 
   // Determine Neural State
   const neuralState = useMemo((): NeuralState => {
@@ -132,7 +166,7 @@ export function MessageBubble({
             </div>
           )}
 
-          <div className="relative z-10">
+          <div className="relative z-10 select-text">
             {message.content ? (
               <MarkdownRenderer content={message.content} />
             ) : neuralState !== "idle" ? (
@@ -155,6 +189,49 @@ export function MessageBubble({
             durationMs={message.thoughtDuration}
           />
         )}
+
+        {!isUser && (
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+              onPress={handleCopy}
+            >
+              <Copy className="size-3.5" />
+              Copy
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+              onPress={() => onRetryRun?.(message.id)}
+              isDisabled={!message.requestContext?.prompt || message.isLoading}
+            >
+              <RotateCcw className="size-3.5" />
+              Retry
+            </Button>
+            {message.isLoading && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 px-2 text-xs text-red-500 hover:text-red-400"
+                onPress={() => onStopRun?.(message.id)}
+              >
+                <Square className="size-3.5" />
+                Stop
+              </Button>
+            )}
+          </div>
+        )}
+
+        {!isUser && (message.trace?.length || message.isLoading) ? (
+          <TraceAccordion
+            trace={message.trace || []}
+            runState={message.runState}
+            stats={traceStats}
+          />
+        ) : null}
 
         {!isUser &&
           (message.supervisorPlan ||
@@ -317,6 +394,77 @@ function SupervisorRail({
         </div>
       )}
     </div>
+  );
+}
+
+function TraceAccordion({
+  trace,
+  runState,
+  stats,
+}: {
+  trace: NonNullable<AgentMessage["trace"]>;
+  runState?: AgentMessage["runState"];
+  stats: {
+    total: number;
+    toolCalls: number;
+    retries: number;
+    errors: number;
+    approvals: number;
+  };
+}) {
+  const stateTone =
+    runState === "failed"
+      ? "text-red-500"
+      : runState === "cancelled"
+        ? "text-amber-500"
+        : runState === "completed"
+          ? "text-emerald-500"
+          : "text-cyan-500";
+
+  return (
+    <details className="w-full rounded-xl border border-border/30 bg-background/40 px-3 py-2">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-xs text-muted-foreground">
+        <span className="flex items-center gap-2">
+          <ChevronDown className="size-3.5" />
+          <span className={`font-medium ${stateTone}`}>
+            Runtime Trace {runState ? `(${runState})` : ""}
+          </span>
+          <span>calls {stats.toolCalls}</span>
+          <span>retries {stats.retries}</span>
+          <span>errors {stats.errors}</span>
+          <span>approvals {stats.approvals}</span>
+        </span>
+        <span>{stats.total} events</span>
+      </summary>
+
+      <div className="mt-2 max-h-52 overflow-y-auto rounded-lg border border-border/20 bg-background/30 p-2 font-mono text-[11px]">
+        {trace.length === 0 ? (
+          <div className="text-muted-foreground">Waiting for runtime events...</div>
+        ) : (
+          trace.map((item) => (
+            <div
+              key={item.id}
+              className="mb-1.5 rounded-md border border-border/10 bg-background/40 p-2"
+            >
+              <div className="flex items-center justify-between gap-2 text-muted-foreground">
+                <span className="uppercase tracking-wide">{item.phase}</span>
+                <span>
+                  {item.timestamp.toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    second: "2-digit",
+                  })}
+                </span>
+              </div>
+              <div className="mt-1 text-foreground">{item.label}</div>
+              {item.preview && (
+                <div className="mt-1 line-clamp-2 text-muted-foreground">{item.preview}</div>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+    </details>
   );
 }
 

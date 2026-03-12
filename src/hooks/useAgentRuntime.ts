@@ -4,18 +4,78 @@ import { listen } from "@tauri-apps/api/event";
 import { toast } from "sonner";
 
 export type AgentEvent =
-  | { type: "status"; data: string }
-  | { type: "thought"; data: string }
-  | { type: "tool_call"; data: any }
-  | { type: "tool_result"; data: { id: string; result: string } }
-  | { type: "error"; data: string }
-  | { type: "stream_chunk"; data: string }
-  | { type: "supervisor_plan_created"; data: any }
-  | { type: "specialist_spawned"; data: any }
-  | { type: "specialist_status_changed"; data: any }
-  | { type: "specialist_completed"; data: any }
-  | { type: "specialist_failed"; data: any }
-  | { type: "supervisor_summary"; data: any };
+  | {
+      runId?: string;
+      timestampMs?: number;
+      type: "status";
+      data: string;
+    }
+  | {
+      runId?: string;
+      timestampMs?: number;
+      type: "thought";
+      data: string;
+    }
+  | {
+      runId?: string;
+      timestampMs?: number;
+      type: "tool_call";
+      data: any;
+    }
+  | {
+      runId?: string;
+      timestampMs?: number;
+      type: "tool_result";
+      data: { id: string; result: string };
+    }
+  | {
+      runId?: string;
+      timestampMs?: number;
+      type: "error";
+      data: string;
+    }
+  | {
+      runId?: string;
+      timestampMs?: number;
+      type: "stream_chunk";
+      data: string;
+    }
+  | {
+      runId?: string;
+      timestampMs?: number;
+      type: "supervisor_plan_created";
+      data: any;
+    }
+  | {
+      runId?: string;
+      timestampMs?: number;
+      type: "specialist_spawned";
+      data: any;
+    }
+  | {
+      runId?: string;
+      timestampMs?: number;
+      type: "specialist_status_changed";
+      data: any;
+    }
+  | {
+      runId?: string;
+      timestampMs?: number;
+      type: "specialist_completed";
+      data: any;
+    }
+  | {
+      runId?: string;
+      timestampMs?: number;
+      type: "specialist_failed";
+      data: any;
+    }
+  | {
+      runId?: string;
+      timestampMs?: number;
+      type: "supervisor_summary";
+      data: any;
+    };
 
 export type AgentStatus = "idle" | "running" | "error" | "completed";
 

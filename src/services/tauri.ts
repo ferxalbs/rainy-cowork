@@ -2245,6 +2245,23 @@ export interface ChatRuntimeTelemetry {
   updated_at: string;
 }
 
+export interface AgentEventEnvelope {
+  runId: string;
+  timestampMs: number;
+  type: string;
+  data: any;
+}
+
+export interface RunAgentWorkflowResponse {
+  runId: string;
+  response: string;
+}
+
+export interface CancelAgentRunResponse {
+  runId: string;
+  status: "cancelled" | "unknown_run";
+}
+
 export async function getDefaultChatScope(): Promise<string> {
   return invoke<string>("get_default_chat_scope");
 }
@@ -2284,17 +2301,25 @@ export const runAgentWorkflow = async (
   workspaceId: string,
   agentSpecId?: string,
   chatScopeId?: string,
-): Promise<string> => {
+  runId?: string,
+): Promise<RunAgentWorkflowResponse> => {
   try {
-    return await invoke<string>("run_agent_workflow", {
+    return await invoke<RunAgentWorkflowResponse>("run_agent_workflow", {
       prompt,
       modelId,
       workspaceId,
       agentSpecId,
       chatScopeId,
+      runId,
     });
   } catch (e) {
     console.error("Agent workflow failed:", e);
     throw e;
   }
 };
+
+export async function cancelAgentRun(
+  runId: string,
+): Promise<CancelAgentRunResponse> {
+  return invoke<CancelAgentRunResponse>("cancel_agent_run", { runId });
+}

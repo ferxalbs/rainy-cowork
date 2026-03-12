@@ -161,6 +161,36 @@ export interface AgentMessage {
     compressionApplied?: boolean;
     compressionTriggerTokens?: number;
   };
+  runState?: "running" | "completed" | "cancelled" | "failed";
+  requestContext?: {
+    runId?: string;
+    prompt?: string;
+    modelId?: string;
+    workspaceId?: string;
+    agentSpecId?: string;
+    chatScopeId?: string;
+    startedAtMs?: number;
+    completedAtMs?: number;
+  };
+  trace?: AgentTraceEntry[];
+}
+
+export interface AgentTraceEntry {
+  id: string;
+  phase:
+    | "think"
+    | "act"
+    | "tool"
+    | "approval"
+    | "retry"
+    | "error"
+    | "done"
+    | "cancelled";
+  label: string;
+  timestamp: Date;
+  attempt?: number;
+  toolName?: string;
+  preview?: string;
 }
 
 export interface SpecialistRunState {

@@ -14,7 +14,11 @@ use crate::commands::ai_providers::ProviderRegistryState;
 use crate::commands::airlock::AirlockServiceState;
 use crate::commands::memory::MemoryManagerState;
 use crate::commands::router::IntelligentRouterState;
+use crate::services::agent_kill_switch::AgentKillSwitch;
+use crate::services::agent_run_control::{AgentRunControl, CancelRunResult};
 use crate::services::SkillExecutor;
+use chrono::Utc;
+use serde::Serialize;
 use std::sync::Arc;
 use tauri::{Emitter, Manager, State};
 
@@ -23,6 +27,29 @@ const AUTO_COMPACTION_TRIGGER_TOKENS: usize = 80_000;
 const AUTO_COMPACTION_KEEP_RECENT_MESSAGES: usize = 24;
 const MAX_COMPACTION_TRANSCRIPT_CHARS: usize = 160_000;
 const MAX_COMPACTION_SUMMARY_CHARS: usize = 12_000;
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FrontendAgentEvent {
+    run_id: String,
+    timestamp_ms: i64,
+    #[serde(flatten)]
+    payload: AgentEvent,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RunAgentWorkflowResponse {
+    pub run_id: String,
+    pub response: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CancelAgentRunResponse {
+    pub run_id: String,
+    pub status: String,
+}
 
 fn is_valid_rainy_api_key(api_key: &str) -> bool {
     api_key.trim_start().starts_with("ra-")
@@ -348,6 +375,7 @@ pub async fn run_agent_workflow(
     workspace_id: String,
     agent_spec_id: Option<String>,
     chat_scope_id: Option<String>,
+    run_id: Option<String>,
     router: State<'_, IntelligentRouterState>,
     airlock_state: State<'_, AirlockServiceState>,
     provider_registry: State<'_, ProviderRegistryState>,
@@ -355,10 +383,12 @@ pub async fn run_agent_workflow(
     skills: State<'_, Arc<SkillExecutor>>,
     agent_manager: State<'_, crate::ai::agent::manager::AgentManager>,
     runtime_registry: State<'_, Arc<RuntimeRegistry>>,
-) -> Result<String, String> {
+    run_control: State<'_, Arc<AgentRunControl>>,
+) -> Result<RunAgentWorkflowResponse, String> {
     crate::ai::model_catalog::ensure_supported_model_slug(&model_id)?;
     ensure_provider_ready_for_model(&model_id, &provider_registry, &router).await?;
     let selected_model_id = model_id.clone();
+    let run_id = run_id.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
 
     let workspace_path = workspace_id.clone();
     let chat_id = chat_scope_id.unwrap_or_else(|| {
@@ -496,6 +526,11 @@ pub async fn run_agent_workflow(
         Arc::new(guard.clone())
     };
 
+    let run_kill_switch = AgentKillSwitch::new();
+    run_control
+        .register_run(run_id.clone(), run_kill_switch.clone())
+        .await;
+
     let runtime = AgentRuntime::new(
         spec,
         options,
@@ -503,7 +538,7 @@ pub async fn run_agent_workflow(
         skills.inner().clone(),
         memory,
         airlock_service,
-        None,
+        Some(run_kill_switch),
         Some(runtime_registry.inner().clone()),
     );
 
@@ -521,19 +556,23 @@ pub async fn run_agent_workflow(
     if let Some(compaction) = compaction_state {
         let _ = app_handle.emit(
             "agent://event",
-            AgentEvent::Status(format!(
-                "CONTEXT_COMPACTION:{}",
-                serde_json::json!({
-                    "applied": true,
-                    "trigger_tokens": AUTO_COMPACTION_TRIGGER_TOKENS,
-                    "source_estimated_tokens": compaction.source_estimated_tokens,
-                    "source_message_count": compaction.source_message_count,
-                    "kept_recent_count": compaction.kept_recent_count,
-                    "compression_model": compaction.compression_model,
-                    "best_practice": "rolling_summary_context_compaction",
-                })
-                .to_string()
-            )),
+            FrontendAgentEvent {
+                run_id: run_id.clone(),
+                timestamp_ms: Utc::now().timestamp_millis(),
+                payload: AgentEvent::Status(format!(
+                    "CONTEXT_COMPACTION:{}",
+                    serde_json::json!({
+                        "applied": true,
+                        "trigger_tokens": AUTO_COMPACTION_TRIGGER_TOKENS,
+                        "source_estimated_tokens": compaction.source_estimated_tokens,
+                        "source_message_count": compaction.source_message_count,
+                        "kept_recent_count": compaction.kept_recent_count,
+                        "compression_model": compaction.compression_model,
+                        "best_practice": "rolling_summary_context_compaction",
+                    })
+                    .to_string()
+                )),
+            },
         );
     }
 
@@ -558,6 +597,7 @@ pub async fn run_agent_workflow(
     let app_handle_clone = app_handle.clone();
     let agent_manager_clone = agent_manager.inner().clone();
     let chat_id_for_events = chat_id.clone();
+    let run_id_for_events = run_id.clone();
 
     // Persist Initial User Prompt
     let _ = agent_manager
@@ -565,10 +605,17 @@ pub async fn run_agent_workflow(
         .await
         .map_err(|e| format!("Failed to save user message: {}", e))?;
 
-    let response = runtime
+    let response_result = runtime
         .run(&prompt, move |event| {
             // Emit to frontend
-            let _ = app_handle_clone.emit("agent://event", event.clone());
+            let _ = app_handle_clone.emit(
+                "agent://event",
+                FrontendAgentEvent {
+                    run_id: run_id_for_events.clone(),
+                    timestamp_ms: Utc::now().timestamp_millis(),
+                    payload: event.clone(),
+                },
+            );
             if let AgentEvent::Status(text) = event {
                 if text.starts_with("RAG_TELEMETRY:") {
                     if let Ok(value) =
@@ -605,7 +652,10 @@ pub async fn run_agent_workflow(
                 }
             }
         })
-        .await?;
+        .await;
+
+    run_control.unregister_run(&run_id).await;
+    let response = response_result?;
 
     // Persist final assistant response only (avoid noisy intermediate event spam).
     let _ = agent_manager
@@ -613,5 +663,19 @@ pub async fn run_agent_workflow(
         .await
         .map_err(|e| format!("Failed to save assistant message: {}", e))?;
 
-    Ok(response)
+    Ok(RunAgentWorkflowResponse { run_id, response })
+}
+
+#[tauri::command]
+pub async fn cancel_agent_run(
+    run_id: String,
+    run_control: State<'_, Arc<AgentRunControl>>,
+) -> Result<CancelAgentRunResponse, String> {
+    let status = match run_control.cancel_run(&run_id).await {
+        CancelRunResult::Cancelled => "cancelled",
+        CancelRunResult::UnknownRun => "unknown_run",
+    }
+    .to_string();
+
+    Ok(CancelAgentRunResponse { run_id, status })
 }

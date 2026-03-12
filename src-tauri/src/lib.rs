@@ -13,10 +13,10 @@ use crate::ai::agent::runtime_registry::RuntimeRegistry;
 use crate::db::Database;
 use ai::{AIProviderManager, IntelligentRouter, ProviderRegistry};
 use services::{
-    ATMClient, AgentLibraryService, BrowserController, CommandPoller, DocumentService, FileManager,
-    FileOperationEngine, FolderManager, ImageService, LLMClient, ManagedResearchService,
-    MemoryManager, NeuralService, NodeAuthenticator, SettingsManager, SkillExecutor, SocketClient,
-    WorkflowRecorderService, WorkspaceManager,
+    ATMClient, AgentLibraryService, AgentRunControl, BrowserController, CommandPoller,
+    DocumentService, FileManager, FileOperationEngine, FolderManager, ImageService, LLMClient,
+    ManagedResearchService, MemoryManager, NeuralService, NodeAuthenticator, SettingsManager,
+    SkillExecutor, SocketClient, WorkflowRecorderService, WorkspaceManager,
 };
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
@@ -67,6 +67,7 @@ pub fn run() {
     // Initialize Node Authenticator
     let authenticator = NodeAuthenticator::new();
     let runtime_registry = Arc::new(RuntimeRegistry::new());
+    let agent_run_control = Arc::new(AgentRunControl::new());
 
     // Initialize Neural Service (Distributed Neural System)
     let neural_service = NeuralService::new(
@@ -149,6 +150,7 @@ pub fn run() {
         .manage(mcp_service.clone()) // Arc<McpService>
         .manage(mcp_http_proxy.clone()) // Arc<McpHttpProxy>
         .manage(runtime_registry.clone()) // Arc<RuntimeRegistry>
+        .manage(agent_run_control.clone()) // Arc<AgentRunControl>
         .manage(socket_client) // SocketClient
         .manage(llm_client) // Arc<Mutex<LLMClient>>
         .manage(workflow_recorder) // Arc<WorkflowRecorderService>
@@ -651,6 +653,7 @@ pub fn run() {
             commands::remove_installed_skill,
             // Agent Workflow (Native Rust)
             commands::agent::run_agent_workflow,
+            commands::agent::cancel_agent_run,
             // Workflow Factory (THE FORGE foundation)
             commands::start_workflow_recording,
             commands::record_workflow_step,

@@ -200,6 +200,8 @@ export function AgentChatPanel({
     executePlan,
     executeToolCalls,
     runNativeAgent,
+    stopAgentRun,
+    retryAgentRun,
     clearMessages,
     clearMessagesAndContext,
     hydrateLongChatHistory,
@@ -816,6 +818,8 @@ export function AgentChatPanel({
                   isExecuting={isExecuting}
                   onExecute={executePlan}
                   onExecuteToolCalls={executeToolCalls}
+                  onStopRun={stopAgentRun}
+                  onRetryRun={retryAgentRun}
                   workspaceId={workspacePath}
                 />
               ))}
