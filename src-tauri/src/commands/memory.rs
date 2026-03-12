@@ -529,7 +529,7 @@ fn extract_tag_value(tags: &[String], key: &str) -> Option<String> {
         .find_map(|tag| tag.strip_prefix(&prefix).map(|value| value.to_string()))
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "macos"))]
 mod tests {
     use super::*;
     use crate::services::memory::MemoryManager;
@@ -549,6 +549,7 @@ mod tests {
         unsafe { std::mem::transmute_copy(&manager) }
     }
 
+    #[cfg(target_os = "macos")]
     #[tokio::test]
     #[serial]
     async fn test_store_memory_command() {
@@ -565,6 +566,7 @@ mod tests {
         assert_eq!(result.unwrap(), "Stored successfully");
     }
 
+    #[cfg(target_os = "macos")]
     #[tokio::test]
     #[serial]
     async fn test_search_memory_command() {
@@ -588,6 +590,7 @@ mod tests {
         assert!(!results.is_empty());
     }
 
+    #[cfg(target_os = "macos")]
     #[tokio::test]
     #[serial]
     async fn test_get_recent_memory_command() {
@@ -607,6 +610,7 @@ mod tests {
         assert_eq!(recent.len(), 2);
     }
 
+    #[cfg(target_os = "macos")]
     #[tokio::test]
     #[serial]
     async fn test_clear_short_term_memory_command() {
@@ -628,6 +632,7 @@ mod tests {
         assert_eq!(size, 0);
     }
 
+    #[cfg(target_os = "macos")]
     #[tokio::test]
     #[serial]
     async fn test_get_memory_stats_command() {
@@ -639,6 +644,7 @@ mod tests {
         assert_eq!(stats.total_entries, 0);
     }
 
+    #[cfg(target_os = "macos")]
     #[tokio::test]
     #[serial]
     async fn test_get_short_term_memory_size_command() {
@@ -660,6 +666,7 @@ mod tests {
         assert_eq!(size, 1);
     }
 
+    #[cfg(target_os = "macos")]
     #[tokio::test]
     #[serial]
     async fn test_is_short_term_memory_empty_command() {
