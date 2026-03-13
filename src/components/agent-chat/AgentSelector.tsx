@@ -1,11 +1,7 @@
 import { useState, useMemo } from "react";
-import {
-  Button,
-  Popover,
-  PopoverTrigger,
-  PopoverContent,
-  Input,
-} from "@heroui/react";
+import { Button } from "../ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import { Input } from "../ui/input";
 import { Check, ChevronDown, Search, Bot, User } from "lucide-react";
 import { AgentSpec } from "../../types/agent-spec";
 
@@ -40,7 +36,7 @@ export function AgentSelector({
   }, [agentSpecs, searchQuery]);
 
   return (
-    <Popover isOpen={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
+    <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
       <PopoverTrigger>
         <Button
           variant="ghost"
@@ -76,7 +72,7 @@ export function AgentSelector({
         </Button>
       </PopoverTrigger>
 
-      <PopoverContent className="w-80 mt-2 p-0 bg-background/60 backdrop-blur-2xl dark:bg-background/20 border border-white/10 rounded-lg overflow-hidden">
+      <PopoverContent align="start" className="w-80 p-0 bg-background/60 backdrop-blur-2xl dark:bg-background/20 border border-white/10 rounded-lg overflow-hidden">
         <div className="flex flex-col">
           {/* Search */}
           <div className="p-3 border-b border-border/10">

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { ChevronDown, Brain, Clock } from "lucide-react";
-import { Button } from "@heroui/react";
-import { motion, AnimatePresence } from "framer-motion";
+import { Button } from "../ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../ui/collapsible";
 
 interface ThoughtDisplayProps {
   thought: string;
@@ -64,20 +64,25 @@ export function ThoughtDisplay({
   const currentBgColor = bgColor[thinkingLevel] || bgColor.medium;
 
   return (
-    <div className={`w-full font-sans ${className}`}>
-      <div
-        className="flex items-center gap-2 cursor-pointer group select-none py-2"
-        onClick={() => setIsExpanded(!isExpanded)}
-      >
-        <div
-          className={`p-1 rounded-md bg-opacity-10 ${currentBgColor} transition-colors`}
-        >
-          <Brain className={`size-3.5 ${currentLevelColor}`} />
-        </div>
+    <Collapsible
+      open={isExpanded}
+      onOpenChange={setIsExpanded}
+      className={`w-full font-sans ${className}`}
+    >
+      <div className="flex items-center gap-2 group select-none py-2">
+        <CollapsibleTrigger>
+          <div
+            className={`p-1 rounded-md bg-opacity-10 ${currentBgColor} transition-colors cursor-pointer`}
+          >
+            <Brain className={`size-3.5 ${currentLevelColor}`} />
+          </div>
+        </CollapsibleTrigger>
 
-        <span className="text-sm font-medium text-foreground/80 group-hover:text-foreground transition-colors">
-          {headerTitle}
-        </span>
+        <CollapsibleTrigger>
+          <span className="text-sm font-medium text-foreground/80 group-hover:text-foreground transition-colors cursor-pointer block">
+            {headerTitle}
+          </span>
+        </CollapsibleTrigger>
 
         {displayTime && (
           <span className="text-xs text-muted-foreground font-mono flex items-center gap-1 ml-1 bg-muted/30 px-1.5 py-0.5 rounded">
@@ -88,40 +93,30 @@ export function ThoughtDisplay({
 
         <div className="flex-1" />
 
-        <Button
-          size="sm"
-          variant="ghost"
-          isIconOnly
-          className="w-6 h-6 min-w-0 data-[hover=true]:bg-muted/50 text-muted-foreground"
-          onPress={() => setIsExpanded(!isExpanded)}
-        >
-          <ChevronDown
-            className={`size-3.5 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`}
-          />
-        </Button>
+        <CollapsibleTrigger>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="w-6 h-6 min-w-0 hover:bg-muted/50 text-muted-foreground cursor-pointer"
+          >
+            <ChevronDown
+              className={`size-3.5 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`}
+            />
+          </Button>
+        </CollapsibleTrigger>
       </div>
 
-      <AnimatePresence initial={false}>
-        {isExpanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2, ease: "easeInOut" }}
-            className="overflow-hidden"
-          >
-            <div className="pl-2 border-l-2 border-muted/30 ml-2.5 my-1">
-              <div className="pl-4 py-2 text-sm text-muted-foreground/90 whitespace-pre-wrap leading-relaxed font-mono bg-muted/5 rounded-r-lg">
-                {thought}
-                {isStreaming && (
-                  <span className="inline-block w-1.5 h-3.5 bg-current ml-1 animate-pulse align-middle" />
-                )}
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+      <CollapsibleContent className="CollapsibleContent overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+        <div className="pl-2 border-l-2 border-muted/30 ml-2.5 my-1">
+          <div className="pl-4 py-2 text-sm text-muted-foreground/90 whitespace-pre-wrap leading-relaxed font-mono bg-muted/5 rounded-r-lg">
+            {thought}
+            {isStreaming && (
+              <span className="inline-block w-1.5 h-3.5 bg-current ml-1 animate-pulse align-middle" />
+            )}
+          </div>
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 

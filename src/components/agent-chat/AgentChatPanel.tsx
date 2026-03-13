@@ -1,11 +1,13 @@
 import React, { useState, useRef, useEffect } from "react";
+import { Button } from "../ui/button";
+import { Textarea } from "../ui/textarea";
 import {
-  Button,
-  TextArea,
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@heroui/react";
+  TooltipProvider
+} from "../ui/tooltip";
+import { ScrollArea } from "../ui/scroll-area";
 import * as tauri from "../../services/tauri";
 import {
   Paperclip,
@@ -424,13 +426,13 @@ export function AgentChatPanel({
       <div
         className={`relative group rounded-[28px] border transition-all duration-300 bg-background/40 backdrop-blur-xl border-white/10 shadow-lg`}
       >
-        <TextArea
+        <Textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Message Agent..."
           rows={centered ? 2 : 1}
-          className={`w-full bg-transparent border-none shadow-none text-foreground placeholder:text-muted-foreground/40 focus:ring-0 px-5 py-4 resize-none ${
+          className={`w-full bg-transparent border-none shadow-none text-foreground placeholder:text-muted-foreground/40 focus-visible:ring-0 px-5 py-4 resize-none ${
             centered
               ? "text-lg tracking-tight min-h-[90px]"
               : "text-sm min-h-[50px]"
@@ -440,14 +442,14 @@ export function AgentChatPanel({
 
         <div className="flex items-center justify-between px-3 pb-3 mt-2">
           <div className="flex items-center gap-2">
-            <Tooltip delay={0}>
-              <TooltipTrigger>
+            <TooltipProvider delay={0}>
+              <Tooltip>
+                <TooltipTrigger>
                 <Button
-                  size="sm"
+                  size="icon"
                   variant="ghost"
-                  isIconOnly
-                  onPress={handleStartForgeRecording}
-                  isDisabled={isForgeBusy || isForgeRecording}
+                  onClick={handleStartForgeRecording}
+                  disabled={isForgeBusy || isForgeRecording}
                   className="rounded-full w-8 h-8 text-muted-foreground hover:text-red-400 hover:bg-red-400/10"
                 >
                   <Circle className="size-3.5" />
@@ -456,15 +458,14 @@ export function AgentChatPanel({
               <TooltipContent>
                 <span className="text-xs">Start Forge recording</span>
               </TooltipContent>
-            </Tooltip>
-            <Tooltip delay={0}>
-              <TooltipTrigger>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger>
                 <Button
-                  size="sm"
+                  size="icon"
                   variant="ghost"
-                  isIconOnly
-                  onPress={handleStopForgeRecording}
-                  isDisabled={isForgeBusy || !isForgeRecording}
+                  onClick={handleStopForgeRecording}
+                  disabled={isForgeBusy || !isForgeRecording}
                   className="rounded-full w-8 h-8 text-muted-foreground hover:text-emerald-400 hover:bg-emerald-400/10"
                 >
                   {isForgeBusy ? (
@@ -477,15 +478,14 @@ export function AgentChatPanel({
               <TooltipContent>
                 <span className="text-xs">Stop Forge recording</span>
               </TooltipContent>
-            </Tooltip>
-            <Tooltip delay={0}>
-              <TooltipTrigger>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger>
                 <Button
-                  size="sm"
+                  size="icon"
                   variant="ghost"
-                  isIconOnly
-                  onPress={handleGenerateForgeAgent}
-                  isDisabled={
+                  onClick={handleGenerateForgeAgent}
+                  disabled={
                     isForgeBusy ||
                     isForgeRecording ||
                     !stoppedForgeRecordingId ||
@@ -499,34 +499,32 @@ export function AgentChatPanel({
               <TooltipContent>
                 <span className="text-xs">Generate Forge specialist</span>
               </TooltipContent>
-            </Tooltip>
-            <Tooltip delay={0}>
-              <TooltipTrigger>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger>
                 <Button
-                  size="sm"
+                  size="icon"
                   variant="ghost"
-                  isIconOnly
                   className="text-muted-foreground/50 hover:text-foreground hover:bg-muted/50 rounded-full w-8 h-8"
                 >
                   <Paperclip className="size-4" />
                 </Button>
-              </TooltipTrigger>
+                </TooltipTrigger>
               <TooltipContent>
                 <span className="text-xs">Attach files</span>
               </TooltipContent>
-            </Tooltip>
+              </Tooltip>
+            </TooltipProvider>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 pr-2">
             <Button
-              size="sm"
-              isIconOnly
-              onPress={handleSubmit}
-              isDisabled={!input.trim() || isProcessing}
-              isPending={isProcessing}
+              size="icon"
+              onClick={handleSubmit}
+              disabled={!input.trim() || isProcessing}
               className={`rounded-full transition-all duration-300 shadow-sm ${
                 input.trim()
-                  ? "bg-foreground text-background scale-100 opacity-100 translate-y-0"
+                  ? "bg-foreground text-background scale-100 opacity-100 translate-y-0 hover:bg-foreground/90"
                   : "bg-muted text-muted-foreground scale-90 opacity-0 translate-y-2 pointer-events-none"
               }`}
             >
@@ -570,53 +568,52 @@ export function AgentChatPanel({
           <div className="w-px h-4 bg-border/20 mx-1" />
 
           <div className="flex items-center gap-1 pr-1">
-            <Tooltip delay={0}>
-              <TooltipTrigger>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  isIconOnly
-                  onPress={clearMessages}
-                  className="rounded-full w-8 h-8 text-muted-foreground hover:text-foreground hover:bg-muted/40"
-                >
-                  <Eraser className="size-3.5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <span className="text-xs">Clear UI only</span>
+            <TooltipProvider delay={0}>
+              <Tooltip>
+                <TooltipTrigger>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={clearMessages}
+                    className="rounded-full w-8 h-8 text-muted-foreground hover:text-foreground hover:bg-muted/40"
+                  >
+                    <Eraser className="size-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <span className="text-xs">Clear UI only</span>
               </TooltipContent>
-            </Tooltip>
-            <Tooltip delay={0}>
-              <TooltipTrigger>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  isIconOnly
-                  onPress={async () => {
-                    try {
-                      await clearMessagesAndContext(workspacePath);
-                    } catch (e) {
-                      console.error(
-                        "Failed to clear persisted chat context:",
-                        e,
-                      );
-                    }
-                  }}
-                  className="rounded-full w-8 h-8 text-muted-foreground hover:text-red-400 hover:bg-red-400/10"
-                >
-                  <Trash2 className="size-3.5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <span className="text-xs">Delete context (memory)</span>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={async () => {
+                      try {
+                        await clearMessagesAndContext(workspacePath);
+                      } catch (e) {
+                        console.error(
+                          "Failed to clear persisted chat context:",
+                          e,
+                        );
+                      }
+                    }}
+                    className="rounded-full w-8 h-8 text-muted-foreground hover:text-red-400 hover:bg-red-400/10"
+                  >
+                    <Trash2 className="size-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <span className="text-xs">Delete context (memory)</span>
               </TooltipContent>
-            </Tooltip>
+              </Tooltip>
+            </TooltipProvider>
             {onClose && (
               <Button
-                size="sm"
+                size="icon"
                 variant="ghost"
-                isIconOnly
-                onPress={onClose}
+                onClick={onClose}
                 className="rounded-full w-8 h-8 text-muted-foreground hover:text-foreground"
               >
                 <Zap className="size-3.5" />
@@ -662,7 +659,7 @@ export function AgentChatPanel({
             />
           </div>
 
-          <TextArea
+          <Textarea
             value={pendingForgeSpec?.soul?.soul_content ?? ""}
             onChange={(event) =>
               setPendingForgeSpec((prev: any) => ({
@@ -671,32 +668,32 @@ export function AgentChatPanel({
               }))
             }
             rows={6}
-            className="mt-3"
+            className="mt-3 bg-background/40 border-border/40 focus-visible:ring-1"
             placeholder="System prompt"
           />
 
           <div className="mt-3 flex items-center gap-2">
             <Button
               size="sm"
-              variant="ghost"
-              onPress={handleValidateForgeDraft}
-              isDisabled={isForgeValidating || isForgeBusy}
+              variant="outline"
+              onClick={handleValidateForgeDraft}
+              disabled={isForgeValidating || isForgeBusy}
             >
               {isForgeValidating ? "Testing..." : "Test Draft"}
             </Button>
             <Button
               size="sm"
-              onPress={handleSaveForgeDraft}
-              isDisabled={isForgeBusy || !forgeValidation?.passed}
-              className="bg-emerald-600 text-white"
+              onClick={handleSaveForgeDraft}
+              disabled={isForgeBusy || !forgeValidation?.passed}
+              className="bg-emerald-600 text-white hover:bg-emerald-700"
             >
               Save & Activate
             </Button>
             <Button
               size="sm"
               variant="ghost"
-              onPress={handleDiscardForgeDraft}
-              isDisabled={isForgeBusy}
+              onClick={handleDiscardForgeDraft}
+              disabled={isForgeBusy}
             >
               Discard
             </Button>
@@ -720,7 +717,7 @@ export function AgentChatPanel({
         </div>
       )}
 
-      <div className="absolute inset-0 overflow-y-auto w-full h-full scrollbar-none z-10">
+      <ScrollArea className="absolute inset-0 w-full h-full z-10">
         <div
           className={`flex flex-col px-4 md:px-8 w-full md:max-w-3xl lg:max-w-4xl mx-auto transition-all duration-300 ${
             messages.length === 0
@@ -802,8 +799,8 @@ export function AgentChatPanel({
                   <Button
                     size="sm"
                     variant="ghost"
-                    onPress={loadOlderHistory}
-                    isDisabled={isHydratingHistory}
+                    onClick={loadOlderHistory}
+                    disabled={isHydratingHistory}
                     className="rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/40"
                   >
                     {isHydratingHistory ? "Loading..." : "Load older messages"}
@@ -827,7 +824,7 @@ export function AgentChatPanel({
             </div>
           )}
         </div>
-      </div>
+      </ScrollArea>
 
       {messages.length > 0 && (
         <div className="absolute bottom-6 left-0 right-0 z-40 px-4 pointer-events-none flex justify-center">

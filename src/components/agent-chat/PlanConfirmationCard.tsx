@@ -1,5 +1,7 @@
 import React from "react";
-import { Card, Button, Chip } from "@heroui/react";
+import { Card } from "../ui/card";
+import { Button } from "../ui/button";
+import { Badge } from "../ui/badge";
 import { FileCode, Play, FileText, FolderOpen, Search } from "lucide-react";
 
 interface PlanConfirmationCardProps {
@@ -44,9 +46,9 @@ export function PlanConfirmationCard({
           <Play className="size-4 text-purple-500" />
           Proposed Actions
         </h3>
-        <Chip size="sm" variant="soft" color="warning">
+        <Badge variant="secondary" className="bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20">
           {toolCalls.length} operation{toolCalls.length !== 1 ? "s" : ""}
-        </Chip>
+        </Badge>
       </div>
 
       <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
@@ -77,9 +79,8 @@ export function PlanConfirmationCard({
         <Button
           className="flex-1 bg-purple-600 hover:bg-purple-700 text-white shadow-lg shadow-purple-500/20"
           size="sm"
-          onPress={onExecute}
-          isDisabled={isExecuting}
-          isPending={isExecuting}
+          onClick={onExecute}
+          disabled={isExecuting}
         >
           <Play className="size-3.5 fill-current" />
           Execute Plan

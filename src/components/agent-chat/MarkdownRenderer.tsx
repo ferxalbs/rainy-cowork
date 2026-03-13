@@ -9,7 +9,7 @@ interface MarkdownRendererProps {
 
 export function MarkdownRenderer({ content }: MarkdownRendererProps) {
   return (
-    <div className="prose prose-sm dark:prose-invert max-w-none break-words">
+    <div className="prose prose-sm dark:prose-invert max-w-none break-words text-foreground">
       <Markdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeHighlight]}
@@ -19,13 +19,13 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
               {...props}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-blue-400 hover:underline"
+              className="text-primary hover:text-primary/80 hover:underline transition-colors"
             />
           ),
           pre: ({ node, ...props }) => (
             <pre
               {...props}
-              className="bg-gray-900/50 rounded-lg p-0 overflow-x-auto border border-white/10"
+              className="bg-muted border border-border/50 rounded-lg p-0 overflow-x-auto text-[13px]"
             />
           ),
           code: ({ node, className, children, ...props }: any) => {
@@ -35,27 +35,27 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
             return isInline ? (
               <code
                 {...props}
-                className={`${className} bg-white/10 rounded px-1 py-0.5 text-[0.9em]`}
+                className={`${className} bg-primary/10 text-primary font-semibold rounded px-1.5 py-0.5 text-[0.9em]`}
               >
                 {children}
               </code>
             ) : (
               <code
                 {...props}
-                className={`${className} block p-4 text-sm font-mono`}
+                className={`${className} block p-4 text-sm font-mono text-foreground/90`}
               >
                 {children}
               </code>
             );
           },
           ul: ({ node, ...props }) => (
-            <ul {...props} className="list-disc pl-4 space-y-1" />
+            <ul {...props} className="list-disc pl-5 space-y-1 mb-4" />
           ),
           ol: ({ node, ...props }) => (
-            <ol {...props} className="list-decimal pl-4 space-y-1" />
+            <ol {...props} className="list-decimal pl-5 space-y-1 mb-4" />
           ),
           li: ({ node, ...props }) => (
-            <li {...props} className="marker:text-gray-400" />
+            <li {...props} className="marker:text-muted-foreground/50 text-foreground/90 leading-relaxed" />
           ),
         }}
       >

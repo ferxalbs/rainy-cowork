@@ -10,7 +10,8 @@ import {
   Square,
   ChevronDown,
 } from "lucide-react";
-import { Button, Card } from "@heroui/react";
+import { Button } from "../ui/button";
+import { Card } from "../ui/card";
 import { motion } from "framer-motion";
 import type { AgentMessage, TaskPlan } from "../../types/agent";
 import { MarkdownRenderer } from "./MarkdownRenderer";
@@ -196,7 +197,7 @@ export function MessageBubble({
               size="sm"
               variant="ghost"
               className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
-              onPress={handleCopy}
+              onClick={handleCopy}
             >
               <Copy className="size-3.5" />
               Copy
@@ -205,8 +206,8 @@ export function MessageBubble({
               size="sm"
               variant="ghost"
               className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
-              onPress={() => onRetryRun?.(message.id)}
-              isDisabled={!message.requestContext?.prompt || message.isLoading}
+              onClick={() => onRetryRun?.(message.id)}
+              disabled={!message.requestContext?.prompt || message.isLoading}
             >
               <RotateCcw className="size-3.5" />
               Retry
@@ -216,7 +217,7 @@ export function MessageBubble({
                 size="sm"
                 variant="ghost"
                 className="h-7 px-2 text-xs text-red-500 hover:text-red-400"
-                onPress={() => onStopRun?.(message.id)}
+                onClick={() => onStopRun?.(message.id)}
               >
                 <Square className="size-3.5" />
                 Stop
@@ -519,9 +520,8 @@ function PlanCard({
         <Button
           className="flex-1 bg-purple-600 hover:bg-purple-700 text-white shadow-lg shadow-purple-500/20"
           size="sm"
-          onPress={() => onExecute?.(plan.id)}
-          isDisabled={isExecuting}
-          isPending={isExecuting}
+          onClick={() => onExecute?.(plan.id)}
+          disabled={isExecuting}
         >
           <Play className="size-3.5" />
           Execute Plan

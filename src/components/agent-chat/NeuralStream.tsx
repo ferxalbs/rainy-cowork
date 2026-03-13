@@ -8,7 +8,6 @@ import {
   Cpu,
   CheckCircle2,
 } from "lucide-react";
-import { ScrollShadow } from "@heroui/react";
 
 interface NeuralStreamProps {
   isVisible: boolean;
@@ -81,27 +80,32 @@ export const NeuralStream: React.FC<NeuralStreamProps> = ({
           </div>
 
           {/* Terminal/Stream Content */}
-          <div className="h-64 font-mono text-xs relative">
-            <ScrollShadow className="h-full w-full">
-              <div ref={scrollRef} className="p-4 space-y-2">
-                {/* Historical Logs */}
-                {logs.map((log, i) => (
-                  <div key={i} className="text-muted-foreground/80 break-words">
-                    <span className="text-primary/50 mr-2">{">"}</span>
-                    {log}
-                  </div>
-                ))}
+          <div className="h-64 font-mono text-xs relative overflow-hidden">
+            <div 
+              ref={scrollRef} 
+              className="absolute inset-0 overflow-y-auto px-4 py-4 space-y-2 pb-12 custom-scrollbar"
+              style={{
+                maskImage: 'linear-gradient(to bottom, transparent, black 10%, black 90%, transparent)',
+                WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 10%, black 90%, transparent)'
+              }}
+            >
+              {/* Historical Logs */}
+              {logs.map((log, i) => (
+                <div key={i} className="text-muted-foreground/80 break-words">
+                  <span className="text-primary/50 mr-2">{">"}</span>
+                  {log}
+                </div>
+              ))}
 
-                {/* Active Thought Stream */}
-                {currentThought && (
-                  <div className="text-primary animate-pulse break-words">
-                    <span className="mr-2 text-secondary">⚡</span>
-                    {currentThought}
-                    <span className="inline-block w-2 h-4 ml-1 bg-primary align-middle animate-blink" />
-                  </div>
-                )}
-              </div>
-            </ScrollShadow>
+              {/* Active Thought Stream */}
+              {currentThought && (
+                <div className="text-primary animate-pulse break-words">
+                  <span className="mr-2 text-secondary">⚡</span>
+                  {currentThought}
+                  <span className="inline-block w-2 h-4 ml-1 bg-primary align-middle animate-blink" />
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Footer Metrics */}
