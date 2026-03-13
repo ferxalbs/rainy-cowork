@@ -3,7 +3,7 @@ import { Button } from "../ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { Input } from "../ui/input";
 import { Check, ChevronDown, Search, Bot, User } from "lucide-react";
-import { AgentSpec } from "../../types/agent-spec";
+import type { AgentSpec } from "../../types/agent-spec";
 
 interface AgentSelectorProps {
   selectedAgentId: string;

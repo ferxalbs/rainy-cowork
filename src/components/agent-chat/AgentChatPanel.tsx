@@ -19,16 +19,24 @@ import {
   Circle,
   Square,
   Wrench,
+  ChevronDown
 } from "lucide-react";
 import { useAgentChat } from "../../hooks/useAgentChat";
 import { useTheme } from "../../hooks/useTheme";
 import { MacOSToggle } from "../layout/MacOSToggle";
 import { toast } from "sonner";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select";
 
 import { UnifiedModelSelector } from "../ai/UnifiedModelSelector";
 import { AgentSelector } from "./AgentSelector";
 import { MessageBubble } from "./MessageBubble";
-import { AgentSpec } from "../../types/agent-spec";
+import type { AgentSpec } from "../../types/agent-spec";
 import type {
   ForgeRecordingMetrics,
   ForgeValidationResult,
@@ -430,12 +438,17 @@ export function AgentChatPanel({
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
+          onInput={(e) => {
+            const target = e.target as HTMLTextAreaElement;
+            target.style.height = 'auto';
+            target.style.height = `${Math.min(target.scrollHeight, 400)}px`;
+          }}
           placeholder="Message Agent..."
           rows={centered ? 2 : 1}
-          className={`w-full bg-transparent border-none shadow-none text-foreground placeholder:text-muted-foreground/40 focus-visible:ring-0 px-5 py-4 resize-none ${
+          className={`w-full bg-transparent border-none shadow-none text-foreground placeholder:text-muted-foreground/40 focus-visible:ring-0 px-5 py-4 resize-none transition-all ${
             centered
-              ? "text-lg tracking-tight min-h-[90px]"
-              : "text-sm min-h-[50px]"
+              ? "text-lg tracking-tight min-h-[90px] max-h-[400px]"
+              : "text-base min-h-[50px] max-h-[400px]"
           }`}
           disabled={isProcessing}
         />
@@ -515,6 +528,31 @@ export function AgentChatPanel({
               </TooltipContent>
               </Tooltip>
             </TooltipProvider>
+
+            <div className="w-px h-4 bg-border/20 mx-1" />
+
+            <AgentSelector
+              selectedAgentId={selectedAgentId}
+              onSelect={setSelectedAgentId}
+              agentSpecs={agentSpecs}
+            />
+
+            <UnifiedModelSelector
+              selectedModelId={currentModelId}
+              onSelect={handleModelSelect}
+            />
+
+            <Select defaultValue="auto">
+              <SelectTrigger className="h-8 border-none bg-muted/30 hover:bg-muted/50 rounded-full px-3 text-xs font-medium w-auto gap-1.5 focus:ring-0 shadow-none">
+                <Sparkles className="size-3 text-muted-foreground" />
+                <SelectValue placeholder="Reasoning" />
+              </SelectTrigger>
+              <SelectContent className="rounded-xl">
+                <SelectItem value="low">Low Effort</SelectItem>
+                <SelectItem value="auto">Auto</SelectItem>
+                <SelectItem value="high">High Effort</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="flex items-center gap-2 pr-2">
@@ -540,26 +578,13 @@ export function AgentChatPanel({
     <div className="h-full w-full relative bg-transparent overflow-hidden text-foreground">
       <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-background/50 to-background/80 pointer-events-none z-0" />
 
-      <div className="absolute top-0 left-0 right-0 z-50 flex justify-center pt-6 pointer-events-none">
+      <div className="absolute top-0 left-0 right-0 z-50 flex justify-end pt-6 pr-6 pointer-events-none">
         <div
           data-tauri-drag-region
           className="absolute inset-x-0 top-0 h-20 pointer-events-auto z-0"
         />
 
-        <div className="relative z-10 flex items-center gap-3 p-1.5 pl-3 rounded-full bg-background/60 backdrop-blur-2xl border border-white/10 shadow-lg pointer-events-auto transition-all hover:bg-background/80">
-          <AgentSelector
-            selectedAgentId={selectedAgentId}
-            onSelect={setSelectedAgentId}
-            agentSpecs={agentSpecs}
-          />
-
-          <UnifiedModelSelector
-            selectedModelId={currentModelId}
-            onSelect={handleModelSelect}
-          />
-
-          <div className="w-px h-4 bg-border/20 mx-1" />
-
+        <div className="relative z-10 flex items-center gap-1 p-1.5 rounded-full bg-background/60 backdrop-blur-2xl border border-white/10 shadow-lg pointer-events-auto transition-all hover:bg-background/80">
           <MacOSToggle
             isDark={mode === "dark"}
             onToggle={(checked) => setMode(checked ? "dark" : "light")}
@@ -759,20 +784,42 @@ export function AgentChatPanel({
           )}
 
           {messages.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center">
-              <div className="mb-8 relative group">
-                <div className="absolute inset-0 bg-primary/20 blur-3xl rounded-full opacity-50" />
-                <Sparkles className="size-16 text-foreground/20 relative z-10" />
+            <div className="flex-1 flex flex-col items-center justify-center pt-8">
+              <div className="mb-4 relative group">
+                <Sparkles className="size-10 text-foreground/40 relative z-10" />
               </div>
 
-              <h1 className="text-3xl font-medium text-foreground mb-3 tracking-tight text-center">
-                How can I help you?
+              <h1 className="text-3xl font-semibold text-foreground tracking-tight text-center mb-1">
+                Let's build
               </h1>
-              <p className="text-muted-foreground text-sm mb-10 text-center max-w-sm font-light">
-                {(agentSpecs.find((s) => s.id === selectedAgentId)?.soul.name ||
-                  "Rainy Agent") +
-                  " is ready to assist with your workspace tasks."}
-              </p>
+              <div className="flex items-center gap-1 mb-10 text-muted-foreground hover:bg-muted/50 px-2 py-1 rounded-md cursor-pointer transition-colors">
+                <span className="text-lg">{workspacePath.split('/').pop() || 'workspace'}</span>
+                <ChevronDown className="size-4 opacity-50" />
+              </div>
+
+              <div className="flex flex-wrap items-stretch justify-center gap-3 mb-8 w-full max-w-3xl px-4">
+                <div 
+                  className="flex flex-col flex-1 min-w-[200px] p-4 rounded-2xl bg-muted/20 hover:bg-muted/40 border border-border/30 cursor-pointer transition-colors text-left"
+                  onClick={() => setInput("Build a classic Snake game in this repo.")}
+                >
+                  <span className="text-xl mb-2">🎮</span>
+                  <span className="text-sm font-medium text-foreground/90">Build a classic Snake game in this repo.</span>
+                </div>
+                <div 
+                  className="flex flex-col flex-1 min-w-[200px] p-4 rounded-2xl bg-muted/20 hover:bg-muted/40 border border-border/30 cursor-pointer transition-colors text-left"
+                  onClick={() => setInput("Create a one-page pdf that summarizes this app.")}
+                >
+                  <span className="text-xl mb-2">📄</span>
+                  <span className="text-sm font-medium text-foreground/90">Create a one-page pdf that summarizes this app.</span>
+                </div>
+                <div 
+                  className="flex flex-col flex-1 min-w-[200px] p-4 rounded-2xl bg-muted/20 hover:bg-muted/40 border border-border/30 cursor-pointer transition-colors text-left"
+                  onClick={() => { setInput("Create a plan to "); document.querySelector('textarea')?.focus(); }}
+                >
+                  <span className="text-xl mb-2">✏️</span>
+                  <span className="text-sm font-medium text-foreground/90">Create a plan to...</span>
+                </div>
+              </div>
 
               {renderInputArea(true)}
             </div>
