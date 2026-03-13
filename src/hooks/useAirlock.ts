@@ -3,8 +3,8 @@ import { listen } from "@tauri-apps/api/event";
 import {
   getPendingAirlockApprovals,
   respondToAirlock,
-  ApprovalRequest,
 } from "../services/tauri";
+import type { ApprovalRequest } from "../services/tauri";
 
 export function useAirlock() {
   const [pendingRequests, setPendingRequests] = useState<ApprovalRequest[]>([]);

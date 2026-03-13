@@ -3,9 +3,9 @@ import {
   useEffect,
   useState,
   useCallback,
-  ReactNode,
   useRef,
 } from "react";
+import type { ReactNode } from "react";
 import type { ThemeName, ThemeMode, ThemeConfig, Theme } from "../types/theme";
 import { themes } from "../lib/themes";
 

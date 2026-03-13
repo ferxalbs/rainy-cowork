@@ -2,13 +2,15 @@ import { Button } from "@heroui/react";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  AtmCommandMetricsResponse,
-  AtmCommandProgressEvent,
-  AtmCommandSummary,
   getAtmCommandDetails,
   getAtmCommandMetrics,
   getAtmCommandProgress,
   listAtmCommands,
+} from "../../../services/tauri";
+import type {
+  AtmCommandMetricsResponse,
+  AtmCommandProgressEvent,
+  AtmCommandSummary,
 } from "../../../services/tauri";
 import { NeuralChip } from "../shared/UiElements";
 

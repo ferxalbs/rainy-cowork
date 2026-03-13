@@ -2,9 +2,9 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import {
   registerNode,
   sendHeartbeat,
-  DesktopNodeStatus,
   setHeadlessMode,
 } from "../services/tauri";
+import type { DesktopNodeStatus } from "../services/tauri";
 import { useAirlock } from "./useAirlock";
 import { toast } from "@heroui/react";
 

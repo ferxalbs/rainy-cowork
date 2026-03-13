@@ -65,12 +65,13 @@ export interface Capability {
   permissions: Permission[];
 }
 
-export enum Permission {
-  Read = "Read",
-  Write = "Write",
-  Execute = "Execute",
-  Network = "Network",
-}
+export const Permission = {
+  Read: "Read",
+  Write: "Write",
+  Execute: "Execute",
+  Network: "Network",
+} as const;
+export type Permission = typeof Permission[keyof typeof Permission];
 
 export interface RuntimeConfig {
   mode?: "single" | "supervisor";

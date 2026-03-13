@@ -12,8 +12,8 @@ import {
   resetNeuralWorkspace,
   setNeuralCredentials,
   setNeuralWorkspaceId,
-  WorkspaceAuth,
 } from "../../services/tauri";
+import type { WorkspaceAuth } from "../../services/tauri";
 import { NeuralLayout } from "./layout/NeuralLayout";
 import { NeuralSidebar } from "./layout/NeuralSidebar";
 import { NeuralActivity } from "./modules/NeuralActivity";

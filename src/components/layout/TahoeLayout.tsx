@@ -1,4 +1,5 @@
-import { ReactNode, useState, useEffect } from "react";
+import { useState, useEffect } from "react";
+import type { ReactNode } from "react";
 import { BackgroundManager } from "../backgrounds/BackgroundManager";
 import { AppSidebar } from "./AppSidebar";
 import { MacOSToggle } from "./MacOSToggle";

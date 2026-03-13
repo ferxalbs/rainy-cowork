@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 // @ts-ignore
 import { Button, Spinner } from "@heroui/react";
 import { toast } from "sonner";
-import { AgentSpec } from "../../../types/agent-spec";
+import type { AgentSpec } from "../../../types/agent-spec";
 import * as tauri from "../../../services/tauri";
 import { useTheme } from "../../../hooks/useTheme";
 import { normalizeAgentSpec } from "../builder/specDefaults";

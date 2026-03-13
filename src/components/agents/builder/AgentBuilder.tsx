@@ -11,7 +11,7 @@ import {
   ArrowLeft,
   SlidersHorizontal,
 } from "lucide-react";
-import { AgentSpec } from "../../../types/agent-spec";
+import type { AgentSpec } from "../../../types/agent-spec";
 import { SoulEditor } from "./SoulEditor";
 import { SkillsEditor } from "./SkillsEditor";
 import { AirlockPanel } from "./AirlockPanel";

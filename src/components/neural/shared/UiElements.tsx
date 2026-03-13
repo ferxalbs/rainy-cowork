@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import type { ReactNode } from "react";
 
 // Custom Chip to avoid HeroUI type issues and ensure consistent design
 export function NeuralChip({

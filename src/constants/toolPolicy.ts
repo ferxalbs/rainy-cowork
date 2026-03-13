@@ -1,4 +1,5 @@
-import { AirlockLevel, AirlockLevels } from "../services/tauri";
+import { AirlockLevels } from "../services/tauri";
+import type { AirlockLevel } from "../services/tauri";
 
 export type ToolSkillName =
   | "filesystem"

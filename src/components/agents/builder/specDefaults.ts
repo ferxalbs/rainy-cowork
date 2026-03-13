@@ -1,4 +1,4 @@
-import { AgentSpec } from "../../../types/agent-spec";
+import type { AgentSpec } from "../../../types/agent-spec";
 
 export function createDefaultAgentSpec(id: string = crypto.randomUUID()): AgentSpec {
   return {
