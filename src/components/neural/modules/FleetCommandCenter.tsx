@@ -259,7 +259,7 @@ export function FleetCommandCenter() {
         onOpenChange={(open) => {
           if (!open) closeActionDialog();
         }}
-        className="backdrop-blur-md bg-background/80 dark:bg-black/60 z-[9999]"
+        className="backdrop-blur-md bg-background/80 dark:bg-background/30 z-[9999]"
       >
         <Modal.Container>
           <Modal.Dialog className="max-w-md w-full backdrop-blur-md bg-background/85 dark:bg-background/20 rounded-2xl shadow-2xl border border-border/20 overflow-hidden">

@@ -19,6 +19,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Implemented `enableCompactMode` in `ThemeProvider` with persistent local storage.
   - Enhanced **API Keys** management with credential masking, one-click visibility, and real-time validation feedback.
   - Improved mobile responsiveness with a condensed horizontal tab navigation for small screens.
+- Hardened Fleet Command Center sensitive-action UX with explicit HeroUI confirmation dialogs (typed phrase + acknowledge checkbox + submitting lock) for kill switch and node retire:
+  - `src/components/neural/modules/FleetCommandCenter.tsx`
+- Removed owner credential payload dependency from Fleet UI actions (desktop bridge now uses persisted secure owner context instead of passing keys from React):
+  - `src/services/tauri.ts`
+  - `src-tauri/src/commands/atm.rs`
+  - `src-tauri/src/services/atm_client.rs`
+- Added fleet node lifecycle hardening and safer operations:
+  - idempotent node registration by fingerprint (avoids duplicate ghost nodes)
+  - fleet status now includes `effectiveStatus` and retire metadata
+  - retire endpoint with owner validation + audit emission + anti-flood protections
+  - files:
+    - `rainy-atm/src/routes/nodes.ts`
+    - `rainy-atm/src/routes/admin-fleet.ts`
+    - `rainy-atm/src/services/command-bridge.ts`
+    - `rainy-atm/src/db/client.ts`
+    - `rainy-atm/src/db/schema.ts`
+- Hardened Cloud Build deploy reliability for registry push instability (`blob upload unknown`) with pull/push retries and removal of duplicate implicit image push:
+  - `rainy-atm/cloudbuild.yaml`
+
+### Fixed
+
+- Fixed Fleet confirmation modal completion flow: dialog now closes correctly after successful action completion.
+  - `src/components/neural/modules/FleetCommandCenter.tsx`
+- Fixed ATM startup recovery regression where instances could remain permanently `DB_NOT_READY` after transient DB outages by continuing background init retries until success.
+  - `rainy-atm/src/index.ts`
+- Fixed retired-node command finalization regression: retired nodes can still report progress/complete for already-running commands, preventing stranded `running` commands.
+  - `rainy-atm/src/routes/nodes.ts`
+- Fixed fleet last-active-node retirement guard to count both `online` and `busy` healthy nodes.
+  - `rainy-atm/src/routes/admin-fleet.ts`
 
 ## [0.5.96] - 2026-03-11 - THE FORGE (AGENT FACTORY PRODUCTION)
 
