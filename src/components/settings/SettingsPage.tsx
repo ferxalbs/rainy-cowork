@@ -139,7 +139,7 @@ export function SettingsPage({
 
         <div className="p-4 pt-2">
           <div className="text-[10px] text-muted-foreground font-mono text-center opacity-50 pointer-events-none">
-            Rainy Cowork
+            Rainy MaTE
           </div>
         </div>
       </aside>

@@ -113,7 +113,6 @@ function App() {
         onSettingsClick={handleSettingsClick}
         activeSection={activeSection}
         isImmersive={
-          !isSettingsSection &&
           activeSection !== "documents" &&
           activeSection !== "research" &&
           activeSection !== "atm-bootstrap"
@@ -250,7 +249,7 @@ function NoFolderGate({ onAddFolder }: { onAddFolder: () => void }) {
             Select a Project Folder
           </h2>
           <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-            To get started, select a folder where Rainy Cowork will work. All
+            To get started, select a folder where Rainy MaTE will work. All
             files, documents, and AI-generated content will be saved there.
           </p>
         </div>
