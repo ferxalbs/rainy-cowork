@@ -1,5 +1,5 @@
 import { Card, Chip, Button, Spinner } from "@heroui/react";
-import { Bot, RefreshCw, Plus, Sparkles } from "lucide-react";
+import { Bot, RefreshCw, Plus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import {
   listAtmAgents,
@@ -129,18 +129,13 @@ export function AgentList({ onCreateClick }: AgentListProps) {
               className="group flex flex-col p-5 border border-border/10 bg-card/40 backdrop-blur-xl hover:bg-card/60 hover:border-primary/20 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 rounded-[1.25rem]"
             >
               <div className="flex justify-between items-start gap-4 mb-4">
-                <div className="flex gap-3 min-w-0 flex-1">
-                  <div className="p-3 bg-primary/10 rounded-2xl group-hover:bg-primary/20 transition-colors shrink-0 flex items-center justify-center">
-                    <Bot className="size-6 text-primary" />
-                  </div>
-                  <div className="flex flex-col justify-center">
-                    <h4 className="font-bold text-foreground text-base leading-tight break-words">
-                      {agent.name}
-                    </h4>
-                    <span className="text-[11px] font-semibold tracking-wider uppercase text-primary/80 mt-1 break-words">
-                      {agent.type.replace(/_/g, " ")}
-                    </span>
-                  </div>
+                <div className="flex flex-col flex-1 min-w-0">
+                  <h4 className="font-bold text-foreground text-base leading-tight break-words">
+                    {agent.name}
+                  </h4>
+                  <span className="text-[11px] font-semibold tracking-wider uppercase text-primary/80 mt-1 break-words">
+                    {agent.type.replace(/_/g, " ")}
+                  </span>
                 </div>
                 <div className="shrink-0 pt-0.5">
                   <Chip
@@ -168,13 +163,10 @@ export function AgentList({ onCreateClick }: AgentListProps) {
               </div>
 
               {agent.config?.model && (
-                <div className="mt-auto pt-4 border-t border-border/10 flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <Sparkles className="size-3.5 text-amber-500/80 shrink-0" />
-                    <span className="text-xs font-medium text-muted-foreground/80 break-words">
-                      {agent.config.model.replace(/-preview$/, "").replace(/^models\//, "")}
-                    </span>
-                  </div>
+                <div className="mt-auto pt-4 border-t border-border/10">
+                  <span className="text-xs font-medium text-muted-foreground/80 break-words">
+                    {agent.config.model.replace(/-preview$/, "").replace(/^models\//, "")}
+                  </span>
                 </div>
               )}
               {agent.isDuplicateLogicalSpec ? (
