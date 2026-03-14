@@ -1,6 +1,5 @@
 import { useState, useMemo } from "react";
 import { cn } from "../../lib/utils";
-import { Button } from "../ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { Input } from "../ui/input";
 import { Check, ChevronDown, Search, Bot, User } from "lucide-react";
