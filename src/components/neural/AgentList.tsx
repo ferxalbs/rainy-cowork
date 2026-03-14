@@ -133,11 +133,11 @@ export function AgentList({ onCreateClick }: AgentListProps) {
                   <div className="p-3 bg-primary/10 rounded-2xl group-hover:bg-primary/20 transition-colors shrink-0 flex items-center justify-center">
                     <Bot className="size-6 text-primary" />
                   </div>
-                  <div className="flex flex-col min-w-0 justify-center">
-                    <h4 className="font-bold text-foreground text-base leading-tight truncate">
+                  <div className="flex flex-col justify-center">
+                    <h4 className="font-bold text-foreground text-base leading-tight break-words">
                       {agent.name}
                     </h4>
-                    <span className="text-[11px] font-semibold tracking-wider uppercase text-primary/80 mt-1 truncate">
+                    <span className="text-[11px] font-semibold tracking-wider uppercase text-primary/80 mt-1 break-words">
                       {agent.type.replace(/_/g, " ")}
                     </span>
                   </div>
@@ -155,14 +155,14 @@ export function AgentList({ onCreateClick }: AgentListProps) {
               </div>
 
               <div className="space-y-2 mb-4 flex-1">
-                <div className="flex items-center justify-between text-[11px] font-mono px-3 py-1.5 rounded-lg bg-black/5 dark:bg-black/20 border border-white/5">
-                  <span className="text-muted-foreground/70 font-sans tracking-wide">ID</span>
-                  <span className="text-muted-foreground select-all">{agent.id.slice(0, 12)}</span>
+                <div className="flex items-start justify-between text-[11px] font-mono px-3 py-1.5 rounded-lg bg-black/5 dark:bg-black/20 border border-white/5 gap-2">
+                  <span className="text-muted-foreground/70 font-sans tracking-wide shrink-0">ID</span>
+                  <span className="text-muted-foreground select-all break-all text-right">{agent.id}</span>
                 </div>
                 {agent.logicalSpecId && (
-                  <div className="flex items-center justify-between text-[11px] font-mono px-3 py-1.5 rounded-lg bg-black/5 dark:bg-black/20 border border-white/5">
-                    <span className="text-muted-foreground/70 font-sans tracking-wide">SPEC</span>
-                    <span className="text-muted-foreground select-all">{agent.logicalSpecId.slice(0, 12)}</span>
+                  <div className="flex items-start justify-between text-[11px] font-mono px-3 py-1.5 rounded-lg bg-black/5 dark:bg-black/20 border border-white/5 gap-2">
+                    <span className="text-muted-foreground/70 font-sans tracking-wide shrink-0">SPEC</span>
+                    <span className="text-muted-foreground select-all break-all text-right">{agent.logicalSpecId}</span>
                   </div>
                 )}
               </div>
@@ -170,8 +170,8 @@ export function AgentList({ onCreateClick }: AgentListProps) {
               {agent.config?.model && (
                 <div className="mt-auto pt-4 border-t border-border/10 flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
-                    <Sparkles className="size-3.5 text-amber-500/80" />
-                    <span className="text-xs font-medium text-muted-foreground/80 truncate">
+                    <Sparkles className="size-3.5 text-amber-500/80 shrink-0" />
+                    <span className="text-xs font-medium text-muted-foreground/80 break-words">
                       {agent.config.model.replace(/-preview$/, "").replace(/^models\//, "")}
                     </span>
                   </div>
