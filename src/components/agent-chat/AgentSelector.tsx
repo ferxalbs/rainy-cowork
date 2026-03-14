@@ -56,7 +56,7 @@ export function AgentSelector({
         </button>
       </PopoverTrigger>
 
-      <PopoverContent align="start" sideOffset={12} className="w-[240px] overflow-hidden rounded-xl border border-white/10 bg-[#1a1a1a]/95 p-1 shadow-2xl backdrop-blur-2xl">
+      <PopoverContent align="start" sideOffset={12} className="w-[240px] overflow-hidden rounded-xl border border-white/10 bg-background/20 p-1 shadow-2xl backdrop-blur-md">
         <div className="flex flex-col">
           {/* Search */}
           <div className="border-b border-white/5 p-1.5">

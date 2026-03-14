@@ -217,7 +217,7 @@ export function AgentChatPanel({
   };
 
   const glassShell =
-    "border border-white/5 bg-[#121212]/60 backdrop-blur-2xl";
+    "border border-white/5 bg-background/30 backdrop-blur-md";
 
   const renderComposer = (centered: boolean) => (
     <div className={cn("mx-auto w-full transition-all duration-300", centered ? "max-w-3xl" : "max-w-2xl")}>
@@ -275,7 +275,7 @@ export function AgentChatPanel({
                   <PopoverContent
                     align="start"
                     sideOffset={12}
-                    className="w-[200px] overflow-hidden rounded-xl border border-white/10 bg-[#1a1a1a]/95 p-1 shadow-2xl backdrop-blur-2xl"
+                    className="w-[200px] overflow-hidden rounded-xl border border-white/10 bg-background/20 p-1 shadow-2xl backdrop-blur-md"
                   >
                     <div className="flex flex-col">
                       <div className="px-3 pb-1.5 pt-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/40">

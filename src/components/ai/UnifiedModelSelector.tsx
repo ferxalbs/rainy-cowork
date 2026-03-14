@@ -142,7 +142,7 @@ export function UnifiedModelSelector({
       <PopoverContent
         align="start"
         sideOffset={12}
-        className="w-[240px] overflow-hidden rounded-xl border border-white/10 bg-[#1a1a1a]/95 p-1 shadow-2xl backdrop-blur-2xl"
+        className="w-[240px] overflow-hidden rounded-xl border border-white/10 bg-background/20 p-1 shadow-2xl backdrop-blur-md"
       >
         <div className="flex flex-col">
           <div className="px-3 pb-1.5 pt-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/40">
