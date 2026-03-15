@@ -110,10 +110,10 @@ jobs:
 
       - name: Tauri Build (Ubuntu)
         if: matrix.platform == 'ubuntu-22.04'
-        run: pnpm run tauri build ${{ matrix.args }}
+        run: pnpm run tauri build ${{ matrix.args }} --config '{"bundle":{"createUpdaterArtifacts":false}}'
         env:
           LIBSQLITE3_SYS_USE_PKG_CONFIG: 1
 
       - name: Tauri Build (macOS/Windows)
         if: matrix.platform != 'ubuntu-22.04'
-        run: pnpm run tauri build ${{ matrix.args }}
+        run: pnpm run tauri build ${{ matrix.args }} --config '{"bundle":{"createUpdaterArtifacts":false}}'
