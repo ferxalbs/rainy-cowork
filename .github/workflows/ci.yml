@@ -108,7 +108,12 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Tauri Build
+      - name: Tauri Build (Ubuntu)
+        if: matrix.platform == 'ubuntu-22.04'
         run: pnpm run tauri build ${{ matrix.args }}
         env:
-          LIBSQLITE3_SYS_USE_PKG_CONFIG: ${{ matrix.platform == 'ubuntu-22.04' && '1' || '' }}
+          LIBSQLITE3_SYS_USE_PKG_CONFIG: 1
+
+      - name: Tauri Build (macOS/Windows)
+        if: matrix.platform != 'ubuntu-22.04'
+        run: pnpm run tauri build ${{ matrix.args }}
