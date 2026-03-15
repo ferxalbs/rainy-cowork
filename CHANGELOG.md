@@ -5,7 +5,25 @@ All notable changes to Rainy Cowork will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 2026-03-13 - CHAT UI REFACTOR
+## [Unreleased] - 2026-03-15 - ATM SECURITY AUDIT & CONNECTOR FIX
+
+### Fixed
+
+- **CRITICAL** — Connector credentials were stored encrypted but read without decryption, causing all connectors (Telegram, WhatsApp) to receive ciphertext as bot tokens. Added `decrypt()` call in `ConnectorRegistry.getConnector()`. (`rainy-atm` v0.1.15)
+- **SECURITY** — WebSocket auth accepted credentials in URL query params (leaked in server logs). Removed `authFromQuery` path; all connections now receive `{type:"auth_required"}` on connect and must send an `identify` message within 5 seconds or be closed with code 4001. (`rainy-atm`)
+- **SECURITY** — Telegram webhook secret verification used string equality, vulnerable to timing attacks. Replaced with `timingSafeEqual()` from Node `crypto`. (`rainy-atm`)
+- **SECURITY** — `tool_access_policy` received from cloud was applied without cryptographic verification. Rust `command_poller` now computes SHA-256 of the canonical JSON and rejects commands where the hash does not match the provided `tool_access_policy_hash`. (`src-tauri`)
+- Tool execution audit write failures were silently swallowed. Failures now increment `rainy:audit:failures` in Redis for observability. (`rainy-atm`)
+
+### Added
+
+- Per-session rate limiting in `UnifiedLaneQueue` — 20 requests/minute per `{channel}:{workspaceId}:{sessionPeer}`, enforced after the existing workspace-level limit. (`rainy-atm`)
+- WhatsApp lane queue (`whatsapp-lane-queue.ts`) and agent runtime (`whatsapp-agent-runtime.ts`) mirroring the Telegram/Discord pattern with Redis keys `rainy:wa:queue:` / `rainy:wa:lock:`. WhatsApp messages no longer silently fail after webhook ingestion. (`rainy-atm`)
+- Telegram `callback_query` updates (inline keyboard presses) are now parsed by `TelegramConnector.parseWebhook()` into a `NormalizedMessage` with `text: cq.data` and `callbackQueryId` in metadata. Previously these were silently dropped. (`rainy-atm`)
+
+### Changed
+
+- `socket_client.rs` annotated with `@RESERVED` to document intentional HTTP-polling-first design while WS auth migration is pending. (`src-tauri`)
 
 ### Changed
 

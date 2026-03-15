@@ -577,6 +577,24 @@ impl CommandPoller {
             )
             .await;
 
+        // Verify cloud-sourced tool_access_policy hash before applying
+        if let (Some(policy), Some(expected_hash)) = (
+            &command.payload.tool_access_policy,
+            &command.payload.tool_access_policy_hash,
+        ) {
+            use sha2::{Digest, Sha256};
+            let canonical = serde_json::to_string(policy)
+                .map_err(|e| format!("Failed to serialize tool_access_policy: {}", e))?;
+            let actual = format!("{:x}", Sha256::digest(canonical.as_bytes()));
+            if actual != *expected_hash {
+                return Err(format!(
+                    "tool_access_policy hash mismatch for command {}",
+                    command.id
+                )
+                .into());
+            }
+        }
+
         let mut command_for_execution = command.clone();
         if !command_for_execution.intent.starts_with("fleet.")
             && command_for_execution.payload.tool_access_policy.is_none()

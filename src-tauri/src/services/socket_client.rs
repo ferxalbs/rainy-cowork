@@ -1,3 +1,4 @@
+// @RESERVED: WebSocket real-time path — pending WS auth migration (Step 2)
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
