@@ -27,6 +27,8 @@ const AUTO_COMPACTION_TRIGGER_TOKENS: usize = 80_000;
 const AUTO_COMPACTION_KEEP_RECENT_MESSAGES: usize = 24;
 const MAX_COMPACTION_TRANSCRIPT_CHARS: usize = 160_000;
 const MAX_COMPACTION_SUMMARY_CHARS: usize = 12_000;
+const CHAT_TITLE_MODEL_ID: &str = "openai/gpt-5-nano";
+const MAX_CHAT_TITLE_CHARS: usize = 72;
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -49,6 +51,114 @@ pub struct RunAgentWorkflowResponse {
 pub struct CancelAgentRunResponse {
     pub run_id: String,
     pub status: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EnsureChatTitleResponse {
+    pub chat: crate::ai::agent::manager::ChatSessionDto,
+    pub status: String,
+}
+
+fn is_placeholder_chat_title(value: &str) -> bool {
+    let normalized = value.trim().to_lowercase();
+    normalized.is_empty()
+        || normalized == "new thread"
+        || normalized == "new chat"
+        || normalized.starts_with("workspace session:")
+}
+
+fn truncate_plain_text(input: &str, max_chars: usize) -> String {
+    input.chars().take(max_chars).collect::<String>()
+}
+
+fn build_fallback_chat_title(seed: &str) -> String {
+    let compact = seed
+        .split_whitespace()
+        .filter(|part| !part.trim().is_empty())
+        .collect::<Vec<_>>()
+        .join(" ");
+
+    let trimmed = compact
+        .trim_matches(|char: char| matches!(char, '"' | '\'' | '`' | '.' | ':' | ';' | ',' | '-'))
+        .trim();
+
+    if trimmed.is_empty() {
+        return "New thread".to_string();
+    }
+
+    truncate_plain_text(trimmed, MAX_CHAT_TITLE_CHARS)
+}
+
+fn sanitize_chat_title(raw: &str, fallback_seed: &str) -> String {
+    let single_line = raw
+        .replace('\n', " ")
+        .replace('\r', " ")
+        .replace('"', "")
+        .replace('\'', "")
+        .trim()
+        .trim_matches(|char: char| matches!(char, '-' | ':' | '.' | ',' | '`'))
+        .to_string();
+
+    if single_line.is_empty() {
+        return build_fallback_chat_title(fallback_seed);
+    }
+
+    truncate_plain_text(&single_line, MAX_CHAT_TITLE_CHARS)
+}
+
+async fn generate_chat_title(
+    router: &IntelligentRouterState,
+    provider_registry: &ProviderRegistryState,
+    chat_id: &str,
+    seed_prompt: &str,
+    assistant_response: Option<&str>,
+) -> Result<String, String> {
+    ensure_provider_ready_for_model(CHAT_TITLE_MODEL_ID, provider_registry, router).await?;
+
+    let response_excerpt = assistant_response
+        .map(|value| truncate_text(value, 600))
+        .unwrap_or_else(|| "No assistant response yet.".to_string());
+
+    let request = ChatCompletionRequest {
+        messages: vec![
+            ChatMessage::system(
+                "Create a concise chat title for a desktop AI workspace conversation.
+Return only the title, no quotes, no markdown, no prefix.
+Use 2 to 6 words, preserve the user's language, and keep it specific."
+                    .to_string(),
+            ),
+            ChatMessage::user(format!(
+                "Chat ID: {}\nUser request:\n{}\n\nAssistant response:\n{}",
+                chat_id,
+                truncate_text(seed_prompt, 600),
+                response_excerpt
+            )),
+        ],
+        model: CHAT_TITLE_MODEL_ID.to_string(),
+        temperature: Some(0.2),
+        max_tokens: Some(24),
+        top_p: Some(1.0),
+        frequency_penalty: Some(0.0),
+        presence_penalty: Some(0.0),
+        stop: None,
+        stream: false,
+        tools: None,
+        tool_choice: None,
+        json_mode: false,
+        reasoning_effort: None,
+    };
+
+    let response = router
+        .0
+        .read()
+        .await
+        .complete(request)
+        .await
+        .map_err(|e| format!("Chat title request failed: {}", e))?;
+
+    let title = response.content.unwrap_or_default();
+    Ok(sanitize_chat_title(&title, seed_prompt))
 }
 
 fn is_valid_rainy_api_key(api_key: &str) -> bool {
@@ -681,4 +791,168 @@ pub async fn cancel_agent_run(
     .to_string();
 
     Ok(CancelAgentRunResponse { run_id, status })
+}
+
+#[tauri::command]
+pub async fn get_chat_session(
+    agent_manager: State<'_, crate::ai::agent::manager::AgentManager>,
+    chat_scope_id: Option<String>,
+) -> Result<crate::ai::agent::manager::ChatSessionDto, String> {
+    let chat_id =
+        chat_scope_id.unwrap_or_else(|| crate::ai::agent::manager::DEFAULT_LONG_CHAT_SCOPE_ID.to_string());
+
+    agent_manager
+        .ensure_chat_session(&chat_id, "Rainy Agent")
+        .await
+        .map_err(|e| format!("Failed to initialize chat session: {}", e))?;
+
+    agent_manager
+        .get_chat_session(&chat_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| format!("Chat session '{}' was not found after initialization", chat_id))
+}
+
+#[tauri::command]
+pub async fn update_chat_title(
+    agent_manager: State<'_, crate::ai::agent::manager::AgentManager>,
+    chat_scope_id: Option<String>,
+    title: Option<String>,
+) -> Result<crate::ai::agent::manager::ChatSessionDto, String> {
+    let chat_id =
+        chat_scope_id.unwrap_or_else(|| crate::ai::agent::manager::DEFAULT_LONG_CHAT_SCOPE_ID.to_string());
+
+    agent_manager
+        .ensure_chat_session(&chat_id, "Rainy Agent")
+        .await
+        .map_err(|e| format!("Failed to initialize chat session: {}", e))?;
+
+    let normalized_title = title
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| truncate_plain_text(value, MAX_CHAT_TITLE_CHARS));
+
+    agent_manager
+        .update_chat_title(&chat_id, normalized_title.as_deref())
+        .await
+        .map_err(|e| e.to_string())?;
+
+    agent_manager
+        .get_chat_session(&chat_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| format!("Chat session '{}' was not found after title update", chat_id))
+}
+
+#[tauri::command]
+pub async fn ensure_chat_title(
+    agent_manager: State<'_, crate::ai::agent::manager::AgentManager>,
+    router: State<'_, IntelligentRouterState>,
+    provider_registry: State<'_, ProviderRegistryState>,
+    chat_scope_id: Option<String>,
+    prompt: Option<String>,
+    response: Option<String>,
+) -> Result<EnsureChatTitleResponse, String> {
+    let chat_id =
+        chat_scope_id.unwrap_or_else(|| crate::ai::agent::manager::DEFAULT_LONG_CHAT_SCOPE_ID.to_string());
+
+    agent_manager
+        .ensure_chat_session(&chat_id, "Rainy Agent")
+        .await
+        .map_err(|e| format!("Failed to initialize chat session: {}", e))?;
+
+    if let Some(existing) = agent_manager
+        .get_chat_session(&chat_id)
+        .await
+        .map_err(|e| e.to_string())?
+    {
+        if let Some(title) = existing.title.as_deref() {
+            if !is_placeholder_chat_title(title) {
+                return Ok(EnsureChatTitleResponse {
+                    chat: existing,
+                    status: "ready".to_string(),
+                });
+            }
+        }
+    }
+
+    let history_rows = agent_manager
+        .get_history(&chat_id)
+        .await
+        .map_err(|e| format!("Failed to load chat history for title generation: {}", e))?;
+
+    let seed_prompt = prompt
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+        .or_else(|| {
+            history_rows
+                .iter()
+                .find(|(_, role, content)| role == "user" && !content.trim().is_empty())
+                .map(|(_, _, content)| content.clone())
+        })
+        .unwrap_or_else(|| "New thread".to_string());
+
+    let assistant_response = response.or_else(|| {
+        history_rows
+            .iter()
+            .rev()
+            .find(|(_, role, content)| role == "assistant" && !content.trim().is_empty())
+            .map(|(_, _, content)| content.clone())
+    });
+
+    let (next_title, status) = match generate_chat_title(
+        &router,
+        &provider_registry,
+        &chat_id,
+        &seed_prompt,
+        assistant_response.as_deref(),
+    )
+    .await
+    {
+        Ok(title) => (title, "generated".to_string()),
+        Err(error) => {
+            eprintln!("[AgentWorkflow] Chat title generation failed: {}", error);
+            (build_fallback_chat_title(&seed_prompt), "fallback".to_string())
+        }
+    };
+
+    agent_manager
+        .update_chat_title(&chat_id, Some(&next_title))
+        .await
+        .map_err(|e| format!("Failed to persist chat title: {}", e))?;
+
+    let chat = agent_manager
+        .get_chat_session(&chat_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| format!("Chat session '{}' was not found after title generation", chat_id))?;
+
+    Ok(EnsureChatTitleResponse { chat, status })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{build_fallback_chat_title, is_placeholder_chat_title, sanitize_chat_title};
+
+    #[test]
+    fn placeholder_titles_are_detected() {
+        assert!(is_placeholder_chat_title("New thread"));
+        assert!(is_placeholder_chat_title("Workspace Session: global:long_chat:v1"));
+        assert!(!is_placeholder_chat_title("Refactor sidebar shell"));
+    }
+
+    #[test]
+    fn fallback_title_compacts_prompt() {
+        let title = build_fallback_chat_title("   Modernize   the sidebar and topbar for chat history   ");
+        assert_eq!(title, "Modernize the sidebar and topbar for chat history");
+    }
+
+    #[test]
+    fn sanitized_title_uses_fallback_when_empty() {
+        let title = sanitize_chat_title("\"\"", "Create the new sidebar system");
+        assert_eq!(title, "Create the new sidebar system");
+    }
 }

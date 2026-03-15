@@ -20,6 +20,10 @@ export function useAgentChat() {
   const [isExecuting, setIsExecuting] = useState(false);
   const [currentPlan, setCurrentPlan] = useState<TaskPlan | null>(null);
   const [chatScopeId, setChatScopeId] = useState<string | null>(null);
+  const [chatSession, setChatSession] = useState<tauri.ChatSession | null>(null);
+  const [chatTitleStatus, setChatTitleStatus] = useState<
+    "idle" | "generating" | "ready" | "fallback"
+  >("idle");
   const [historyCursorRowid, setHistoryCursorRowid] = useState<number | null>(
     null,
   );
@@ -80,15 +84,6 @@ export function useAgentChat() {
     setCurrentPlan(null);
   }, []);
 
-  const clearMessagesAndContext = useCallback(async (chatId: string) => {
-    await tauri.clearChatHistory(chatScopeId || chatId);
-    setMessages([]);
-    setCurrentPlan(null);
-    setHistoryCursorRowid(null);
-    setHasMoreHistory(false);
-    hasHydratedRef.current = true;
-  }, [chatScopeId]);
-
   const mapPersistedRoleToUiType = useCallback(
     (role: "user" | "assistant" | "system"): AgentMessage["type"] => {
       if (role === "assistant") return "agent";
@@ -106,12 +101,40 @@ export function useAgentChat() {
     return scope;
   }, []); // No dependency on chatScopeId to avoid recreation loop
 
+  const refreshChatSession = useCallback(
+    async (scopeOverride?: string) => {
+      try {
+        const scope = scopeOverride || (await ensureChatScope());
+        const session = await tauri.getChatSession(scope);
+        setChatSession(session);
+        setChatTitleStatus(session.title?.trim() ? "ready" : "idle");
+        return session;
+      } catch (error) {
+        console.error("Failed to load chat session:", error);
+        return null;
+      }
+    },
+    [ensureChatScope],
+  );
+
+  const clearMessagesAndContext = useCallback(async (chatId: string) => {
+    await tauri.clearChatHistory(chatScopeId || chatId);
+    setMessages([]);
+    setCurrentPlan(null);
+    setHistoryCursorRowid(null);
+    setHasMoreHistory(false);
+    setChatTitleStatus("idle");
+    hasHydratedRef.current = true;
+    await refreshChatSession(chatScopeId || chatId);
+  }, [chatScopeId, refreshChatSession]);
+
   const hydrateLongChatHistory = useCallback(async () => {
     if (isHydratingRef.current || hasHydratedRef.current) return;
     isHydratingRef.current = true;
     setIsHydratingHistory(true);
     try {
       const scope = await ensureChatScope();
+      await refreshChatSession(scope);
       const window = await tauri.getChatHistoryWindow(scope, undefined, 100);
       const hydratedMessages: AgentMessage[] = window.messages.map((msg) => ({
         id: msg.id,
@@ -156,6 +179,7 @@ export function useAgentChat() {
   }, [
     ensureChatScope,
     mapPersistedRoleToUiType,
+    refreshChatSession,
   ]);
 
   const loadOlderHistory = useCallback(async () => {
@@ -1121,6 +1145,25 @@ export function useAgentChat() {
               : m,
           ),
         );
+
+        if (typeof result.response === "string" && result.response.trim().length > 0) {
+          setChatTitleStatus("generating");
+          try {
+            const titleResult = await tauri.ensureChatTitle({
+              chatScopeId: resolvedChatScopeId,
+              prompt: instruction,
+              response: result.response,
+            });
+            setChatSession(titleResult.chat);
+            setChatTitleStatus(
+              titleResult.status === "fallback" ? "fallback" : "ready",
+            );
+          } catch (titleError) {
+            console.error("Failed to ensure chat title:", titleError);
+            const refreshed = await refreshChatSession(resolvedChatScopeId);
+            setChatTitleStatus(refreshed?.title?.trim() ? "ready" : "fallback");
+          }
+        }
       } catch (err: any) {
         console.error("Native agent error:", err);
         setMessages((prev) =>
@@ -1157,7 +1200,7 @@ export function useAgentChat() {
         if (unlisten) unlisten();
       }
     },
-    [captureForgeStep, createTraceEntry, ensureChatScope],
+    [captureForgeStep, createTraceEntry, ensureChatScope, refreshChatSession],
   );
 
   const stopAgentRun = useCallback(async (messageId: string) => {
@@ -1207,6 +1250,9 @@ export function useAgentChat() {
   return {
     messages,
     setMessages,
+    chatScopeId,
+    chatSession,
+    chatTitleStatus,
     isPlanning,
     isExecuting,
     currentPlan,
@@ -1221,6 +1267,7 @@ export function useAgentChat() {
     runNativeAgent,
     stopAgentRun,
     retryAgentRun,
+    refreshChatSession,
     hydrateLongChatHistory,
     loadOlderHistory,
     hasMoreHistory,

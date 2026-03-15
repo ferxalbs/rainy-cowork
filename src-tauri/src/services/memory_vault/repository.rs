@@ -511,22 +511,45 @@ impl MemoryVaultRepository {
         Ok(results)
     }
 
-    pub async fn touch_access(
-        &self,
-        id: &str,
-        last_accessed: i64,
-        access_count: i64,
-    ) -> Result<(), String> {
+    /// Batch-increment access counters for multiple entries in a single transaction.
+    pub async fn touch_access_batch(&self, ids: &[String], now: i64) -> Result<(), String> {
+        if ids.is_empty() {
+            return Ok(());
+        }
         self.conn
-            .execute(
-                "UPDATE memory_vault_entries
-             SET last_accessed = ?1, access_count = ?2
-             WHERE id = ?3",
-                params![last_accessed, access_count, id.to_string()],
-            )
+            .execute("BEGIN IMMEDIATE TRANSACTION", ())
             .await
-            .map_err(|e| format!("Failed to update vault access counters: {}", e))?;
-        Ok(())
+            .map_err(|e| format!("Failed to begin touch_access_batch transaction: {}", e))?;
+
+        let result: Result<(), String> = async {
+            for id in ids {
+                self.conn
+                    .execute(
+                        "UPDATE memory_vault_entries
+                         SET last_accessed = ?1, access_count = access_count + 1
+                         WHERE id = ?2",
+                        params![now, id.clone()],
+                    )
+                    .await
+                    .map_err(|e| format!("Failed to touch access for {}: {}", id, e))?;
+            }
+            Ok(())
+        }
+        .await;
+
+        match result {
+            Ok(()) => {
+                self.conn
+                    .execute("COMMIT", ())
+                    .await
+                    .map_err(|e| format!("Failed to commit touch_access_batch: {}", e))?;
+                Ok(())
+            }
+            Err(err) => {
+                let _ = self.conn.execute("ROLLBACK", ()).await;
+                Err(err)
+            }
+        }
     }
 
     pub async fn counts(&self, workspace_id: Option<&str>) -> Result<(usize, usize), String> {

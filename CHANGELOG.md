@@ -1,6 +1,6 @@
 # CHANGELOG
 
-All notable changes to Rainy Cowork will be documented in this file.
+All notable changes to Rainy MaTE will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -35,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **AgentBuilder**: Refined "Save Draft" button, Max Tokens input, and slider thumbs with `bg-white`, `shadow-lg`, and hover scale effects.
   - **AgentStorePage**: Polished "New Agent", "Refresh List", header actions, and agent list item hover states.
   - **ApiKeysTab**: Updated "Verify", "Lock in Vault", and key action buttons.
+  - **Popovers**: Refined background opacities (`bg-background/20-30`) and blurs in Workspace Selector and Reasoning Effort dropdowns to avoid solid black appearance.
 
 - Refactored `AgentChatPanel.tsx` for stability, fixing syntax errors and duplicate declarations.
 - Aligned Chat UI with reference design: added growing dynamic input area, redesigned "Let's build" suggestion cards, and improved adaptive blurs (`backdrop-blur-2xl`).

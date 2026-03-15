@@ -655,6 +655,9 @@ pub fn run() {
             // Agent Workflow (Native Rust)
             commands::agent::run_agent_workflow,
             commands::agent::cancel_agent_run,
+            commands::agent::get_chat_session,
+            commands::agent::update_chat_title,
+            commands::agent::ensure_chat_title,
             // Workflow Factory (THE FORGE foundation)
             commands::start_workflow_recording,
             commands::record_workflow_step,

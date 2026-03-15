@@ -1,46 +1,26 @@
-import React, { useState, useMemo, useEffect, useRef } from "react";
-import { AnimatedThemeToggler } from "../ui/animated-theme-toggler";
-import {
-  ArrowUp,
-  Check,
-  ChevronDown,
-  Compass,
-  Eraser,
-  FileText,
-  Gamepad2,
-  Mic,
-  Plus,
-  Sparkles,
-  Trash2,
-} from "lucide-react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Eraser, FileText, Gamepad2, Sparkles } from "lucide-react";
 
 import * as tauri from "../../services/tauri";
 import { cn } from "../../lib/utils";
-import { useTheme } from "../../hooks/useTheme";
 import { useAgentChat } from "../../hooks/useAgentChat";
+import type { Folder } from "../../types";
 import type { AgentSpec } from "../../types/agent-spec";
 import type { UnifiedModel } from "../ai/UnifiedModelSelector";
-import {
-  UnifiedModelSelector,
-  getReasoningOptions,
-} from "../ai/UnifiedModelSelector";
-
-import { MessageBubble } from "./MessageBubble";
-import { AgentSelector } from "./AgentSelector";
+import { getReasoningOptions } from "../ai/UnifiedModelSelector";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { ScrollArea } from "../ui/scroll-area";
-import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
-import { Textarea } from "../ui/textarea";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "../ui/tooltip";
+import { MessageBubble } from "./MessageBubble";
+import { ChatComposer } from "./ChatComposer";
+import { ChatTopbar } from "./ChatTopbar";
 
 interface AgentChatPanelProps {
   workspacePath: string;
+  folders: Folder[];
+  activeFolderId?: string;
+  onSelectWorkspace?: (folder: Folder) => void | Promise<void>;
+  onAddWorkspace?: () => void;
   onClose?: () => void;
   onOpenSettings?: () => void;
   className?: string;
@@ -60,16 +40,12 @@ const PROMPTS = [
     accent: "text-rose-500",
   },
   {
-    icon: Eraser, // Changed from PenTool
+    icon: Eraser,
     title: "Create a plan to modernize the current workflow.",
     prompt: "Create a plan to modernize the current workflow.",
     accent: "text-amber-500",
   },
 ];
-
-function titleCase(value: string): string {
-  return value.charAt(0).toUpperCase() + value.slice(1);
-}
 
 function useAutoResizeTextarea(
   ref: React.RefObject<HTMLTextAreaElement | null>,
@@ -86,10 +62,13 @@ function useAutoResizeTextarea(
 
 export function AgentChatPanel({
   workspacePath,
-  onClose,
+  folders,
+  activeFolderId,
+  onSelectWorkspace,
+  onAddWorkspace,
+  onOpenSettings,
   className,
 }: AgentChatPanelProps) {
-  const { mode: _mode } = useTheme();
   const [input, setInput] = useState("");
   const [currentModelId, setCurrentModelId] = useState("");
   const [selectedModel, setSelectedModel] = useState<UnifiedModel | null>(null);
@@ -101,6 +80,8 @@ export function AgentChatPanel({
 
   const {
     messages,
+    chatSession,
+    chatTitleStatus,
     isPlanning,
     isExecuting,
     currentPlan,
@@ -119,10 +100,6 @@ export function AgentChatPanel({
 
   const isProcessing = isPlanning || isExecuting;
   const reasoningOptions = useMemo(() => getReasoningOptions(selectedModel), [selectedModel]);
-  const workspaceName = useMemo(
-    () => workspacePath.split("/").filter(Boolean).pop() || "workspace",
-    [workspacePath],
-  );
   const latestTelemetry = [...messages]
     .reverse()
     .find((message) => message.type === "agent" && message.ragTelemetry)?.ragTelemetry;
@@ -217,222 +194,110 @@ export function AgentChatPanel({
     }
   };
 
-  const glassShell =
-    "border border-white/5 bg-background/30 backdrop-blur-md";
-
   const renderComposer = (centered: boolean) => (
-    <div className={cn("mx-auto w-full transition-all duration-300", centered ? "max-w-3xl" : "max-w-2xl")}>
-      <div className={cn("relative overflow-hidden rounded-[1.5rem] p-2 transition-all", glassShell)}>
-        <div className="relative z-10 flex flex-col">
-          {/* Row 1: Textarea */}
-          <Textarea
-            ref={textareaRef}
-            value={input}
-            onChange={(event) => setInput(event.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Ask MaTE anything, @ to add files, / for commands"
-            className={cn(
-              "w-full resize-none border-none bg-transparent px-3 py-3 text-sm text-foreground shadow-none outline-none ring-0 placeholder:text-muted-foreground/50 focus-visible:border-none focus-visible:ring-0",
-              centered ? "min-h-[100px]" : "min-h-[64px]",
-            )}
-            disabled={isProcessing}
-          />
-
-          {/* Row 2: Selectors and Tools */}
-          <div className="flex items-center justify-between pb-1 pl-1 pr-1">
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                className="flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-white/5 hover:text-foreground"
-              >
-                <Plus className="size-4" />
-              </button>
-
-              <UnifiedModelSelector
-                selectedModelId={currentModelId}
-                onSelect={handleModelSelect}
-                onModelResolved={setSelectedModel}
-              />
-
-              <AgentSelector
-                selectedAgentId={selectedAgentId}
-                onSelect={setSelectedAgentId}
-                agentSpecs={agentSpecs}
-              />
-
-              {reasoningOptions.length > 0 && (
-                <Popover>
-                  <PopoverTrigger>
-                    <button
-                      type="button"
-                      className="group flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-                    >
-                      <span className="truncate">
-                        {reasoningEffort ? titleCase(reasoningEffort) : "Reasoning"}
-                      </span>
-                      <ChevronDown className="size-3 opacity-50 transition-transform group-data-[state=open]:rotate-180" />
-                    </button>
-                  </PopoverTrigger>
-                  <PopoverContent
-                    align="start"
-                    sideOffset={12}
-                    className="w-[200px] overflow-hidden rounded-xl border border-white/10 bg-background/20 p-1 shadow-2xl backdrop-blur-md"
-                  >
-                    <div className="flex flex-col">
-                      <div className="px-3 pb-1.5 pt-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/40">
-                        Reasoning effort
-                      </div>
-                      {reasoningOptions.map((option) => {
-                        const active = reasoningEffort === option;
-                        return (
-                          <button
-                            key={option}
-                            type="button"
-                            onClick={() => setReasoningEffort(option)}
-                            className={cn(
-                              "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-xs transition-colors",
-                              active
-                                ? "bg-white/10 text-foreground"
-                                : "text-muted-foreground hover:bg-white/5 hover:text-foreground",
-                            )}
-                          >
-                            <span>{titleCase(option)}</span>
-                            {active && <Check className="size-3.5 shrink-0" />}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </PopoverContent>
-                </Popover>
-              )}
-            </div>
-
-            <div className="flex items-center gap-1">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-8 rounded-full text-muted-foreground hover:bg-white/5 hover:text-foreground"
-              >
-                <Mic className="size-4" />
-              </Button>
-              <Button
-                size="icon"
-                onClick={() => void handleSubmit()}
-                disabled={!input.trim() || isProcessing}
-                className={cn(
-                  "size-8 rounded-full bg-white/90 text-black shadow-sm transition-all hover:bg-white dark:bg-white/90 dark:text-black",
-                  (!input.trim() || isProcessing) && "scale-95 opacity-50",
-                )}
-              >
-                <ArrowUp className="size-4" />
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <ChatComposer
+      input={input}
+      onInputChange={setInput}
+      onKeyDown={handleKeyDown}
+      onSubmit={() => void handleSubmit()}
+      disabled={isProcessing}
+      textareaRef={textareaRef}
+      currentModelId={currentModelId}
+      onSelectModel={handleModelSelect}
+      onModelResolved={setSelectedModel}
+      selectedAgentId={selectedAgentId}
+      onSelectAgent={setSelectedAgentId}
+      agentSpecs={agentSpecs}
+      reasoningOptions={reasoningOptions}
+      reasoningEffort={reasoningEffort}
+      onSelectReasoningEffort={setReasoningEffort}
+      centered={centered}
+    />
   );
 
   return (
     <div className={cn("relative h-full w-full overflow-hidden bg-transparent text-foreground", className)}>
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_35%),linear-gradient(180deg,rgba(0,0,0,0.02),transparent_24%,rgba(0,0,0,0.08))] dark:bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_28%),linear-gradient(180deg,rgba(0,0,0,0),transparent_24%,rgba(0,0,0,0.22))]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.12),transparent_30%),radial-gradient(circle_at_20%_20%,rgba(255,184,76,0.08),transparent_26%),linear-gradient(180deg,rgba(0,0,0,0.02),transparent_20%,rgba(0,0,0,0.08))] dark:bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_28%),radial-gradient(circle_at_12%_18%,rgba(255,184,76,0.08),transparent_26%),linear-gradient(180deg,rgba(0,0,0,0),transparent_24%,rgba(0,0,0,0.2))]" />
 
-      <div className="pointer-events-none absolute left-0 right-0 top-0 z-40 px-4 pt-4 md:px-6">
-        <div data-tauri-drag-region className="absolute inset-x-0 top-0 h-20" />
-
-        <div className="pointer-events-auto mx-auto flex w-full max-w-5xl items-center justify-between gap-3 rounded-full border border-black/5 bg-background/90 px-3 py-1.5 shadow-sm backdrop-blur-md dark:border-white/10 dark:bg-background/20">
-          <div className="flex min-w-0 items-center gap-2 md:gap-3">
-            <div className="flex items-center gap-2 pl-1">
-              <Compass className="size-4 text-primary" />
-              <span className="text-sm font-medium tracking-tight">New thread</span>
-            </div>
-            <button
-              type="button"
-              className="ml-1 flex min-w-0 items-center gap-1 rounded-full px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground"
-            >
-              <span className="truncate uppercase tracking-wide">{workspaceName}</span>
-              <ChevronDown className="size-3.5" />
-            </button>
-          </div>
-
-          <div className="flex items-center gap-1">
-            <AnimatedThemeToggler />
-            <div className="mx-2 hidden h-4 w-px bg-border/50 sm:block" />
-            <TooltipProvider delay={0}>
-              <Tooltip>
-                <TooltipTrigger
-                  onClick={clearMessages}
-                  render={
-                    <button
-                      type="button"
-                      className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground"
-                    />
-                  }
-                >
-                  <Eraser className="size-4" />
-                </TooltipTrigger>
-                <TooltipContent>Clear UI only</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger
-                  onClick={() => void clearMessagesAndContext(workspacePath)}
-                  render={
-                    <button
-                      type="button"
-                      className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                    />
-                  }
-                >
-                  <Trash2 className="size-4" />
-                </TooltipTrigger>
-                <TooltipContent>Delete persisted context</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-            {onClose && (
-              <Button variant="ghost" size="icon-sm" onClick={onClose} className="rounded-full ml-1" />
-            )}
-          </div>
-        </div>
-      </div>
+      <ChatTopbar
+        chatSession={chatSession}
+        titleStatus={chatTitleStatus}
+        workspacePath={workspacePath}
+        folders={folders}
+        activeFolderId={activeFolderId}
+        onSelectFolder={onSelectWorkspace}
+        onAddFolder={onAddWorkspace}
+        onNewChat={() => void clearMessagesAndContext(workspacePath)}
+        onClearUi={clearMessages}
+        onOpenSettings={onOpenSettings}
+      />
 
       <ScrollArea className="absolute inset-0 z-10 h-full w-full">
         <div
           className={cn(
             "mx-auto flex w-full max-w-6xl flex-col px-4 transition-all duration-300 md:px-6",
-            messages.length === 0 ? "min-h-full justify-center pb-12 pt-24" : "min-h-full pb-44 pt-28",
+            messages.length === 0 ? "min-h-full justify-center pb-12 pt-16" : "min-h-full pb-44 pt-24",
           )}
         >
           {messages.length === 0 ? (
             <div className="flex flex-1 flex-col items-center justify-center">
-              <div className="mb-4 flex size-12 items-center justify-center rounded-xl border border-black/5 bg-background shadow-sm dark:border-white/10 dark:bg-background/20">
-                <Sparkles className="size-6 text-primary" />
+              <div className="mb-4 flex size-10 items-center justify-center rounded-xl border border-black/5 bg-background shadow-sm dark:border-white/10 dark:bg-background/20">
+                <Sparkles className="size-5 text-primary" />
               </div>
 
-              <div className="mb-8 text-center">
-                <h1 className="text-4xl font-semibold tracking-[-0.04em] text-foreground">Let&apos;s build</h1>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Faster controls, cleaner chat, and a workspace-first command surface.
+              <div className="mb-6 text-center">
+                <h1 className="text-2xl font-semibold tracking-[-0.03em] text-foreground">
+                  Conversation-first workspace control
+                </h1>
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  The new shell starts here: faster context, cleaner workspace switching, and auto-titled sessions.
                 </p>
               </div>
 
-              <div className="mb-8 w-full max-w-[760px] px-2 flex flex-col md:flex-row gap-3 justify-center">
+              <div className="mb-6 flex flex-wrap items-center justify-center gap-2">
+                <Badge
+                  variant="outline"
+                  className="rounded-full border-white/10 bg-background/60 px-2.5 py-0.5 text-[9px] uppercase tracking-[0.14em] backdrop-blur-md"
+                >
+                  Single persistent scope
+                </Badge>
+                <Badge
+                  variant="outline"
+                  className="rounded-full border-white/10 bg-background/60 px-2.5 py-0.5 text-[9px] uppercase tracking-[0.14em] backdrop-blur-md"
+                >
+                  GPT-5 Nano titles
+                </Badge>
+                <Badge
+                  variant="outline"
+                  className="rounded-full border-white/10 bg-background/60 px-2.5 py-0.5 text-[9px] uppercase tracking-[0.14em] backdrop-blur-md"
+                >
+                  Dynamic chats next
+                </Badge>
+              </div>
+
+              <div className="mb-8 flex w-full max-w-2xl flex-col gap-2.5 px-2 md:flex-row">
                 {PROMPTS.map(({ accent, icon: Icon, prompt, title }) => (
                   <button
                     key={title}
                     type="button"
                     onClick={() => applyPrompt(prompt)}
-                    className="group relative flex-1 min-w-0 overflow-hidden rounded-2xl border border-black/5 bg-background p-4 text-left shadow-sm transition-colors hover:bg-muted/40 dark:border-white/10 dark:bg-background/20 dark:hover:bg-background/30"
+                    className="group relative flex-1 overflow-hidden rounded-2xl border border-white/10 bg-background/66 p-4 text-left shadow-sm transition-colors hover:bg-white/5"
                   >
-                    <div className="relative z-10 flex h-full flex-col gap-3">
+                    <div className="relative z-10 flex h-full flex-col gap-4">
                       <div className="flex items-center justify-between">
-                        <div className={cn("flex size-8 items-center justify-center rounded-lg bg-foreground/5 dark:bg-white/10", accent)}>
-                          <Icon className="size-4" />
+                        <div
+                          className={cn(
+                            "flex size-8 items-center justify-center rounded-xl bg-white/10",
+                            accent,
+                          )}
+                        >
+                          <Icon className="size-3.5" />
                         </div>
-                        <span className="text-[9px] font-bold uppercase tracking-[0.1em] text-muted-foreground/60 transition-colors group-hover:text-muted-foreground">
+                        <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-muted-foreground/60">
                           Explore
                         </span>
                       </div>
-                      <p className="text-sm font-medium leading-relaxed tracking-[-0.01em] text-foreground/85">
+                      <p className="text-xs font-medium leading-relaxed tracking-[-0.01em] text-foreground/90">
                         {title}
                       </p>
                     </div>
@@ -445,17 +310,29 @@ export function AgentChatPanel({
           ) : (
             <div className="space-y-8">
               <div className="flex flex-wrap items-center justify-center gap-2">
-                <Badge variant="outline" className="rounded-md border-white/10 bg-background/80 px-2 py-1 text-[10px] uppercase tracking-[0.14em] backdrop-blur-sm backdrop-saturate-150 dark:bg-background/10">
+                <Badge
+                  variant="outline"
+                  className="rounded-md border-white/10 bg-background/80 px-2 py-1 text-[10px] uppercase tracking-[0.14em] backdrop-blur-sm backdrop-saturate-150 dark:bg-background/10"
+                >
                   History: {latestTelemetry?.historySource || "persisted_long_chat"}
                 </Badge>
-                <Badge variant="outline" className="rounded-md border-white/10 bg-background/80 px-2 py-1 text-[10px] uppercase tracking-[0.14em] backdrop-blur-sm backdrop-saturate-150 dark:bg-background/10">
+                <Badge
+                  variant="outline"
+                  className="rounded-md border-white/10 bg-background/80 px-2 py-1 text-[10px] uppercase tracking-[0.14em] backdrop-blur-sm backdrop-saturate-150 dark:bg-background/10"
+                >
                   Retrieval: {latestTelemetry?.retrievalMode || "unavailable"}
                 </Badge>
-                <Badge variant="outline" className="rounded-md border-white/10 bg-background/80 px-2 py-1 text-[10px] uppercase tracking-[0.14em] backdrop-blur-sm backdrop-saturate-150 dark:bg-background/10">
+                <Badge
+                  variant="outline"
+                  className="rounded-md border-white/10 bg-background/80 px-2 py-1 text-[10px] uppercase tracking-[0.14em] backdrop-blur-sm backdrop-saturate-150 dark:bg-background/10"
+                >
                   Embedding: {latestTelemetry?.embeddingProfile || "gemini-embedding-2-preview"}
                 </Badge>
                 {latestTelemetry?.compressionApplied && (
-                  <Badge variant="outline" className="rounded-md border-white/10 bg-background/80 px-2 py-1 text-[10px] uppercase tracking-[0.14em] backdrop-blur-sm backdrop-saturate-150 dark:bg-background/10">
+                  <Badge
+                    variant="outline"
+                    className="rounded-md border-white/10 bg-background/80 px-2 py-1 text-[10px] uppercase tracking-[0.14em] backdrop-blur-sm backdrop-saturate-150 dark:bg-background/10"
+                  >
                     Compression @{latestTelemetry.compressionTriggerTokens || 80000}
                   </Badge>
                 )}
@@ -468,7 +345,7 @@ export function AgentChatPanel({
                     variant="ghost"
                     onClick={loadOlderHistory}
                     disabled={isHydratingHistory}
-                    className="rounded-lg border border-white/10 bg-background/80 px-4 backdrop-blur-sm backdrop-saturate-150 dark:bg-background/10"
+                    className="rounded-full border border-white/10 bg-background/80 px-4 backdrop-blur-sm backdrop-saturate-150 dark:bg-background/10"
                   >
                     {isHydratingHistory ? "Loading..." : "Load older messages"}
                   </Button>

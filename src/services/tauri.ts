@@ -2258,6 +2258,20 @@ export interface ChatRuntimeTelemetry {
   updated_at: string;
 }
 
+export interface ChatSession {
+  id: string;
+  title: string | null;
+  created_at: string;
+  updated_at: string;
+  message_count: number;
+  last_message_at: string | null;
+}
+
+export interface EnsureChatTitleResult {
+  chat: ChatSession;
+  status: "ready" | "generated" | "fallback";
+}
+
 export interface AgentEventEnvelope {
   runId: string;
   timestampMs: number;
@@ -2277,6 +2291,34 @@ export interface CancelAgentRunResponse {
 
 export async function getDefaultChatScope(): Promise<string> {
   return invoke<string>("get_default_chat_scope");
+}
+
+export async function getChatSession(
+  chatScopeId?: string,
+): Promise<ChatSession> {
+  return invoke<ChatSession>("get_chat_session", {
+    chatScopeId,
+  });
+}
+
+export async function updateChatTitle(
+  title?: string | null,
+  chatScopeId?: string,
+): Promise<ChatSession> {
+  return invoke<ChatSession>("update_chat_title", {
+    chatScopeId,
+    title,
+  });
+}
+
+export async function ensureChatTitle(
+  input: {
+    chatScopeId?: string;
+    prompt?: string;
+    response?: string;
+  } = {},
+): Promise<EnsureChatTitleResult> {
+  return invoke<EnsureChatTitleResult>("ensure_chat_title", input);
 }
 
 export async function getChatCompactionState(

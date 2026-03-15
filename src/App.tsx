@@ -212,6 +212,10 @@ function App() {
               {activeFolder ? (
                 <AgentChatPanel
                   workspacePath={activeFolder.path}
+                  folders={folders}
+                  activeFolderId={activeFolder.id}
+                  onSelectWorkspace={handleFolderSelect}
+                  onAddWorkspace={addFolder}
                   onOpenSettings={handleSettingsClick}
                 />
               ) : (

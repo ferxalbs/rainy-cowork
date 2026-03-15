@@ -189,15 +189,12 @@ impl MemoryVaultService {
         let query_lc = query.to_lowercase();
         let mut results = Vec::new();
 
+        let now = chrono::Utc::now().timestamp();
         for row in rows {
             let entry = self.decrypt_row(&row)?;
             if query_lc.is_empty() || entry.content.to_lowercase().contains(&query_lc) {
-                let touched = entry.access_count + 1;
-                let now = chrono::Utc::now().timestamp();
-                let _ = self.repository.touch_access(&entry.id, now, touched).await;
-
                 results.push(DecryptedMemoryEntry {
-                    access_count: touched,
+                    access_count: entry.access_count + 1,
                     last_accessed: now,
                     ..entry
                 });
@@ -206,6 +203,9 @@ impl MemoryVaultService {
                 break;
             }
         }
+
+        let ids: Vec<String> = results.iter().map(|e| e.id.clone()).collect();
+        let _ = self.repository.touch_access_batch(&ids, now).await;
 
         Ok(results)
     }
@@ -285,23 +285,23 @@ impl MemoryVaultService {
                 },
             },
         };
+        let now = chrono::Utc::now().timestamp();
         let mut results = Vec::new();
 
         for (row, distance) in rows {
             let entry = self.decrypt_row(&row)?;
-            let touched = entry.access_count + 1;
-            let now = chrono::Utc::now().timestamp();
-            let _ = self.repository.touch_access(&entry.id, now, touched).await;
-
             results.push((
                 DecryptedMemoryEntry {
-                    access_count: touched,
+                    access_count: entry.access_count + 1,
                     last_accessed: now,
                     ..entry
                 },
                 distance,
             ));
         }
+
+        let ids: Vec<String> = results.iter().map(|(e, _)| e.id.clone()).collect();
+        let _ = self.repository.touch_access_batch(&ids, now).await;
 
         Ok((results, mode))
     }
@@ -481,33 +481,44 @@ impl MemoryVaultService {
             return Ok(());
         }
 
-        // We need to query rows that have no embedding or the wrong dimension.
-        // We can't fetch everything at once if the DB is huge, but doing it in chunks
-        // or just fetching IDs first is safer.
-        let mut rows = self
-            .repository
-            .conn()
-            .query(
-                "SELECT e.id
-                 FROM memory_vault_entries e
-                 LEFT JOIN memory_vault_embedding_vectors v
-                   ON v.entry_id = e.id AND v.embedding_model = ?2
-                 WHERE e.embedding IS NULL
-                    OR e.embedding_dim != ?1
-                    OR e.embedding_model != ?2
-                    OR v.entry_id IS NULL",
-                (
-                    super::types::EMBEDDING_DIM as i64,
-                    super::types::EMBEDDING_MODEL.to_string(),
-                ),
-            )
-            .await
-            .map_err(|e| format!("Failed to query rows for backfill: {}", e))?;
-
+        // Paginate ID collection to avoid loading millions of rows into RAM.
+        const PAGE_SIZE: usize = 500;
         let mut ids_to_reembed = Vec::new();
-        while let Some(row) = rows.next().await.map_err(|e| e.to_string())? {
-            let id: String = row.get(0).unwrap_or_default();
-            ids_to_reembed.push(id);
+        let mut offset: usize = 0;
+        loop {
+            let mut rows = self
+                .repository
+                .conn()
+                .query(
+                    "SELECT e.id
+                     FROM memory_vault_entries e
+                     LEFT JOIN memory_vault_embedding_vectors v
+                       ON v.entry_id = e.id AND v.embedding_model = ?2
+                     WHERE e.embedding IS NULL
+                        OR e.embedding_dim != ?1
+                        OR e.embedding_model != ?2
+                        OR v.entry_id IS NULL
+                     LIMIT ?3 OFFSET ?4",
+                    (
+                        super::types::EMBEDDING_DIM as i64,
+                        super::types::EMBEDDING_MODEL.to_string(),
+                        PAGE_SIZE as i64,
+                        offset as i64,
+                    ),
+                )
+                .await
+                .map_err(|e| format!("Failed to query rows for backfill (offset {}): {}", offset, e))?;
+
+            let mut page_count = 0usize;
+            while let Some(row) = rows.next().await.map_err(|e| e.to_string())? {
+                let id: String = row.get(0).unwrap_or_default();
+                ids_to_reembed.push(id);
+                page_count += 1;
+            }
+            if page_count < PAGE_SIZE {
+                break;
+            }
+            offset += PAGE_SIZE;
         }
 
         if ids_to_reembed.is_empty() {

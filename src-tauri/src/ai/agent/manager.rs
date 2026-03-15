@@ -63,6 +63,16 @@ pub struct ChatRuntimeTelemetryDto {
     pub updated_at: String,
 }
 
+#[derive(Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct ChatSessionDto {
+    pub id: String,
+    pub title: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+    pub message_count: i64,
+    pub last_message_at: Option<String>,
+}
+
 impl AgentManager {
     pub fn new(pool: Pool<Sqlite>) -> Self {
         Self { db: Arc::new(pool) }
@@ -209,6 +219,11 @@ impl AgentManager {
             .await?;
 
         sqlx::query("DELETE FROM chat_runtime_telemetry WHERE chat_id = ?")
+            .bind(chat_id)
+            .execute(&*self.db)
+            .await?;
+
+        sqlx::query("UPDATE chats SET title = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
             .bind(chat_id)
             .execute(&*self.db)
             .await?;
@@ -386,6 +401,41 @@ impl AgentManager {
         .await
     }
 
+    pub async fn get_chat_session(
+        &self,
+        chat_id: &str,
+    ) -> Result<Option<ChatSessionDto>, sqlx::Error> {
+        sqlx::query_as::<_, ChatSessionDto>(
+            "SELECT
+                chats.id,
+                chats.title,
+                chats.created_at,
+                chats.updated_at,
+                COUNT(messages.id) AS message_count,
+                MAX(messages.created_at) AS last_message_at
+             FROM chats
+             LEFT JOIN messages ON messages.chat_id = chats.id
+             WHERE chats.id = ?
+             GROUP BY chats.id, chats.title, chats.created_at, chats.updated_at",
+        )
+        .bind(chat_id)
+        .fetch_optional(&*self.db)
+        .await
+    }
+
+    pub async fn update_chat_title(
+        &self,
+        chat_id: &str,
+        title: Option<&str>,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query("UPDATE chats SET title = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+            .bind(title)
+            .bind(chat_id)
+            .execute(&*self.db)
+            .await?;
+        Ok(())
+    }
+
     pub async fn ensure_chat_session(
         &self,
         chat_id: &str,
@@ -413,7 +463,7 @@ impl AgentManager {
         )
         .bind(chat_id)
         .bind(default_agent_id)
-        .bind(format!("Workspace Session: {}", chat_id))
+        .bind(Option::<String>::None)
         .execute(&*self.db)
         .await?;
 

@@ -2,13 +2,15 @@ use crate::services::memory::{
     IngestionResult, MemoryEntry, MemoryError, MemoryStats, SemanticRetrievalMode,
     SemanticSearchResult,
 };
-use crate::services::embedder::EmbeddingTaskType;
+use crate::services::embedder::{EmbedderService, EmbeddingTaskType};
 use crate::services::memory_vault::{MemorySensitivity, MemoryVaultService, StoreMemoryInput};
 use crate::services::memory_vault::{EMBEDDING_MODEL, EMBEDDING_PROVIDER};
 use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use tokio::sync::RwLock;
+
+const SEMANTIC_SEARCH_TIMEOUT_MS: u64 = 4000;
 
 #[derive(Debug, Clone)]
 pub struct MemoryManager {
@@ -16,6 +18,7 @@ pub struct MemoryManager {
     short_term_capacity: usize,
     vault_dir: PathBuf,
     vault: Arc<RwLock<Option<Arc<MemoryVaultService>>>>,
+    embedder_cache: Arc<OnceLock<Option<Arc<EmbedderService>>>>,
 }
 
 impl MemoryManager {
@@ -28,10 +31,13 @@ impl MemoryManager {
             short_term_capacity: short_term_size.max(1),
             vault_dir,
             vault: Arc::new(RwLock::new(None)),
+            embedder_cache: Arc::new(OnceLock::new()),
         }
     }
 
     pub async fn init(&self) {
+        // Pre-warm embedder cache so the first search doesn't pay Keychain init cost.
+        let _ = self.resolve_gemini_embedder();
         if let Ok(vault) = self.ensure_vault().await {
             vault.spawn_reembed_backfill();
         }
@@ -105,13 +111,13 @@ impl MemoryManager {
 
         vault
             .put(StoreMemoryInput {
-                id,
+                id: id.clone(),
                 workspace_id: workspace_id.to_string(),
-                content,
-                tags,
-                source,
-                sensitivity,
-                metadata,
+                content: content.clone(),
+                tags: tags.clone(),
+                source: source.clone(),
+                sensitivity: sensitivity.clone(),
+                metadata: metadata.clone(),
                 created_at,
                 embedding: None,
                 embedding_model: Some(EMBEDDING_MODEL.to_string()),
@@ -121,6 +127,37 @@ impl MemoryManager {
             })
             .await
             .map_err(MemoryError::Other)?;
+
+        // Embed in the background so the write path is non-blocking. The upsert in put()
+        // uses INSERT OR REPLACE so the second call simply attaches the embedding.
+        if let Ok(Some(embedder)) = self.resolve_gemini_embedder() {
+            let vault_bg = vault.clone();
+            let workspace_id = workspace_id.to_string();
+            tokio::spawn(async move {
+                if let Ok(vec) = embedder
+                    .embed_text_with_task(&content, EmbeddingTaskType::RetrievalDocument)
+                    .await
+                {
+                    let _ = vault_bg
+                        .put(StoreMemoryInput {
+                            id,
+                            workspace_id,
+                            content,
+                            tags,
+                            source,
+                            sensitivity,
+                            metadata,
+                            created_at,
+                            embedding: Some(vec),
+                            embedding_model: Some(EMBEDDING_MODEL.to_string()),
+                            embedding_provider: Some(EMBEDDING_PROVIDER.to_string()),
+                            embedding_dim: Some(crate::services::memory_vault::EMBEDDING_DIM),
+                            additional_embeddings: Vec::new(),
+                        })
+                        .await;
+                }
+            });
+        }
 
         Ok(())
     }
@@ -254,12 +291,15 @@ impl MemoryManager {
             }
         };
 
-        let query_embedding = match embedder
-            .embed_text_with_task(query, EmbeddingTaskType::RetrievalQuery)
-            .await
+        let embed_future = embedder.embed_text_with_task(query, EmbeddingTaskType::RetrievalQuery);
+        let query_embedding = match tokio::time::timeout(
+            std::time::Duration::from_millis(SEMANTIC_SEARCH_TIMEOUT_MS),
+            embed_future,
+        )
+        .await
         {
-            Ok(v) => v,
-            Err(e) => {
+            Ok(Ok(v)) => v,
+            Ok(Err(e)) => {
                 let entries = self
                     .query_workspace_memory(workspace_id, query, limit)
                     .await?;
@@ -267,6 +307,17 @@ impl MemoryManager {
                     entries,
                     mode: SemanticRetrievalMode::LexicalFallback,
                     reason: Some(format!("Gemini embedding request failed: {}", e)),
+                    confidential_entry_ids: Vec::new(),
+                });
+            }
+            Err(_elapsed) => {
+                let entries = self
+                    .query_workspace_memory(workspace_id, query, limit)
+                    .await?;
+                return Ok(SemanticSearchResult {
+                    entries,
+                    mode: SemanticRetrievalMode::LexicalFallback,
+                    reason: Some("Semantic search timed out; using lexical fallback".to_string()),
                     confidential_entry_ids: Vec::new(),
                 });
             }
@@ -544,37 +595,30 @@ impl MemoryManager {
         })
     }
 
-    fn resolve_gemini_embedder(
-        &self,
-    ) -> Result<Option<crate::services::embedder::EmbedderService>, String> {
-        let settings = crate::services::settings::SettingsManager::new();
-        let provider_raw = settings.get_embedder_provider().to_string();
-        let provider = match provider_raw.trim().to_lowercase().as_str() {
-            "g" | "google" | "gemini" => EMBEDDING_PROVIDER.to_string(),
-            _ => {
-                return Err(format!(
-                    "Unsupported embedding provider '{}' for STEP 3; Gemini is required",
-                    provider_raw
-                ));
+    fn resolve_gemini_embedder(&self) -> Result<Option<Arc<EmbedderService>>, String> {
+        let cached = self.embedder_cache.get_or_init(|| {
+            let settings = crate::services::settings::SettingsManager::new();
+            let provider_raw = settings.get_embedder_provider().to_string();
+            let provider = match provider_raw.trim().to_lowercase().as_str() {
+                "g" | "google" | "gemini" => EMBEDDING_PROVIDER.to_string(),
+                _ => return None,
+            };
+            let keychain = crate::ai::keychain::KeychainManager::new();
+            let api_key = keychain
+                .get_key(EMBEDDING_PROVIDER)
+                .or_else(|_| keychain.get_key(&provider_raw))
+                .unwrap_or_default()
+                .unwrap_or_default();
+            if api_key.trim().is_empty() {
+                return None;
             }
-        };
-
-        let keychain = crate::ai::keychain::KeychainManager::new();
-        let api_key = keychain
-            .get_key(EMBEDDING_PROVIDER)
-            .or_else(|_| keychain.get_key(&provider_raw))
-            .unwrap_or_default()
-            .unwrap_or_default();
-
-        if api_key.trim().is_empty() {
-            return Ok(None);
-        }
-
-        Ok(Some(crate::services::embedder::EmbedderService::new(
-            provider,
-            api_key,
-            Some(EMBEDDING_MODEL.to_string()),
-        )))
+            Some(Arc::new(EmbedderService::new(
+                provider,
+                api_key,
+                Some(EMBEDDING_MODEL.to_string()),
+            )))
+        });
+        Ok(cached.clone())
     }
 }
 
