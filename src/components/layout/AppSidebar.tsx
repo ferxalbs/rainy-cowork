@@ -4,8 +4,6 @@ import {
   FolderOpen,
   Download,
   FileCode,
-  Sparkles,
-  Palette,
   ChevronLeft,
   ChevronRight,
   MessageSquare,
@@ -77,11 +75,11 @@ const NavItem = ({
       isIconOnly={isCollapsed}
       className={`transition-all duration-200 group relative ${
         isCollapsed
-          ? "w-10 h-10 justify-center mx-auto rounded-xl mb-1"
-          : "w-full justify-start gap-3 h-10 px-3"
+          ? "w-9 h-9 justify-center mx-auto rounded-xl"
+          : "w-full justify-start gap-3 h-9 px-3 rounded-xl"
       } ${
         isActive
-          ? "bg-primary/10 text-primary font-medium shadow-sm"
+          ? "bg-primary/10 text-primary font-medium shadow-none"
           : "text-muted-foreground hover:text-foreground hover:bg-white/10"
       }`}
       onPress={() => onNavigate?.(id)}
@@ -91,7 +89,7 @@ const NavItem = ({
       />
       {!isCollapsed && (
         <>
-          <span className="truncate flex-1 text-left">{label}</span>
+          <span className="truncate flex-1 text-left text-[13px]">{label}</span>
           {badge !== undefined && badge > 0 && (
             <span
               className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
@@ -215,7 +213,7 @@ export function AppSidebar({
         {/* Sidebar Header / Logo */}
         <div
           data-tauri-drag-region
-          className={`mt-8 px-4 pb-4 flex items-center shrink-0 overflow-hidden ${isCollapsed ? "justify-center" : "gap-3"}`}
+          className={`mt-6 px-4 pb-3 flex items-center shrink-0 overflow-hidden ${isCollapsed ? "justify-center" : "gap-3"}`}
         >
           <div
             className="size-8 bg-foreground shrink-0"
@@ -242,7 +240,7 @@ export function AppSidebar({
           )}
         </div>
 
-        <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 space-y-6 scrollbar-hide">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-2.5 space-y-5 scrollbar-hide">
           {/* Folders Section */}
           <div className="space-y-1">
             {!isCollapsed && (
@@ -275,11 +273,11 @@ export function AppSidebar({
                       isIconOnly={isCollapsed}
                       className={`transition-all duration-200 group relative ${
                         isCollapsed
-                          ? "w-10 h-10 justify-center mx-auto rounded-xl mb-1"
-                          : "w-full justify-start gap-3 h-10 px-3"
+                          ? "w-9 h-9 justify-center mx-auto rounded-xl"
+                          : "w-full justify-start gap-3 h-9 px-3 rounded-xl"
                       } ${
                         isActive
-                          ? "bg-primary/10 text-primary font-medium shadow-sm"
+                          ? "bg-primary/10 text-primary font-medium shadow-none"
                           : "text-muted-foreground hover:text-foreground hover:bg-white/10"
                       }`}
                       onPress={() => onFolderSelect?.(folder)}
@@ -290,7 +288,7 @@ export function AppSidebar({
                         <Icon className="size-4" />
                       </div>
                       {!isCollapsed && (
-                        <span className="truncate flex-1 text-left">
+                        <span className="truncate flex-1 text-left text-[13px]">
                           {folder.name}
                         </span>
                       )}
@@ -387,30 +385,8 @@ export function AppSidebar({
           </div>
         </div>
 
-        <div className="mt-auto p-3 space-y-2">
-          <Separator className="bg-border/30" />
-
-          {/* Settings Submenu */}
-          <div className="space-y-1 pt-2">
-            <NavItem
-              id="settings-models"
-              label="AI Provider"
-              icon={Sparkles}
-              isActive={activeSection === "settings-models"}
-              isCollapsed={isCollapsed}
-              onNavigate={onNavigate}
-            />
-            <NavItem
-              id="settings-appearance"
-              label="Appearance"
-              icon={Palette}
-              isActive={activeSection === "settings-appearance"}
-              isCollapsed={isCollapsed}
-              onNavigate={onNavigate}
-            />
-          </div>
-
-          <Separator className="bg-border/30" />
+        <div className="mt-auto p-2.5 space-y-1">
+          <Separator className="bg-border/20 mx-1" />
 
           {/* Update Check Button */}
           {(() => {
@@ -452,15 +428,15 @@ export function AppSidebar({
                 isDisabled={isBusy}
                 className={`transition-all duration-200 ${
                   isCollapsed
-                    ? "w-10 h-10 justify-center mx-auto rounded-xl"
-                    : "w-full justify-start gap-3 h-10 px-3"
+                    ? "w-9 h-9 justify-center mx-auto rounded-xl"
+                    : "w-full justify-start gap-3 h-9 px-3 rounded-xl"
                 } ${
                   isUpToDate
                     ? "text-green-500"
                     : isError
                       ? "text-red-400"
                       : isAvailable
-                        ? "text-primary bg-primary/10 font-medium"
+                        ? "text-primary bg-primary/10 font-medium shadow-none"
                         : "text-muted-foreground hover:text-foreground hover:bg-white/10"
                 }`}
                 onPress={handlePress}
@@ -469,7 +445,7 @@ export function AppSidebar({
                   className={`size-4 shrink-0 ${isBusy ? "animate-spin" : ""}`}
                 />
                 {!isCollapsed && (
-                  <span className="truncate flex-1 text-left text-xs">
+                  <span className="truncate flex-1 text-left text-[13px] font-medium tracking-tight">
                     {label}
                   </span>
                 )}
@@ -486,28 +462,31 @@ export function AppSidebar({
             );
           })()}
 
-          {/* User / Settings Footer */}
+          {/* User / Settings Footer - The "monstrosity" fix */}
           <div
-            className={`mt-2 flex items-center transition-all ${isCollapsed ? "flex-col gap-4 py-2" : "px-1 gap-3 py-2"}`}
+            className={`mt-1 flex items-center transition-all ${isCollapsed ? "flex-col gap-3 py-1" : "justify-between gap-1 px-1"}`}
           >
-            <Tooltip delay={0}>
-              <Button
-                variant="ghost"
-                size="sm"
-                isIconOnly
-                onPress={onSettingsClick}
-                className="text-muted-foreground hover:bg-white/10"
-              >
-                <Settings className="size-4" />
-              </Button>
-              <Tooltip.Content>Settings</Tooltip.Content>
-            </Tooltip>
+            <Button
+              variant="ghost"
+              size="sm"
+              isIconOnly={isCollapsed}
+              onPress={onSettingsClick}
+              className={`transition-all duration-200 ${
+                isCollapsed
+                  ? "w-9 h-9 justify-center mx-auto rounded-xl"
+                  : "flex-1 justify-start gap-3 h-9 px-3 rounded-xl"
+              } text-muted-foreground hover:text-foreground hover:bg-white/10`}
+            >
+              <Settings className="size-4 shrink-0" />
+              {!isCollapsed && <span className="truncate text-[13px] font-medium tracking-tight">Settings</span>}
+            </Button>
+            
             <Button
               variant="ghost"
               size="sm"
               isIconOnly
               onPress={onToggleCollapse}
-              className="text-muted-foreground hover:bg-white/10"
+              className="text-muted-foreground/40 hover:bg-white/10 h-8 w-8 rounded-lg shrink-0"
             >
               {isCollapsed ? (
                 <ChevronRight className="size-4" />

@@ -24,6 +24,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - `socket_client.rs` annotated with `@RESERVED` to document intentional HTTP-polling-first design while WS auth migration is pending. (`src-tauri`)
+- **Memory system performance optimizations** — reduced latency and resource usage across the RAG loop (`src-tauri`):
+  - `EmbedderService` is now cached in a `OnceLock` and pre-warmed during `MemoryManager::init()`, eliminating repeated Keychain + settings initialization on every search.
+  - `touch_access` updates are now batched into a single transaction via `touch_access_batch()` in the vault repository, replacing N individual write queries per search result.
+  - New memory entries are stored immediately (non-blocking write path), then embedded asynchronously via a background `tokio::spawn` task that upserts the embedding vector once available.
+  - Semantic search now enforces a 4-second timeout on the Gemini embedding API call; timeouts fall back to lexical search with a descriptive reason logged in `SemanticSearchResult`.
+  - Re-embedding backfill (`run_reembed_backfill`) now fetches unembedded IDs in pages of 500 using `LIMIT/OFFSET`, preventing unbounded memory usage on large vaults.
 
 ### Changed
 
@@ -35,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **AgentBuilder**: Refined "Save Draft" button, Max Tokens input, and slider thumbs with `bg-white`, `shadow-lg`, and hover scale effects.
   - **AgentStorePage**: Polished "New Agent", "Refresh List", header actions, and agent list item hover states.
   - **ApiKeysTab**: Updated "Verify", "Lock in Vault", and key action buttons.
+  - **Sidebar**: Redesigned for a more slender profile (`68px` collapsed width), reduced top margins (`mt-6`) for traffic light alignment, and downsized buttons/icons (`size-9`/`size-7`) for a more elegant aesthetic.
   - **Popovers**: Refined background opacities (`bg-background/20-30`) and blurs in Workspace Selector and Reasoning Effort dropdowns to avoid solid black appearance.
 
 - Refactored `AgentChatPanel.tsx` for stability, fixing syntax errors and duplicate declarations.
