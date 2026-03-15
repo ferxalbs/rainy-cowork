@@ -110,3 +110,5 @@ jobs:
 
       - name: Tauri Build
         run: pnpm run tauri build ${{ matrix.args }}
+        env:
+          LIBSQLITE3_SYS_USE_PKG_CONFIG: ${{ matrix.platform == 'ubuntu-22.04' && '1' || '' }}

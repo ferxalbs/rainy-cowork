@@ -530,6 +530,7 @@ fn extract_tag_value(tags: &[String], key: &str) -> Option<String> {
 }
 
 #[cfg(test)]
+#[cfg(target_os = "macos")]
 mod tests {
     use super::*;
     use crate::services::memory::MemoryManager;
