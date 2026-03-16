@@ -91,7 +91,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.5.96] - 2026-03-11 - THE FORGE (AGENT FACTORY PRODUCTION)
 
-
 ### Added
 
 - Added THE FORGE foundation command surface and services for local workflow-to-agent generation:
@@ -1789,7 +1788,7 @@ All passed with no new Rust warnings in these runs.
 
 ### Notes
 
-- xAI API uses OpenAI-compatible endpoints at https://api.x.ai/v1
+- xAI API uses OpenAI-compatible endpoints at <https://api.x.ai/v1>
 - Grok-3 is the default model with 131K context window
 - Streaming support via Server-Sent Events (SSE)
 - Embeddings not supported by xAI (returns UnsupportedCapability error)
