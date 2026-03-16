@@ -38,7 +38,7 @@ impl KeychainManager {
 
         #[cfg(all(not(test), target_os = "macos"))]
         {
-            use security_framework::os::macos::passwords::{
+            use security_framework::passwords::{
                 delete_generic_password, set_generic_password,
             };
 
@@ -70,7 +70,7 @@ impl KeychainManager {
 
         #[cfg(all(not(test), target_os = "macos"))]
         {
-            use security_framework::os::macos::passwords::get_generic_password;
+            use security_framework::passwords::get_generic_password;
 
             match get_generic_password(SERVICE_NAME, &account) {
                 Ok(bytes) => {
@@ -114,7 +114,7 @@ impl KeychainManager {
 
         #[cfg(all(not(test), target_os = "macos"))]
         {
-            use security_framework::os::macos::passwords::delete_generic_password;
+            use security_framework::passwords::delete_generic_password;
 
             match delete_generic_password(SERVICE_NAME, &account) {
                 Ok(_) => Ok(()),
