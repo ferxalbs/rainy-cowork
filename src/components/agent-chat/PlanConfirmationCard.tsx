@@ -32,7 +32,9 @@ const methodColors: Record<string, string> = {
   default: "text-gray-400 bg-gray-400/10 border-gray-400/20",
 };
 
-export function PlanConfirmationCard({
+// ⚡ Bolt Optimization: Wrapped child component in React.memo() to prevent
+// unnecessary re-renders in the main chat loop during token updates.
+export const PlanConfirmationCard = React.memo(function PlanConfirmationCard({
   toolCalls,
   onExecute,
   isExecuting,
@@ -88,4 +90,4 @@ export function PlanConfirmationCard({
       </div>
     </Card>
   );
-}
+});
