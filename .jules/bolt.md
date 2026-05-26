@@ -1,0 +1,3 @@
+## 2026-05-26 - [Streaming Chat Component Rendering Optimization]
+**Learning:** In streaming chat interfaces (like `MessageBubble.tsx`), token streaming causes extreme render frequency. Child components with moderate complexity (`SupervisorRail`, `TraceAccordion`, `PlanCard`, `ArtifactBadgeRow`, `PlanConfirmationCard`) must be wrapped in `React.memo()` to avoid deep re-renders on every token. Crucially, inline fallback arrays (like `prop || []`) passed to these components defeat `React.memo()` entirely because they create referential inequality on every render.
+**Action:** Always extract static fallback arrays (e.g. `const EMPTY_ARRAY: never[] = []`) outside the component body, and ensure callbacks passed to memoized children are wrapped in `React.useCallback`.

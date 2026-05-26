@@ -27,7 +27,9 @@ interface ArtifactBadgeRowProps {
   artifacts: ChatArtifact[];
 }
 
-export function ArtifactBadgeRow({ artifacts }: ArtifactBadgeRowProps) {
+import React from "react";
+
+export const ArtifactBadgeRow = React.memo(function ArtifactBadgeRow({ artifacts }: ArtifactBadgeRowProps) {
   const [openingPath, setOpeningPath] = useState<string | null>(null);
   const [errorByPath, setErrorByPath] = useState<Record<string, string>>({});
 
@@ -128,4 +130,4 @@ export function ArtifactBadgeRow({ artifacts }: ArtifactBadgeRowProps) {
       })}
     </div>
   );
-}
+});
