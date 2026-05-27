@@ -1,0 +1,4 @@
+## 2025-02-12 - Prevent Re-renders in Streaming Agent Message List
+
+**Learning:** Streaming message updates (e.g., token-by-token text generation) can cause catastrophic performance degradation if large, nested child components inside the `MessageBubble` re-render on every token update. Even if child components are internally simple, passing unmemoized fallback properties like `[]` inline (e.g., `trace={message.trace || []}`) or inline arrow functions defeats `React.memo()`, forcing React to reconcile the entire tree on every stream tick.
+**Action:** Extract empty fallback arrays as stable constants (`const EMPTY_ARRAY: never[] = [];`) outside the component to preserve referential equality. Ensure all expensive subcomponents (`PlanCard`, `TraceAccordion`, `SupervisorRail`, `ArtifactBadgeRow`) are wrapped in `React.memo()` and their parent component (`MessageBubbleComponent`) consistently memoizes functions via `useCallback` passed as props.
