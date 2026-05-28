@@ -1,0 +1,3 @@
+## 2024-05-28 - React Memoization and Referential Equality in Streaming UIs
+**Learning:** In highly dynamic React components like a streaming chat interface (`MessageBubble`), wrapping child components in `React.memo` is only effective if all passed props maintain referential equality. Passing inline arrays (e.g., `trace || []`) or inline functions creates new object references on every render, defeating the memoization and causing expensive re-renders across the entire component tree.
+**Action:** Extract default fallback objects and arrays to stable global constants outside the component (e.g., `const EMPTY_ARRAY: never[] = [];`) and use `React.useCallback` for event handlers passed as props to memoized child components.
