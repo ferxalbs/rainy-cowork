@@ -1,4 +1,5 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useCallback } from "react";
+
 import {
   Play,
   Ban,
@@ -30,6 +31,9 @@ import {
 
 import { ThoughtDisplay } from "./ThoughtDisplay";
 import type { SpecialistRunState } from "../../types/agent";
+
+// ⚡ Bolt: Stable reference for fallback props to prevent unnecessary re-renders in memoized children during streaming updates
+const EMPTY_ARRAY: never[] = [];
 
 // Map step types to icons
 const stepIcons: Record<string, React.ElementType> = {
@@ -72,23 +76,25 @@ function MessageBubbleComponent({
   const isUser = message.type === "user";
   const isSystem = message.type === "system";
 
-  const handleExecuteToolCalls = () => {
+  // ⚡ Bolt: Memoize callback to prevent prop regeneration on every token during streaming
+  const handleExecuteToolCalls = useCallback(() => {
     if (message.toolCalls && onExecuteToolCalls && workspaceId) {
       onExecuteToolCalls(message.id, message.toolCalls, workspaceId);
     }
-  };
+  }, [message.toolCalls, onExecuteToolCalls, workspaceId, message.id]);
 
-  const handleCopy = async () => {
+  // ⚡ Bolt: Memoize callback to prevent prop regeneration on every token during streaming
+  const handleCopy = useCallback(async () => {
     if (!message.content) return;
     try {
       await navigator.clipboard.writeText(message.content);
     } catch (error) {
       console.error("Failed to copy message", error);
     }
-  };
+  }, [message.content]);
 
   const traceStats = useMemo(() => {
-    const trace = message.trace || [];
+    const trace = message.trace || EMPTY_ARRAY;
     let toolCalls = 0;
     let retries = 0;
     let errors = 0;
@@ -275,7 +281,7 @@ function MessageBubbleComponent({
 
         {!isUser && (message.trace?.length || message.isLoading) ? (
           <TraceAccordion
-            trace={message.trace || []}
+            trace={message.trace || EMPTY_ARRAY}
             runState={message.runState}
             stats={traceStats}
           />
@@ -290,8 +296,8 @@ function MessageBubbleComponent({
             (message.specialists && message.specialists.length > 0)) && (
             <SupervisorRail
               summary={message.supervisorPlan?.summary}
-              steps={message.supervisorPlan?.steps || []}
-              specialists={message.specialists || []}
+              steps={message.supervisorPlan?.steps || EMPTY_ARRAY}
+              specialists={message.specialists || EMPTY_ARRAY}
             />
           )}
 
@@ -368,7 +374,7 @@ export const MessageBubble = React.memo(
 // Re-export with a name hint for the parent to avoid confusion
 export { MessageBubble as MemoizedMessageBubble };
 
-function SupervisorRail({
+const SupervisorRail = React.memo(function SupervisorRail({
   summary,
   steps,
   specialists,
@@ -481,9 +487,9 @@ function SupervisorRail({
       )}
     </div>
   );
-}
+});
 
-function ExternalSessionRail({
+const ExternalSessionRail = React.memo(function ExternalSessionRail({
   sessions,
 }: {
   sessions: ExternalAgentSession[];
@@ -624,9 +630,9 @@ function ExternalSessionRail({
       </div>
     </div>
   );
-}
+});
 
-function TraceAccordion({
+const TraceAccordion = React.memo(function TraceAccordion({
   trace,
   runState,
   stats,
@@ -727,9 +733,9 @@ function TraceAccordion({
       </div>
     </details>
   );
-}
+});
 
-function PlanCard({
+const PlanCard = React.memo(function PlanCard({
   plan,
   onExecute,
   isExecuting,
@@ -789,7 +795,7 @@ function PlanCard({
       </div>
     </Card>
   );
-}
+});
 
 const AIRLOCK_BADGE_CONFIG: Record<number, { label: string; className: string }> = {
   0: { label: "L0 Safe",      className: "border-emerald-500/30 text-emerald-500 bg-emerald-500/10" },
