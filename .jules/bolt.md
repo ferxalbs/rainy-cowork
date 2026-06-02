@@ -1,0 +1,3 @@
+## 2024-06-02 - Avoid inline empty arrays for fallback props in streaming UI
+**Learning:** In React components that receive frequent updates (like streaming chat interfaces where tokens update rapidly), using inline empty arrays as fallbacks (e.g., `prop || []`) causes referential inequality on every render. This completely defeats `React.memo()` optimizations on child components, forcing complete teardowns and rebuilds of complex ASTs or component trees unnecessarily.
+**Action:** Extract fallback empty arrays as stable global constants (e.g., `const EMPTY_ARRAY: never[] = [];`) outside the component to preserve referential equality and allow memoization to work correctly.
