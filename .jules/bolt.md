@@ -1,0 +1,3 @@
+## 2024-06-05 - [Memoizing Streaming Chat Interfaces]
+**Learning:** In highly dynamic chat interfaces like `MessageBubble`, deeply nested child components (`SupervisorRail`, `TraceAccordion`, `PlanCard`) will unecessarily re-render on every single token stream update if they aren't wrapped in `React.memo()`. Furthermore, passing inline arrays (like `|| []`) or inline arrow functions completely defeats `React.memo` by breaking referential equality on every frame.
+**Action:** Always extract fallback arrays to a stable global constant (`const EMPTY_ARRAY = []`), wrap callback props in `React.useCallback`, and wrap complex child components in `React.memo()` in streaming UI components to preserve 60fps rendering.
