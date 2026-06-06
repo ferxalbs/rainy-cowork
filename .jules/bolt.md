@@ -1,0 +1,3 @@
+## 2026-06-06 - [React.memo and Referential Equality]
+**Learning:** In React streaming interfaces, when using `React.memo()` to prevent expensive re-renders in list items (like chat components), inline fallback default arrays (e.g., `props.items || []`) generate a new memory reference on every render, completely defeating the memoization. The parent component's re-render will force the child to re-render despite `React.memo`.
+**Action:** Always extract static fallback arrays to stable constants outside the component (e.g., `const EMPTY_ARRAY: never[] = []`) and pass that stable reference to preserve memoization and avoid wasted renders.
