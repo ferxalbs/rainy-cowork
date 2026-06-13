@@ -32,6 +32,10 @@ import { ThoughtDisplay } from "./ThoughtDisplay";
 import type { SpecialistRunState } from "../../types/agent";
 
 // Map step types to icons
+const EMPTY_TRACE: NonNullable<AgentMessage["trace"]> = [];
+const EMPTY_STEPS: string[] = [];
+const EMPTY_SPECIALISTS: SpecialistRunState[] = [];
+
 const stepIcons: Record<string, React.ElementType> = {
   createFile: FileCode,
   modifyFile: FileCode,
@@ -72,23 +76,31 @@ function MessageBubbleComponent({
   const isUser = message.type === "user";
   const isSystem = message.type === "system";
 
-  const handleExecuteToolCalls = () => {
+  const handleRetryRun = React.useCallback(() => {
+    onRetryRun?.(message.id);
+  }, [onRetryRun, message.id]);
+
+  const handleStopRun = React.useCallback(() => {
+    onStopRun?.(message.id);
+  }, [onStopRun, message.id]);
+
+  const handleExecuteToolCalls = React.useCallback(() => {
     if (message.toolCalls && onExecuteToolCalls && workspaceId) {
       onExecuteToolCalls(message.id, message.toolCalls, workspaceId);
     }
-  };
+  }, [message.toolCalls, message.id, onExecuteToolCalls, workspaceId]);
 
-  const handleCopy = async () => {
+  const handleCopy = React.useCallback(async () => {
     if (!message.content) return;
     try {
       await navigator.clipboard.writeText(message.content);
     } catch (error) {
       console.error("Failed to copy message", error);
     }
-  };
+  }, [message.content]);
 
   const traceStats = useMemo(() => {
-    const trace = message.trace || [];
+    const trace = message.trace || EMPTY_TRACE;
     let toolCalls = 0;
     let retries = 0;
     let errors = 0;
@@ -253,7 +265,7 @@ function MessageBubbleComponent({
               size="sm"
               variant="ghost"
               className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
-              onClick={() => onRetryRun?.(message.id)}
+              onClick={handleRetryRun}
               disabled={!message.requestContext?.prompt || message.isLoading}
             >
               <RotateCcw className="size-3.5" />
@@ -264,7 +276,7 @@ function MessageBubbleComponent({
                 size="sm"
                 variant="ghost"
                 className="h-7 px-2 text-xs text-red-500 hover:text-red-400"
-                onClick={() => onStopRun?.(message.id)}
+                onClick={handleStopRun}
               >
                 <Square className="size-3.5" />
                 Stop
@@ -275,7 +287,7 @@ function MessageBubbleComponent({
 
         {!isUser && (message.trace?.length || message.isLoading) ? (
           <TraceAccordion
-            trace={message.trace || []}
+            trace={message.trace || EMPTY_TRACE}
             runState={message.runState}
             stats={traceStats}
           />
@@ -290,8 +302,8 @@ function MessageBubbleComponent({
             (message.specialists && message.specialists.length > 0)) && (
             <SupervisorRail
               summary={message.supervisorPlan?.summary}
-              steps={message.supervisorPlan?.steps || []}
-              specialists={message.specialists || []}
+              steps={message.supervisorPlan?.steps || EMPTY_STEPS}
+              specialists={message.specialists || EMPTY_SPECIALISTS}
             />
           )}
 
@@ -368,7 +380,7 @@ export const MessageBubble = React.memo(
 // Re-export with a name hint for the parent to avoid confusion
 export { MessageBubble as MemoizedMessageBubble };
 
-function SupervisorRail({
+const SupervisorRail = React.memo(function SupervisorRail({
   summary,
   steps,
   specialists,
@@ -481,9 +493,9 @@ function SupervisorRail({
       )}
     </div>
   );
-}
+});
 
-function ExternalSessionRail({
+const ExternalSessionRail = React.memo(function ExternalSessionRail({
   sessions,
 }: {
   sessions: ExternalAgentSession[];
@@ -624,9 +636,9 @@ function ExternalSessionRail({
       </div>
     </div>
   );
-}
+});
 
-function TraceAccordion({
+const TraceAccordion = React.memo(function TraceAccordion({
   trace,
   runState,
   stats,
@@ -652,19 +664,25 @@ function TraceAccordion({
           ? "text-emerald-500"
           : "text-cyan-500";
 
-  const visibleTrace = isOpen ? trace.slice(0, visibleCount) : [];
+  const handleToggle = React.useCallback((event: React.SyntheticEvent<HTMLDetailsElement>) => {
+    const nextOpen = event.currentTarget.open;
+    setIsOpen(nextOpen);
+    if (!nextOpen) {
+      setVisibleCount(40);
+    }
+  }, []);
+
+  const visibleTrace = isOpen ? trace.slice(0, visibleCount) : EMPTY_TRACE;
   const hasHiddenTrace = visibleCount < trace.length;
+
+  const handleShowMore = React.useCallback(() => {
+    setVisibleCount((count) => Math.min(trace.length, count + 40));
+  }, [trace.length]);
 
   return (
     <details
       className="w-full rounded-xl border border-border/30 bg-background/40 px-3 py-2"
-      onToggle={(event) => {
-        const nextOpen = (event.currentTarget as HTMLDetailsElement).open;
-        setIsOpen(nextOpen);
-        if (!nextOpen) {
-          setVisibleCount(40);
-        }
-      }}
+      onToggle={handleToggle}
     >
       <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-xs text-muted-foreground">
         <span className="flex items-center gap-2">
@@ -716,7 +734,7 @@ function TraceAccordion({
                   size="sm"
                   variant="ghost"
                   className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
-                  onClick={() => setVisibleCount((count) => Math.min(trace.length, count + 40))}
+                  onClick={handleShowMore}
                 >
                   Show {Math.min(40, trace.length - visibleCount)} more
                 </Button>
@@ -727,9 +745,9 @@ function TraceAccordion({
       </div>
     </details>
   );
-}
+});
 
-function PlanCard({
+const PlanCard = React.memo(function PlanCard({
   plan,
   onExecute,
   isExecuting,
@@ -738,6 +756,9 @@ function PlanCard({
   onExecute?: (id: string) => void;
   isExecuting?: boolean;
 }) {
+  const handleExecute = React.useCallback(() => {
+    onExecute?.(plan.id);
+  }, [onExecute, plan.id]);
   return (
     <Card className="w-full max-w-md md:max-w-lg lg:max-w-xl p-4 space-y-4 border-l-4 border-l-purple-500 bg-purple-50/50 dark:bg-purple-900/10">
       <div className="flex items-center justify-between">
@@ -780,7 +801,7 @@ function PlanCard({
         <Button
           className="flex-1 bg-purple-600 hover:bg-purple-700 text-white shadow-lg shadow-purple-500/20"
           size="sm"
-          onClick={() => onExecute?.(plan.id)}
+          onClick={handleExecute}
           disabled={isExecuting}
         >
           <Play className="size-3.5" />
@@ -789,7 +810,7 @@ function PlanCard({
       </div>
     </Card>
   );
-}
+});
 
 const AIRLOCK_BADGE_CONFIG: Record<number, { label: string; className: string }> = {
   0: { label: "L0 Safe",      className: "border-emerald-500/30 text-emerald-500 bg-emerald-500/10" },
