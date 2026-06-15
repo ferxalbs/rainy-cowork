@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useCallback } from "react";
 import {
   Play,
   Ban,
@@ -32,6 +32,9 @@ import { ThoughtDisplay } from "./ThoughtDisplay";
 import type { SpecialistRunState } from "../../types/agent";
 
 // Map step types to icons
+// ⚡ Bolt Performance Optimization: Stable reference for empty arrays to preserve React.memo referential equality
+const EMPTY_ARRAY: never[] = [];
+
 const stepIcons: Record<string, React.ElementType> = {
   createFile: FileCode,
   modifyFile: FileCode,
@@ -72,20 +75,29 @@ function MessageBubbleComponent({
   const isUser = message.type === "user";
   const isSystem = message.type === "system";
 
-  const handleExecuteToolCalls = () => {
+  // ⚡ Bolt Performance Optimization: Memoize handlers passed to child components to prevent re-renders
+  const handleExecuteToolCalls = useCallback(() => {
     if (message.toolCalls && onExecuteToolCalls && workspaceId) {
       onExecuteToolCalls(message.id, message.toolCalls, workspaceId);
     }
-  };
+  }, [message.toolCalls, onExecuteToolCalls, workspaceId, message.id]);
 
-  const handleCopy = async () => {
+  const handleCopy = useCallback(async () => {
     if (!message.content) return;
     try {
       await navigator.clipboard.writeText(message.content);
     } catch (error) {
       console.error("Failed to copy message", error);
     }
-  };
+  }, [message.content]);
+
+  const handleRetryRun = useCallback(() => {
+    onRetryRun?.(message.id);
+  }, [onRetryRun, message.id]);
+
+  const handleStopRun = useCallback(() => {
+    onStopRun?.(message.id);
+  }, [onStopRun, message.id]);
 
   const traceStats = useMemo(() => {
     const trace = message.trace || [];
@@ -253,7 +265,7 @@ function MessageBubbleComponent({
               size="sm"
               variant="ghost"
               className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
-              onClick={() => onRetryRun?.(message.id)}
+              onClick={handleRetryRun}
               disabled={!message.requestContext?.prompt || message.isLoading}
             >
               <RotateCcw className="size-3.5" />
@@ -264,7 +276,7 @@ function MessageBubbleComponent({
                 size="sm"
                 variant="ghost"
                 className="h-7 px-2 text-xs text-red-500 hover:text-red-400"
-                onClick={() => onStopRun?.(message.id)}
+                onClick={handleStopRun}
               >
                 <Square className="size-3.5" />
                 Stop
@@ -275,7 +287,7 @@ function MessageBubbleComponent({
 
         {!isUser && (message.trace?.length || message.isLoading) ? (
           <TraceAccordion
-            trace={message.trace || []}
+            trace={message.trace || EMPTY_ARRAY}
             runState={message.runState}
             stats={traceStats}
           />
@@ -290,8 +302,8 @@ function MessageBubbleComponent({
             (message.specialists && message.specialists.length > 0)) && (
             <SupervisorRail
               summary={message.supervisorPlan?.summary}
-              steps={message.supervisorPlan?.steps || []}
-              specialists={message.specialists || []}
+              steps={message.supervisorPlan?.steps || EMPTY_ARRAY}
+              specialists={message.specialists || EMPTY_ARRAY}
             />
           )}
 
@@ -368,7 +380,8 @@ export const MessageBubble = React.memo(
 // Re-export with a name hint for the parent to avoid confusion
 export { MessageBubble as MemoizedMessageBubble };
 
-function SupervisorRail({
+// ⚡ Bolt Performance Optimization: Memoize complex child component to prevent unnecessary re-renders during token streaming
+const SupervisorRail = React.memo(function SupervisorRail({
   summary,
   steps,
   specialists,
@@ -481,9 +494,10 @@ function SupervisorRail({
       )}
     </div>
   );
-}
+});
 
-function ExternalSessionRail({
+// ⚡ Bolt Performance Optimization: Memoize complex child component to prevent unnecessary re-renders during token streaming
+const ExternalSessionRail = React.memo(function ExternalSessionRail({
   sessions,
 }: {
   sessions: ExternalAgentSession[];
@@ -624,9 +638,10 @@ function ExternalSessionRail({
       </div>
     </div>
   );
-}
+});
 
-function TraceAccordion({
+// ⚡ Bolt Performance Optimization: Memoize complex child component to prevent unnecessary re-renders during token streaming
+const TraceAccordion = React.memo(function TraceAccordion({
   trace,
   runState,
   stats,
@@ -727,9 +742,10 @@ function TraceAccordion({
       </div>
     </details>
   );
-}
+});
 
-function PlanCard({
+// ⚡ Bolt Performance Optimization: Memoize complex child component to prevent unnecessary re-renders during token streaming
+const PlanCard = React.memo(function PlanCard({
   plan,
   onExecute,
   isExecuting,
@@ -789,7 +805,7 @@ function PlanCard({
       </div>
     </Card>
   );
-}
+});
 
 const AIRLOCK_BADGE_CONFIG: Record<number, { label: string; className: string }> = {
   0: { label: "L0 Safe",      className: "border-emerald-500/30 text-emerald-500 bg-emerald-500/10" },
