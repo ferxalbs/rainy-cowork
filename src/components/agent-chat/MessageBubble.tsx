@@ -1,4 +1,6 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useCallback } from "react";
+
+const EMPTY_ARRAY: never[] = [];
 import {
   Play,
   Ban,
@@ -72,20 +74,28 @@ function MessageBubbleComponent({
   const isUser = message.type === "user";
   const isSystem = message.type === "system";
 
-  const handleExecuteToolCalls = () => {
+  const handleExecuteToolCalls = useCallback(() => {
     if (message.toolCalls && onExecuteToolCalls && workspaceId) {
       onExecuteToolCalls(message.id, message.toolCalls, workspaceId);
     }
-  };
+  }, [message.toolCalls, onExecuteToolCalls, workspaceId, message.id]);
 
-  const handleCopy = async () => {
+  const handleRetry = useCallback(() => {
+    onRetryRun?.(message.id);
+  }, [onRetryRun, message.id]);
+
+  const handleStop = useCallback(() => {
+    onStopRun?.(message.id);
+  }, [onStopRun, message.id]);
+
+  const handleCopy = useCallback(async () => {
     if (!message.content) return;
     try {
       await navigator.clipboard.writeText(message.content);
     } catch (error) {
       console.error("Failed to copy message", error);
     }
-  };
+  }, [message.content]);
 
   const traceStats = useMemo(() => {
     const trace = message.trace || [];
@@ -253,7 +263,7 @@ function MessageBubbleComponent({
               size="sm"
               variant="ghost"
               className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
-              onClick={() => onRetryRun?.(message.id)}
+              onClick={handleRetry}
               disabled={!message.requestContext?.prompt || message.isLoading}
             >
               <RotateCcw className="size-3.5" />
@@ -264,7 +274,7 @@ function MessageBubbleComponent({
                 size="sm"
                 variant="ghost"
                 className="h-7 px-2 text-xs text-red-500 hover:text-red-400"
-                onClick={() => onStopRun?.(message.id)}
+                onClick={handleStop}
               >
                 <Square className="size-3.5" />
                 Stop
@@ -275,7 +285,7 @@ function MessageBubbleComponent({
 
         {!isUser && (message.trace?.length || message.isLoading) ? (
           <TraceAccordion
-            trace={message.trace || []}
+            trace={message.trace || EMPTY_ARRAY}
             runState={message.runState}
             stats={traceStats}
           />
@@ -290,8 +300,8 @@ function MessageBubbleComponent({
             (message.specialists && message.specialists.length > 0)) && (
             <SupervisorRail
               summary={message.supervisorPlan?.summary}
-              steps={message.supervisorPlan?.steps || []}
-              specialists={message.specialists || []}
+              steps={message.supervisorPlan?.steps || EMPTY_ARRAY}
+              specialists={message.specialists || EMPTY_ARRAY}
             />
           )}
 
@@ -368,7 +378,7 @@ export const MessageBubble = React.memo(
 // Re-export with a name hint for the parent to avoid confusion
 export { MessageBubble as MemoizedMessageBubble };
 
-function SupervisorRail({
+const SupervisorRail = React.memo(function SupervisorRail({
   summary,
   steps,
   specialists,
@@ -481,9 +491,9 @@ function SupervisorRail({
       )}
     </div>
   );
-}
+});
 
-function ExternalSessionRail({
+const ExternalSessionRail = React.memo(function ExternalSessionRail({
   sessions,
 }: {
   sessions: ExternalAgentSession[];
@@ -624,9 +634,9 @@ function ExternalSessionRail({
       </div>
     </div>
   );
-}
+});
 
-function TraceAccordion({
+const TraceAccordion = React.memo(function TraceAccordion({
   trace,
   runState,
   stats,
@@ -727,9 +737,9 @@ function TraceAccordion({
       </div>
     </details>
   );
-}
+});
 
-function PlanCard({
+const PlanCard = React.memo(function PlanCard({
   plan,
   onExecute,
   isExecuting,
@@ -789,7 +799,7 @@ function PlanCard({
       </div>
     </Card>
   );
-}
+});
 
 const AIRLOCK_BADGE_CONFIG: Record<number, { label: string; className: string }> = {
   0: { label: "L0 Safe",      className: "border-emerald-500/30 text-emerald-500 bg-emerald-500/10" },

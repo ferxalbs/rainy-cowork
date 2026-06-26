@@ -1,0 +1,3 @@
+## 2024-05-24 - [Streaming Chat Re-render Bottleneck]
+**Learning:** In streaming chat interfaces, frequent token updates cause the entire message component to re-render. Passing inline fallback arrays (e.g., `trace || []`) to complex child components defeats React.memo(), triggering unnecessary re-renders of heavy UI elements (traces, plans, rails) on every single token chunk, which blocks the main thread.
+**Action:** Extract inline fallback arrays to stable top-level constants (e.g., `const EMPTY_ARRAY = []`), wrap all complex message child components in `React.memo()`, and wrap functional props in `useCallback` to ensure referential stability during high-frequency stream updates.
